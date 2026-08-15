@@ -1,0 +1,62 @@
+name: MathGraph RGRS eager x absence interaction
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  interaction:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: System info
+        run: |
+          uname -a
+          nproc
+          free -h
+
+      - name: Build focused tests
+        run: |
+          for t in cedar cslib init-prelude; do
+            ./lka.py build-test "$t"
+          done
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Build A0 pinned
+        run: ./lka.py build-checker sokonanoda
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Build A1 eagerness only
+        run: ./lka.py build-checker sokonanoda-eager-only
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Build A2 structural absence only
+        run: ./lka.py build-checker sokonanoda-irrel
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Build A3 eagerness plus absence core
+        run: ./lka.py build-checker sokonanoda-eager-absence-core
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Build A4 full latest
+        run: ./lka.py build-checker sokonanoda-latest
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Run all arms
+        run: |
+          for checker in sokonanoda sokonanoda-eager-only sokonanoda-irrel sokonanoda-eager-absence-core sokonanoda-latest; do
+            echo "===== $checker ====="
+            for t in cedar cslib init-prelude; do
+              ./lka.py run --checker "$checker" --test "$t"
+            done
+          done
+        shell: 'nix develop -c bash -euxo pipefail {0}'
