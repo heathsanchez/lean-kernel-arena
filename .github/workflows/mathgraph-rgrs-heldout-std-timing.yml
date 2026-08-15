@@ -1,0 +1,47 @@
+name: MathGraph RGRS held-out Std timing
+
+on:
+  push:
+    branches: [mathgraph-rgrs-applicability-probe]
+    paths:
+      - '.github/workflows/mathgraph-rgrs-heldout-std-timing.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mathgraph-rgrs-heldout-std-timing
+  cancel-in-progress: true
+
+jobs:
+  heldout-timing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build held-out Std export
+        run: ./lka.py build-test std
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Build pinned sokonanoda
+        run: ./lka.py build-checker sokonanoda
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Build latest sokonanoda
+        run: ./lka.py build-checker sokonanoda-latest
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Run pinned on held-out Std
+        run: ./lka.py run --checker sokonanoda --test std
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Run latest on held-out Std
+        run: ./lka.py run --checker sokonanoda-latest --test std
+        shell: 'nix develop -c bash -euxo pipefail {0}'
