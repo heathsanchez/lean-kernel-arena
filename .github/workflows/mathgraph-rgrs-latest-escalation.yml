@@ -1,0 +1,61 @@
+name: MathGraph RGRS latest escalation
+
+on:
+  push:
+    branches: [mathgraph-rgrs-latest-escalation]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mathgraph-rgrs-latest-escalation
+  cancel-in-progress: true
+
+jobs:
+  mathlib-and-semantics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: System info
+        run: |
+          uname -a
+          nproc
+          free -h
+
+      - name: Build tests
+        run: |
+          for t in mathlib bogus1 constlevels ctor-num-fields init init-prelude; do
+            ./lka.py build-test "$t"
+          done
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Build pinned sokonanoda
+        run: ./lka.py build-checker sokonanoda
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Build latest sokonanoda
+        run: ./lka.py build-checker sokonanoda-latest
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Run pinned Mathlib
+        run: ./lka.py run --checker sokonanoda --test mathlib
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Run latest Mathlib
+        run: ./lka.py run --checker sokonanoda-latest --test mathlib
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Run latest semantic battery
+        run: |
+          for t in bogus1 constlevels ctor-num-fields init init-prelude; do
+            ./lka.py run --checker sokonanoda-latest --test "$t"
+          done
+        shell: 'nix develop -c bash -euxo pipefail {0}'
