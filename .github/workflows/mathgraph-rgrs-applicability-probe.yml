@@ -1,0 +1,43 @@
+name: MathGraph RGRS applicability probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [mathgraph-rgrs-applicability-probe]
+    paths:
+      - 'experiments/export_structure_probe.py'
+      - '.github/workflows/mathgraph-rgrs-applicability-probe.yml'
+
+jobs:
+  static-structure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+      - name: Build comparison exports
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          for t in cedar cslib mathlib init-prelude; do
+            ./lka.py build-test "$t"
+          done
+      - name: Measure pre-outcome structure
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          python3 experiments/export_structure_probe.py --jsonl \
+            _build/tests/cedar.ndjson \
+            _build/tests/cslib.ndjson \
+            _build/tests/mathlib.ndjson \
+            _build/tests/init-prelude.ndjson | tee /tmp/rgrs-structure.jsonl
+      - name: Summary table
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          python3 - <<'PY'
+          import json
+          rows=[json.loads(x) for x in open('/tmp/rgrs-structure.jsonl')]
+          print('test\tabsent_rate\tapps/expr\tbinders/expr\texprs\tbytes')
+          for r in rows:
+              name=r['file'].split('/')[-1].replace('.ndjson','')
+              print(f"{name}\t{r['absent_binder_rate']:.6f}\t{r['apps_per_expr']:.6f}\t{r['binders_per_expr']:.6f}\t{r['exprs']}\t{r['bytes']}")
+          PY
