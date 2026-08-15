@@ -11,14 +11,14 @@ build: |
   from pathlib import Path
   p = Path('src/util.rs')
   s = p.read_text()
-  old = '''    pub fn alloc_expr(&mut self, e: Expr<'t>) -> ExprPtr<'t> {
+  old = """    pub fn alloc_expr(&mut self, e: Expr<'t>) -> ExprPtr<'t> {
         if let Some(r) = self.dag.exprs.get(&e) {
             return ExprPtr::local(r)
         }
         ExprPtr::local(self.dag.exprs.insert(self.arena, e))
     }
-'''
-  new = '''    pub fn alloc_expr(&mut self, e: Expr<'t>) -> ExprPtr<'t> {
+  """
+  new = """    pub fn alloc_expr(&mut self, e: Expr<'t>) -> ExprPtr<'t> {
         if let Some(r) = self.export_file.dag.exprs.get(&e) {
             return ExprPtr::global(r, r.num_loose_bvars())
         }
@@ -27,7 +27,7 @@ build: |
         }
         ExprPtr::local(self.dag.exprs.insert(self.arena, e))
     }
-'''
+  """
   assert old in s, 'pinned alloc_expr form not found'
   p.write_text(s.replace(old, new, 1))
   print('RGRS D1: enabled persistent global expression reuse')
