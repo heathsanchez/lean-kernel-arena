@@ -7,31 +7,8 @@ url: https://github.com/intgrah/sokonanoda
 ref: master
 rev: 0fab8874080e379a774a9a27f7538d8a1ddd786b
 build: |
-  python3 - <<'PY'
-  from pathlib import Path
-  p = Path('src/util.rs')
-  s = p.read_text()
-  old = """    pub fn alloc_expr(&mut self, e: Expr<'t>) -> ExprPtr<'t> {
-        if let Some(r) = self.dag.exprs.get(&e) {
-            return ExprPtr::local(r)
-        }
-        ExprPtr::local(self.dag.exprs.insert(self.arena, e))
-    }
-  """
-  new = """    pub fn alloc_expr(&mut self, e: Expr<'t>) -> ExprPtr<'t> {
-        if let Some(r) = self.export_file.dag.exprs.get(&e) {
-            return ExprPtr::global(r, r.num_loose_bvars())
-        }
-        if let Some(r) = self.dag.exprs.get(&e) {
-            return ExprPtr::local(r)
-        }
-        ExprPtr::local(self.dag.exprs.insert(self.arena, e))
-    }
-  """
-  assert old in s, 'pinned alloc_expr form not found'
-  p.write_text(s.replace(old, new, 1))
-  print('RGRS D1: enabled persistent global expression reuse')
-  PY
+  ROOT=$(cd ../../../.. && pwd)
+  python3 "$ROOT/scripts/rgrs_patch_global_expr.py" reuse
   cat > config.json <<__END__
    {
      "use_stdin": true,
@@ -42,7 +19,6 @@ build: |
      "num_threads": 4
    }
   __END__
-  ROOT=$(cd ../../../.. && pwd)
   "$ROOT/lka.py" build-test init-prelude
   RUSTFLAGS="-C target-cpu=native -Cprofile-generate=$PWD/pgo" cargo build --release
   target/release/sokonanoda config.json < "$ROOT/_build/tests/init-prelude.ndjson" >/dev/null
