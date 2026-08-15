@@ -1,0 +1,28 @@
+name: MathGraph RGRS perf structure screen
+
+on:
+  push:
+    branches: [mathgraph-rgrs-applicability-probe]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  structure-screen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and measure structure only
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          for t in perf/app-lam perf/args-before-unfold perf/beta-ladder perf/church-numerals perf/discarded-argument; do
+            ./lka.py build-test "$t"
+            f="_build/tests/${t#perf/}.ndjson"
+            python3 experiments/export_structure_probe.py --jsonl "$f"
+          done
