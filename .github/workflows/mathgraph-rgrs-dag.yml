@@ -1,10 +1,16 @@
 name: MathGraph RGRS DAG separator
 
 on:
+  push:
+    branches: [mathgraph-rgrs-dag]
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: mathgraph-rgrs-dag
+  cancel-in-progress: true
 
 jobs:
   rgrs-dag-separator:
