@@ -31,7 +31,10 @@ jobs:
           free -h
 
       - name: Build decisive Arena tests
-        run: ./lka.py build-test cedar cslib mathlib std grind-ring-5 init init-prelude
+        run: |
+          for t in cedar cslib mathlib std grind-ring-5 init init-prelude; do
+            ./lka.py build-test "$t"
+          done
         shell: 'nix develop -c bash -euxo pipefail {0}'
 
       - name: Build sokonanoda
@@ -43,11 +46,21 @@ jobs:
         shell: 'nix develop -c bash -euxo pipefail {0}'
 
       - name: Run sokonanoda focused set
-        run: ./lka.py run --checker sokonanoda --test cedar --test cslib --test mathlib --test std --test grind-ring-5 --test init --test init-prelude
+        run: |
+          for t in cedar cslib mathlib std grind-ring-5 init init-prelude; do
+            ./lka.py run --checker sokonanoda --test "$t"
+          done
         shell: 'nix develop -c bash -euxo pipefail {0}'
 
       - name: Run MathGraph A5 focused set
-        run: ./lka.py run --checker mathgraph-a5 --test cedar --test cslib --test mathlib --test std --test grind-ring-5 --test init --test init-prelude
+        run: |
+          for t in cedar cslib mathlib std grind-ring-5 init init-prelude; do
+            ./lka.py run --checker mathgraph-a5 --test "$t"
+          done
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Write combined results
+        run: ./lka.py write-results --out _build/a5-focused-results.json
         shell: 'nix develop -c bash -euxo pipefail {0}'
 
       - name: Build comparative site
@@ -61,5 +74,6 @@ jobs:
           name: mathgraph-a5-safety
           path: |
             _out
-            _build/results
+            _results
+            _build/a5-focused-results.json
           if-no-files-found: warn
