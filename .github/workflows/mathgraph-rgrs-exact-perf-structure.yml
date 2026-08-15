@@ -1,0 +1,32 @@
+name: MathGraph RGRS exact perf structure
+on:
+  workflow_dispatch:
+  push:
+    branches: [mathgraph-rgrs-applicability-v2]
+    paths:
+      - experiments/export_structure_probe_exact.py
+      - .github/workflows/mathgraph-rgrs-exact-perf-structure.yml
+jobs:
+  exact-structure:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build focused perf fixtures
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          for t in perf/app-lam perf/args-before-unfold perf/beta-ladder perf/church-numerals perf/discarded-argument; do
+            ./lka.py build-test "$t"
+          done
+      - name: Exact binder dependency
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          python3 experiments/export_structure_probe_exact.py \
+            _build/tests/perf/app-lam.ndjson \
+            _build/tests/perf/args-before-unfold.ndjson \
+            _build/tests/perf/beta-ladder.ndjson \
+            _build/tests/perf/church-numerals.ndjson \
+            _build/tests/perf/discarded-argument.ndjson
