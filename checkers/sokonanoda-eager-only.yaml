@@ -1,0 +1,44 @@
+description: |
+  RGRS causal arm A1: pinned sokonanoda with only the argument-value path made eager.
+url: https://github.com/intgrah/sokonanoda
+ref: master
+rev: 0fab8874080e379a774a9a27f7538d8a1ddd786b
+build: |
+  python3 - <<'PY'
+  from pathlib import Path
+  p = Path('src/infer.rs')
+  s = p.read_text()
+  lazy = '''    pub(crate) fn arg_value(&mut self, depth: u32, env: E<'t>, a: ExprPtr<'t>) -> V<'t> {
+          match self.ctx.read_expr_ref(a) {
+              Var { .. } | Sort { .. } | Const { .. } | NatLit { .. } | StringLit { .. } =>
+                  self.eval(depth, env, a),
+              _ => self.mk_thunk_hc(env, a),
+          }
+      }
+  '''
+  eager = '''    pub(crate) fn arg_value(&mut self, depth: u32, env: E<'t>, a: ExprPtr<'t>) -> V<'t> {
+          self.eval(depth, env, a)
+      }
+  '''
+  assert lazy in s, 'pinned lazy arg_value form not found'
+  p.write_text(s.replace(lazy, eager, 1))
+  print('RGRS A1: applied eagerness only')
+  PY
+  cat > config.json <<__END__
+   {
+     "use_stdin": true,
+     "nat_extension": true,
+     "string_extension": true,
+     "unpermitted_axiom_hard_error": false,
+     "unsafe_permit_all_axioms": true,
+     "num_threads": 4
+   }
+  __END__
+  ROOT=$(cd ../../../.. && pwd)
+  "$ROOT/lka.py" build-test init-prelude
+  RUSTFLAGS="-C target-cpu=native -Cprofile-generate=$PWD/pgo" cargo build --release
+  target/release/sokonanoda config.json < "$ROOT/_build/tests/init-prelude.ndjson" >/dev/null
+  llvm-profdata merge -o "$PWD/pgo/merged.profdata" "$PWD/pgo"
+  RUSTFLAGS="-C target-cpu=native -Cprofile-use=$PWD/pgo/merged.profdata" cargo build --release
+run: |
+  target/release/sokonanoda config.json < "$IN" || exit 1
