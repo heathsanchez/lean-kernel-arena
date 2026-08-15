@@ -1,0 +1,45 @@
+description: |
+  MathGraph A5 safety ablation: A6 with E0030 removed, retaining Lambda key_env capture.
+url: https://github.com/metalogiclabs/mathgraph-kernel
+ref: main
+rev: 07f7d884bdc1bbd0e6d161bf541908cdf9d14e2f
+build: |
+  git clone https://github.com/intgrah/sokonanoda.git upstream
+  cd upstream
+  git checkout 9b4ea12f4cd437d00b6bcd0e34743065c58dea08
+  python3 ../scripts/apply_a6.py
+  python3 - <<'PY'
+  from pathlib import Path
+  p = Path('src/eval.rs')
+  s = p.read_text()
+  old = """            Expr::Lambda { binder_name, binder_style, binder_type, body, .. } =>
+                  value::mk_lam(self.arena, binder_name, binder_style, binder_type, Closure::mk_eval(env, body)),
+  """
+  new = """            Expr::Lambda { binder_name, binder_style, binder_type, body, .. } =>
+                  {
+                  let ce = self.key_env(env, e);
+                  value::mk_lam(self.arena, binder_name, binder_style, binder_type, Closure::mk_eval(ce, body))
+              }
+  """
+  assert old in s, 'A6 lambda form not found'
+  p.write_text(s.replace(old, new, 1))
+  print('Reverted E0030; built A5')
+  PY
+  cat > config.json <<__END__
+   {
+     "use_stdin": true,
+     "nat_extension": true,
+     "string_extension": true,
+     "unpermitted_axiom_hard_error": false,
+     "unsafe_permit_all_axioms": true,
+     "num_threads": 4
+   }
+  __END__
+  ROOT=$(cd ../../../../.. && pwd)
+  "$ROOT/lka.py" build-test init-prelude
+  RUSTFLAGS="-C target-cpu=native -Cprofile-generate=$PWD/pgo" cargo build --release
+  target/release/sokonanoda config.json < "$ROOT/_build/tests/init-prelude.ndjson" >/dev/null
+  llvm-profdata merge -o "$PWD/pgo/merged.profdata" "$PWD/pgo"
+  RUSTFLAGS="-C target-cpu=native -Cprofile-use=$PWD/pgo/merged.profdata" cargo build --release
+run: |
+  upstream/target/release/sokonanoda upstream/config.json < "$IN" || exit 1
