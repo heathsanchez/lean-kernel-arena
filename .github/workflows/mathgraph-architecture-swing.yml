@@ -1,0 +1,71 @@
+name: MathGraph architecture swing
+
+on:
+  push:
+    branches: [mathgraph-architecture-swing]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mathgraph-architecture-swing
+  cancel-in-progress: true
+
+jobs:
+  decompose-eagerness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: System info
+        run: |
+          uname -a
+          nproc
+          free -h
+
+      - name: Build focused tests
+        run: |
+          for t in cedar cslib init-prelude; do
+            ./lka.py build-test "$t"
+          done
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Build pinned sokonanoda
+        run: ./lka.py build-checker sokonanoda
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Build latest sokonanoda
+        run: ./lka.py build-checker sokonanoda-latest
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Build irrelevance-only arm
+        run: ./lka.py build-checker sokonanoda-irrel
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Run pinned
+        run: |
+          for t in cedar cslib init-prelude; do
+            ./lka.py run --checker sokonanoda --test "$t"
+          done
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Run latest
+        run: |
+          for t in cedar cslib init-prelude; do
+            ./lka.py run --checker sokonanoda-latest --test "$t"
+          done
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Run irrelevance-only
+        run: |
+          for t in cedar cslib init-prelude; do
+            ./lka.py run --checker sokonanoda-irrel --test "$t"
+          done
+        shell: 'nix develop -c bash -euxo pipefail {0}'
