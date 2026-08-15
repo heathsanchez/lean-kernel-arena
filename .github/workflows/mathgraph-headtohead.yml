@@ -1,4 +1,4 @@
-name: MathGraph head-to-head
+name: MathGraph A5 safety ablation
 
 on:
   push:
@@ -8,8 +8,12 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: mathgraph-a5-safety
+  cancel-in-progress: true
+
 jobs:
-  arena-headtohead:
+  focused-ablation:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -26,40 +30,35 @@ jobs:
           nproc
           free -h
 
-      - name: Build full Arena test corpus
-        run: ./lka.py build-test
+      - name: Build decisive Arena tests
+        run: ./lka.py build-test cedar cslib mathlib std grind-ring-5 init init-prelude
         shell: 'nix develop -c bash -euxo pipefail {0}'
 
       - name: Build sokonanoda
         run: ./lka.py build-checker sokonanoda
         shell: 'nix develop -c bash -euxo pipefail {0}'
 
-      - name: Build MathGraph Kernel A6
-        run: ./lka.py build-checker mathgraph-kernel
+      - name: Build MathGraph A5
+        run: ./lka.py build-checker mathgraph-a5
         shell: 'nix develop -c bash -euxo pipefail {0}'
 
-      - name: Run sokonanoda
-        run: ./lka.py run --checker sokonanoda
+      - name: Run sokonanoda focused set
+        run: ./lka.py run --checker sokonanoda --test cedar --test cslib --test mathlib --test std --test grind-ring-5 --test init --test init-prelude
         shell: 'nix develop -c bash -euxo pipefail {0}'
 
-      - name: Run MathGraph Kernel A6
-        run: ./lka.py run --checker mathgraph-kernel
+      - name: Run MathGraph A5 focused set
+        run: ./lka.py run --checker mathgraph-a5 --test cedar --test cslib --test mathlib --test std --test grind-ring-5 --test init --test init-prelude
         shell: 'nix develop -c bash -euxo pipefail {0}'
 
       - name: Build comparative site
         run: ./lka.py build-site
         shell: 'nix develop -c bash -euxo pipefail {0}'
 
-      - name: Show result files
-        if: always()
-        run: |
-          find _out _build -maxdepth 4 -type f \( -name '*result*' -o -name '*.json' \) 2>/dev/null | sort | head -200
-
-      - name: Upload complete comparison
+      - name: Upload comparison
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: mathgraph-vs-sokonanoda
+          name: mathgraph-a5-safety
           path: |
             _out
             _build/results
