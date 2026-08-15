@@ -1,0 +1,59 @@
+name: MathGraph RGRS DAG separator
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rgrs-dag-separator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build focused tests
+        run: |
+          for t in cedar cslib init-prelude; do
+            ./lka.py build-test "$t"
+          done
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Build D0 pinned
+        run: ./lka.py build-checker sokonanoda
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Build D1 global expression reuse
+        run: ./lka.py build-checker sokonanoda-global-expr
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Build D2 global probe ablation
+        run: ./lka.py build-checker sokonanoda-global-probe-ablation
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Run D0 pinned
+        run: |
+          for t in cedar cslib init-prelude; do
+            ./lka.py run --checker sokonanoda --test "$t"
+          done
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Run D1 global expression reuse
+        run: |
+          for t in cedar cslib init-prelude; do
+            ./lka.py run --checker sokonanoda-global-expr --test "$t"
+          done
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Run D2 global probe ablation
+        run: |
+          for t in cedar cslib init-prelude; do
+            ./lka.py run --checker sokonanoda-global-probe-ablation --test "$t"
+          done
+        shell: 'nix develop -c bash -euxo pipefail {0}'
