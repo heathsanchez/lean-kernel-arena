@@ -1,0 +1,24 @@
+name: MathGraph RGRS held-out Std structure
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [mathgraph-rgrs-applicability-probe]
+    paths:
+      - '.github/workflows/mathgraph-rgrs-heldout-std-structure.yml'
+
+jobs:
+  heldout-structure:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build held-out Std export
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: ./lka.py build-test std
+      - name: Measure held-out structure only
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: python3 experiments/export_structure_probe.py --jsonl _build/tests/std.ndjson
