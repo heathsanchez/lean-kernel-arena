@@ -3,6 +3,8 @@ name: MathGraph RGRS perf fixture timing
 on:
   push:
     branches: [mathgraph-rgrs-applicability-probe]
+    paths:
+      - '.github/workflows/mathgraph-rgrs-perf-fixture-timing.yml'
   workflow_dispatch:
 
 permissions:
@@ -26,16 +28,16 @@ jobs:
           done
       - name: Build pinned checker
         shell: 'nix develop -c bash -euxo pipefail {0}'
-        run: ./lka.py build-checker checkers/sokonanoda.yaml
+        run: ./lka.py build-checker sokonanoda
       - name: Build latest checker
         shell: 'nix develop -c bash -euxo pipefail {0}'
-        run: ./lka.py build-checker checkers/sokonanoda-latest.yaml
+        run: ./lka.py build-checker sokonanoda-latest
       - name: Compare pinned vs latest on held-out perf fixtures
         shell: 'nix develop -c bash -euxo pipefail {0}'
         run: |
           for t in perf/app-lam perf/args-before-unfold perf/beta-ladder perf/church-numerals perf/discarded-argument; do
             echo "===== $t :: pinned ====="
-            ./lka.py run-test sokonanoda "$t"
+            ./lka.py run --checker sokonanoda --test "$t"
             echo "===== $t :: latest ====="
-            ./lka.py run-test sokonanoda-latest "$t"
+            ./lka.py run --checker sokonanoda-latest --test "$t"
           done
