@@ -1,0 +1,50 @@
+description: |
+  RGRS D2 causal ablation: pinned sokonanoda performs the same persistent
+  ExportFile expression-DAG lookup as D1 but deliberately does not reuse the
+  returned global expression. This retains lookup overhead while disabling the
+  identity/reuse mechanism under test.
+url: https://github.com/intgrah/sokonanoda
+ref: master
+rev: 0fab8874080e379a774a9a27f7538d8a1ddd786b
+build: |
+  python3 - <<'PY'
+  from pathlib import Path
+  p = Path('src/util.rs')
+  s = p.read_text()
+  old = '''    pub fn alloc_expr(&mut self, e: Expr<'t>) -> ExprPtr<'t> {
+        if let Some(r) = self.dag.exprs.get(&e) {
+            return ExprPtr::local(r)
+        }
+        ExprPtr::local(self.dag.exprs.insert(self.arena, e))
+    }
+'''
+  new = '''    pub fn alloc_expr(&mut self, e: Expr<'t>) -> ExprPtr<'t> {
+        let _ = self.export_file.dag.exprs.get(&e);
+        if let Some(r) = self.dag.exprs.get(&e) {
+            return ExprPtr::local(r)
+        }
+        ExprPtr::local(self.dag.exprs.insert(self.arena, e))
+    }
+'''
+  assert old in s, 'pinned alloc_expr form not found'
+  p.write_text(s.replace(old, new, 1))
+  print('RGRS D2: global expression probe enabled; reuse disabled')
+  PY
+  cat > config.json <<__END__
+   {
+     "use_stdin": true,
+     "nat_extension": true,
+     "string_extension": true,
+     "unpermitted_axiom_hard_error": false,
+     "unsafe_permit_all_axioms": true,
+     "num_threads": 4
+   }
+  __END__
+  ROOT=$(cd ../../../.. && pwd)
+  "$ROOT/lka.py" build-test init-prelude
+  RUSTFLAGS="-C target-cpu=native -Cprofile-generate=$PWD/pgo" cargo build --release
+  target/release/sokonanoda config.json < "$ROOT/_build/tests/init-prelude.ndjson" >/dev/null
+  llvm-profdata merge -o "$PWD/pgo/merged.profdata" "$PWD/pgo"
+  RUSTFLAGS="-C target-cpu=native -Cprofile-use=$PWD/pgo/merged.profdata" cargo build --release
+run: |
+  target/release/sokonanoda config.json < "$IN" || exit 1
