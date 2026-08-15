@@ -1,0 +1,41 @@
+name: MathGraph RGRS perf fixture timing
+
+on:
+  push:
+    branches: [mathgraph-rgrs-applicability-probe]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  timing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build held-out perf fixtures
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          for t in perf/app-lam perf/args-before-unfold perf/beta-ladder perf/church-numerals perf/discarded-argument; do
+            ./lka.py build-test "$t"
+          done
+      - name: Build pinned checker
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-checker checkers/sokonanoda.yaml
+      - name: Build latest checker
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-checker checkers/sokonanoda-latest.yaml
+      - name: Compare pinned vs latest on held-out perf fixtures
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          for t in perf/app-lam perf/args-before-unfold perf/beta-ladder perf/church-numerals perf/discarded-argument; do
+            echo "===== $t :: pinned ====="
+            ./lka.py run-test sokonanoda "$t"
+            echo "===== $t :: latest ====="
+            ./lka.py run-test sokonanoda-latest "$t"
+          done
