@@ -1,0 +1,25 @@
+description: |
+  RGRS D1 instrumentation arm. Same global-expression reuse mechanism as D1,
+  plus relaxed atomic counters for probes, persistent hits, local duplicates,
+  and true avoided local insertions. Not used for performance comparison.
+url: https://github.com/intgrah/sokonanoda
+ref: master
+rev: 0fab8874080e379a774a9a27f7538d8a1ddd786b
+build: |
+  ROOT=$(cd ../../../.. && pwd)
+  python3 "$ROOT/scripts/rgrs_patch_global_expr.py" reuse
+  python3 "$ROOT/scripts/rgrs_instrument_global_expr.py"
+  cat > config.json <<__END__
+   {
+     "use_stdin": true,
+     "nat_extension": true,
+     "string_extension": true,
+     "unpermitted_axiom_hard_error": false,
+     "unsafe_permit_all_axioms": true,
+     "num_threads": 4
+   }
+  __END__
+  "$ROOT/lka.py" build-test init-prelude
+  RUSTFLAGS="-C target-cpu=native" cargo build --release
+run: |
+  target/release/sokonanoda config.json < "$IN" || exit 1
