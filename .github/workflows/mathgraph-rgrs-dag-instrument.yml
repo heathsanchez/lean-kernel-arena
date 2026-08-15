@@ -1,0 +1,38 @@
+name: MathGraph RGRS DAG instrumentation
+
+on:
+  push:
+    branches:
+      - mathgraph-rgrs-dag-instrument
+  workflow_dispatch:
+
+jobs:
+  instrument:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build focused exports
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          ./lka.py build-test cedar
+          ./lka.py build-test cslib
+      - name: Build instrumented D1
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: ./lka.py build-checker sokonanoda-global-expr-instrument
+      - name: Build instrumented D2
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: ./lka.py build-checker sokonanoda-global-probe-instrument
+      - name: Run instrumented D1
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          ./lka.py run --checker sokonanoda-global-expr-instrument --test cedar
+          ./lka.py run --checker sokonanoda-global-expr-instrument --test cslib
+      - name: Run instrumented D2
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          ./lka.py run --checker sokonanoda-global-probe-instrument --test cedar
+          ./lka.py run --checker sokonanoda-global-probe-instrument --test cslib
