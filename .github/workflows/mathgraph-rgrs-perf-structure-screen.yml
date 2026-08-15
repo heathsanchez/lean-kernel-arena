@@ -23,6 +23,6 @@ jobs:
         run: |
           for t in perf/app-lam perf/args-before-unfold perf/beta-ladder perf/church-numerals perf/discarded-argument; do
             ./lka.py build-test "$t"
-            f="_build/tests/${t#perf/}.ndjson"
+            f="_build/tests/${t}.ndjson"
             python3 experiments/export_structure_probe.py --jsonl "$f"
           done
