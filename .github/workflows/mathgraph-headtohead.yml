@@ -1,0 +1,66 @@
+name: MathGraph head-to-head
+
+on:
+  push:
+    branches: [mathgraph-local-headtohead]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  arena-headtohead:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: System info
+        run: |
+          uname -a
+          nproc
+          free -h
+
+      - name: Build full Arena test corpus
+        run: ./lka.py build-test
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Build sokonanoda
+        run: ./lka.py build-checker sokonanoda
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Build MathGraph Kernel A6
+        run: ./lka.py build-checker mathgraph-kernel
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Run sokonanoda
+        run: ./lka.py run --checker sokonanoda
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Run MathGraph Kernel A6
+        run: ./lka.py run --checker mathgraph-kernel
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Build comparative site
+        run: ./lka.py build-site
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Show result files
+        if: always()
+        run: |
+          find _out _build -maxdepth 4 -type f \( -name '*result*' -o -name '*.json' \) 2>/dev/null | sort | head -200
+
+      - name: Upload complete comparison
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mathgraph-vs-sokonanoda
+          path: |
+            _out
+            _build/results
+          if-no-files-found: warn
