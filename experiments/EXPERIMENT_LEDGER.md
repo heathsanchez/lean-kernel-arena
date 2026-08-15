@@ -113,22 +113,33 @@ Frozen acquisition midpoint threshold: `tau = 0.1580774332`.
 - frozen prediction: latest faster,
 - observed: pinned 9.6 s, latest 8.7 s (~9.4% faster), both correct.
 
-Verdict: **PROMOTE -> PROJECT**, one true prospective success; threshold is experimental, not a law.
+This was a genuine prospective success and justified PROJECT rather than immediate suppression.
 
-### Prospective perf-fixture projection
-
-Timing-blind structure measurements:
-- app-lam 95.22%,
-- beta-ladder 92.80%,
-- discarded-argument 35.71%,
-- args-before-unfold 34.15%,
-- church-numerals 27.27%.
+### Prospective perf-fixture test — selector counterexamples
 
 Frozen before timing:
-- all five predicted to favor latest,
-- high 93-95% pair predicted to show at least as much benefit as lower 27-36% group.
+- app-lam A=95.22% -> latest faster,
+- beta-ladder A=92.80% -> latest faster,
+- discarded-argument A=35.71% -> latest faster,
+- args-before-unfold A=34.15% -> latest faster,
+- church-numerals A=27.27% -> latest faster,
+- high-A pair predicted to show at least as much latest benefit as lower-A group,
+- any sign miss required REFRAME; no threshold retuning permitted.
 
-Timing workflow had R10 harness errors before any performance reveal; corrected run is `31912455339`. Predictions remain frozen.
+Corrected workflow: `31912455339`. All semantic outcomes correct.
+
+Observed Arena-formatted timings:
+- app-lam: pinned 65 ms, latest 56 ms — hit,
+- beta-ladder: pinned 620 ms, latest 626 ms — **sign miss**,
+- discarded-argument: pinned 9 ms, latest 8 ms — hit,
+- args-before-unfold: pinned 10 ms, latest 11 ms — **sign miss**,
+- church-numerals: pinned 12 ms, latest 11 ms — hit.
+
+Verdict: **REFRAME**. The simple workload-level absent-binder threshold is not sufficient (2/5 prospective sign misses), and global A magnitude is not a monotone mechanism signal because beta-ladder is both extremely high-A and adverse.
+
+Preserve absent-binder rate as a coarse correlate with one macro prospective success (Std), but not as an admitted routing law. The updated residual is local interaction: *where/how* binder absence meets evaluator demand matters more than global frequency. Candidate refinements include demanded-vs-discarded argument structure, beta-chain shape, unfolding timing, conversion density, and recursor/iota pressure.
+
+Do not retune `tau` on the revealed fixtures.
 
 ## Eager + structural-absence causal interaction experiment
 
@@ -143,7 +154,7 @@ Precommitted arms:
 
 Causal interaction target: `I = G(E+A) - G(E) - G(A)`.
 
-The workflow is dispatch-only and was deliberately not globally launched after latest lost on full Mathlib. **RETAIN design; scope it only when R5 evidence makes the comparison admissible.**
+The workflow is dispatch-only and was deliberately not globally launched after latest lost on full Mathlib. **RETAIN design; scope it only when local interaction evidence makes the comparison admissible.**
 
 ## Current interpretation
 
@@ -151,7 +162,7 @@ Do not collapse these records into one “best kernel.” Maintain four frontier
 
 1. **Best protected calibrated kernel:** A6 (~23.96% paired median gain vs pinned, 161/161 semantics).
 2. **Best conditional raw local result:** A5 on Cedar (~25.9% faster than pinned), with severe CSLib regression.
-3. **Best current causal/applicability discovery:** absent-binder-rate R5 observable with one prospective Std success.
+3. **Best current causal/applicability discovery:** absent-binder rate exposed a real regime distinction but failed as a sufficient global selector; the live target is now local evaluator-demand interaction.
 4. **Current public leaderboard frontier:** separate; only an actual Arena run of an exact immutable checker revision establishes it.
 
 The next architectural target should use A6 as the retained performance base, not forget it. RGRS experiments should explain/scope mechanisms and then attempt to **compose admitted discoveries back onto A6**, under semantic, causal, resource, and reproducibility gates.
