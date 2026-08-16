@@ -1,0 +1,41 @@
+name: MathGraph A7 safe E0030 separator
+on:
+  push:
+    branches: [mathgraph-a7-safe-e0030]
+permissions:
+  contents: read
+jobs:
+  separator:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+      - name: Build focused workloads
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          for t in cedar cslib init-prelude bogus1 constlevels ctor-num-fields; do
+            ./lka.py build-test "$t"
+          done
+      - name: Build pinned and A7
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          ./lka.py build-checker sokonanoda
+          ./lka.py build-checker mathgraph-a7-safe-e0030
+      - name: Focused comparison
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          for t in cedar cslib init-prelude; do
+            echo "===== $t :: pinned ====="
+            /usr/bin/time -v ./lka.py run --checker sokonanoda --test "$t"
+            echo "===== $t :: A7 ====="
+            /usr/bin/time -v ./lka.py run --checker mathgraph-a7-safe-e0030 --test "$t"
+          done
+      - name: Semantic controls
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          set +e
+          for t in bogus1 constlevels ctor-num-fields init-prelude; do
+            echo "===== A7 semantic: $t ====="
+            ./lka.py run --checker mathgraph-a7-safe-e0030 --test "$t"
+          done
+          exit 0
