@@ -1,0 +1,42 @@
+name: MathGraph A3 Mathlib gate
+
+on:
+  push:
+    branches: [mathgraph-a3-mathlib-gate]
+  workflow_dispatch:
+
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+      - name: Build protected workloads
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          for t in mathlib init-prelude bogus1 constlevels ctor-num-fields; do
+            ./lka.py build-test "$t"
+          done
+      - name: Build pinned and A3 checkers
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          ./lka.py build-checker sokonanoda
+          ./lka.py build-checker mathgraph-a3
+      - name: Mathlib head-to-head
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          echo '===== mathlib :: pinned ====='
+          /usr/bin/time -v ./lka.py run --checker sokonanoda --test mathlib
+          echo '===== mathlib :: A3 ====='
+          /usr/bin/time -v ./lka.py run --checker mathgraph-a3 --test mathlib
+      - name: Semantic controls
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          set +e
+          for c in sokonanoda mathgraph-a3; do
+            for t in bogus1 constlevels ctor-num-fields init-prelude; do
+              echo "===== semantic :: $c :: $t ====="
+              ./lka.py run --checker "$c" --test "$t"
+            done
+          done
+          exit 0
