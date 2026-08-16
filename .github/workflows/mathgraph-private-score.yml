@@ -1,0 +1,54 @@
+name: MathGraph private Arena score
+
+on:
+  push:
+    branches: [mathgraph-private-score]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  score:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout exact merged Arena revision
+        uses: actions/checkout@v4
+        with:
+          ref: mathgraph-private-score
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Confirm revision and checker
+        run: |
+          git rev-parse HEAD
+          sed -n '1,120p' checkers/mathgraph.yaml
+
+      - name: Build MathGraph checker
+        run: ./lka.py build-checker mathgraph
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Generate full supported test corpus
+        run: ./lka.py build-test --skip-declined-by mathgraph
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Run MathGraph on full corpus
+        run: ./lka.py run --checker mathgraph
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Pack results
+        run: ./lka.py ci-pack --outdir /tmp/mathgraph-score --results
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Upload private score artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mathgraph-private-arena-score
+          path: |
+            /tmp/mathgraph-score
+            _build/results
