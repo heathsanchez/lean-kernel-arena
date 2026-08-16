@@ -1,0 +1,33 @@
+name: MathGraph A3 fork validation
+
+on:
+  push:
+    branches: [mathgraph-a3-fork-conversion]
+  workflow_dispatch:
+
+jobs:
+  full-corpus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+      - name: Build fork-backed A3 checker
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: ./lka.py build-checker mathgraph-a3
+      - name: Generate full supported Arena corpus
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: ./lka.py build-test --skip-declined-by mathgraph-a3
+      - name: Run fork-backed A3 on full Arena corpus
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: ./lka.py run --checker mathgraph-a3
+      - name: Pack machine-readable results
+        if: always()
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: ./lka.py ci-pack --outdir /tmp/a3-fork-results --results || true
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mathgraph-a3-fork-full-corpus-results
+          path: /tmp/a3-fork-results
