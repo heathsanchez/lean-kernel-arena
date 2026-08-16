@@ -1,0 +1,44 @@
+name: MathGraph A3-A5 decomposition
+on:
+  push:
+    branches: [mathgraph-a3-a5-decomposition]
+permissions:
+  contents: read
+jobs:
+  decompose:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+      - name: Build workloads
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          for t in cedar cslib init-prelude bogus1 constlevels ctor-num-fields; do
+            ./lka.py build-test "$t"
+          done
+      - name: Build checkers
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          for c in sokonanoda mathgraph-a3 mathgraph-a4 mathgraph-a5; do
+            ./lka.py build-checker "$c"
+          done
+      - name: Cedar and CSLib causal ladder
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          for t in cedar cslib init-prelude; do
+            for c in sokonanoda mathgraph-a3 mathgraph-a4 mathgraph-a5; do
+              echo "===== $t :: $c ====="
+              /usr/bin/time -v ./lka.py run --checker "$c" --test "$t"
+            done
+          done
+      - name: Semantic controls
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          set +e
+          for c in mathgraph-a3 mathgraph-a4 mathgraph-a5; do
+            for t in bogus1 constlevels ctor-num-fields init-prelude; do
+              echo "===== semantic :: $c :: $t ====="
+              ./lka.py run --checker "$c" --test "$t"
+            done
+          done
+          exit 0
