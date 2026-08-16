@@ -1,0 +1,67 @@
+name: MathGraph vs sokonanoda Mathlib calibration
+
+on:
+  push:
+    branches: [mathgraph-headtohead-calibration]
+  workflow_dispatch:
+
+jobs:
+  headtohead:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+
+      - name: Build upstream sokonanoda
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: ./lka.py build-checker sokonanoda
+
+      - name: Build MathGraph
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: ./lka.py build-checker mathgraph
+
+      - name: Build Mathlib Arena test
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: ./lka.py build-test mathlib
+
+      - name: Run paired Mathlib benchmark
+        shell: nix develop -c bash -euxo pipefail {0}
+        run: |
+          mkdir -p /tmp/headtohead
+          for i in 1 2 3; do
+            if [ $((i % 2)) -eq 1 ]; then order="sokonanoda mathgraph"; else order="mathgraph sokonanoda"; fi
+            for checker in $order; do
+              rm -f _results/${checker}_mathlib.json
+              ./lka.py run --checker "$checker" --test mathlib
+              cp _results/${checker}_mathlib.json "/tmp/headtohead/${checker}_mathlib_run${i}.json"
+            done
+          done
+          python3 - <<'PY'
+          import json, pathlib, statistics
+          root = pathlib.Path('/tmp/headtohead')
+          out = {}
+          for checker in ('sokonanoda','mathgraph'):
+              rows=[]
+              for p in sorted(root.glob(f'{checker}_mathlib_run*.json')):
+                  d=json.loads(p.read_text())
+                  rows.append({k:d.get(k) for k in ('correctness','status','wall_time','cpu_time','max_rss','instructions')})
+              out[checker]={
+                  'runs':rows,
+                  'median_wall_time':statistics.median(r['wall_time'] for r in rows),
+                  'median_cpu_time':statistics.median(r['cpu_time'] for r in rows),
+                  'max_peak_rss':max(r['max_rss'] for r in rows),
+                  'median_instructions':statistics.median(r['instructions'] for r in rows),
+              }
+          b=out['sokonanoda']['median_wall_time']; m=out['mathgraph']['median_wall_time']
+          out['comparison']={'mathgraph_vs_sokonanoda_wall_ratio':m/b,'speedup_factor':b/m,'wall_reduction_pct':100*(1-m/b)}
+          (root/'summary.json').write_text(json.dumps(out,indent=2))
+          print(json.dumps(out,indent=2))
+          PY
+
+      - name: Upload calibration results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mathgraph-sokonanoda-mathlib-headtohead
+          path: /tmp/headtohead
