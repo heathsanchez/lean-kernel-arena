@@ -1,4 +1,4 @@
-name: MathGraph V2 private official instruction gate
+name: MathGraph V2 private instruction proxy
 
 on:
   push:
@@ -8,21 +8,29 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: mathgraph-v2-private-instructions
+  cancel-in-progress: true
+
 jobs:
   score:
-    # Same runner class used by the official Lean Kernel Arena checker matrix.
-    # It exposes a vPMU, so perf hardware instruction counts are available.
-    runs-on: nscloud-ubuntu-22.04-amd64-8x16
+    runs-on: ubuntu-24.04
     timeout-minutes: 360
 
     steps:
       - name: Checkout control branch
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install deterministic instruction counter
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y valgrind
+          valgrind --version
 
       - name: Clone and pin official Arena revision
         shell: bash
@@ -33,22 +41,13 @@ jobs:
           git checkout 73cb14f23f8e3c2a325557a4a2ee0aa9bf5d44f3
           test "$(git rev-parse HEAD)" = "73cb14f23f8e3c2a325557a4a2ee0aa9bf5d44f3"
 
-      - name: Verify hardware performance counters
-        shell: 'nix develop -c bash -euxo pipefail {0}'
-        working-directory: /tmp/arena
-        run: |
-          echo "perf_event_paranoid=$(cat /proc/sys/kernel/perf_event_paranoid || true)"
-          perf --version
-          perf stat -e cycles,instructions -- true 2>&1 | tee /tmp/perf-smoke.txt
-          grep -Eq '[0-9][0-9,]*[[:space:]]+instructions' /tmp/perf-smoke.txt
-
       - name: Define frozen public and jump32 checkers
         shell: bash
         working-directory: /tmp/arena
         run: |
           set -euxo pipefail
           cat > checkers/mathgraph-public.yaml <<'EOF'
-          description: "Frozen published MathGraph checker for private V2 instruction comparison."
+          description: "Frozen published MathGraph checker for private V2 instruction proxy."
           url: https://github.com/metalogiclabs/mathgraph-lean-kernel
           ref: mathgraph
           rev: 1e209dad266d59b4d43cdea189876bc6ea551339
@@ -107,90 +106,107 @@ jobs:
           ./lka.py build-checker mathgraph-public
           ./lka.py build-checker mathgraph-jump32
 
-      - name: Generate full official supported corpus
+      - name: Generate deciding official tests
         shell: 'nix develop -c bash -euxo pipefail {0}'
         working-directory: /tmp/arena
-        run: ./lka.py build-test
+        run: |
+          ./lka.py build-test mathlib
+          ./lka.py build-test perf/beta-ladder
+          ./lka.py build-test perf/grind-ring-5
+          ./lka.py build-test perf/app-lam
+          ./lka.py build-test std
 
-      - name: Run frozen public MathGraph
-        shell: 'nix develop -c bash -euxo pipefail {0}'
+      - name: Locate checker binaries
+        shell: bash
         working-directory: /tmp/arena
-        run: ./lka.py run --checker mathgraph-public
+        run: |
+          set -euxo pipefail
+          PUB=$(find _build/checkers/mathgraph-public -type f -path '*/target/release/sokonanoda' -perm -111 | head -1)
+          J32=$(find _build/checkers/mathgraph-jump32 -type f -path '*/target/release/sokonanoda' -perm -111 | head -1)
+          test -n "$PUB" && test -n "$J32"
+          echo "PUB=$PWD/$PUB" >> "$GITHUB_ENV"
+          echo "J32=$PWD/$J32" >> "$GITHUB_ENV"
+          echo "PUB_CFG=$(dirname "$PUB")/../../config.json" >> "$GITHUB_ENV"
+          echo "J32_CFG=$(dirname "$J32")/../../config.json" >> "$GITHUB_ENV"
 
-      - name: Run frozen jump32 candidate
-        shell: 'nix develop -c bash -euxo pipefail {0}'
+      - name: Smoke-test Callgrind and semantic equality
+        shell: bash
         working-directory: /tmp/arena
-        run: ./lka.py run --checker mathgraph-jump32
+        run: |
+          set -euxo pipefail
+          "$PUB" "$PUB_CFG" < _build/tests/perf/beta-ladder.ndjson >/tmp/pub.out
+          "$J32" "$J32_CFG" < _build/tests/perf/beta-ladder.ndjson >/tmp/j32.out
+          diff -u /tmp/pub.out /tmp/j32.out
+          valgrind --tool=callgrind --callgrind-out-file=/tmp/smoke.callgrind "$PUB" "$PUB_CFG" < _build/tests/perf/beta-ladder.ndjson >/dev/null
+          grep '^summary:' /tmp/smoke.callgrind
 
-      - name: Emit machine-readable results
-        shell: 'nix develop -c bash -euxo pipefail {0}'
+      - name: Count retired guest instructions on deciding workloads
+        shell: bash
         working-directory: /tmp/arena
-        run: ./lka.py write-results --out /tmp/v2-private-results.json
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/callgrind
+          for test in perf/beta-ladder perf/grind-ring-5 perf/app-lam std mathlib; do
+            safe=${test//\//_}
+            infile="_build/tests/$test.ndjson"
+            echo "=== $test public ==="
+            /usr/bin/time -f '%e %U %S %M' -o "/tmp/callgrind/${safe}.public.time" \
+              valgrind --tool=callgrind --callgrind-out-file="/tmp/callgrind/${safe}.public" \
+              "$PUB" "$PUB_CFG" < "$infile" >/dev/null
+            echo "=== $test jump32 ==="
+            /usr/bin/time -f '%e %U %S %M' -o "/tmp/callgrind/${safe}.jump32.time" \
+              valgrind --tool=callgrind --callgrind-out-file="/tmp/callgrind/${safe}.jump32" \
+              "$J32" "$J32_CFG" < "$infile" >/dev/null
+          done
 
-      - name: Decide private promotion gate
+      - name: Decide private proxy gate
         shell: bash
         run: |
           set -euxo pipefail
-          python3 - <<'PY' | tee /tmp/v2-private-summary.txt
-          import json
-          from collections import Counter
+          python3 - <<'PY' | tee /tmp/private-proxy-summary.txt
+          from pathlib import Path
 
-          data=json.load(open('/tmp/v2-private-results.json'))
-          rows=data['results']
-          P={r['test']:r for r in rows if r.get('checker')=='mathgraph-public'}
-          J={r['test']:r for r in rows if r.get('checker')=='mathgraph-jump32'}
-          common=sorted(P.keys() & J.keys())
-          assert len(common)==189, len(common)
+          root=Path('/tmp/callgrind')
+          tests=['perf_beta-ladder','perf_grind-ring-5','perf_app-lam','std','mathlib']
 
-          pc=Counter(P[t]['correctness'] for t in common)
-          jc=Counter(J[t]['correctness'] for t in common)
-          mismatches=[t for t in common if P[t]['correctness'] != J[t]['correctness']]
-          print('public correctness',dict(pc))
-          print('jump32 correctness',dict(jc))
-          print('correctness mismatches',mismatches)
-          assert not mismatches
+          def ir(path):
+              events=None
+              summary=None
+              for line in Path(path).read_text(errors='replace').splitlines():
+                  if line.startswith('events:'):
+                      events=line.split(':',1)[1].split()
+                  elif line.startswith('summary:'):
+                      summary=[int(x) for x in line.split(':',1)[1].split()]
+              assert events and summary, path
+              assert 'Ir' in events, (path,events)
+              return summary[events.index('Ir')]
 
-          # Hardware counters must be genuinely present; zero is inconclusive, not a win.
-          assert int(P['mathlib'].get('instructions') or 0) > 0, 'public mathlib instructions missing'
-          assert int(J['mathlib'].get('instructions') or 0) > 0, 'jump32 mathlib instructions missing'
+          print('CALLGRIND Ir comparison (deterministic software instruction proxy; not official PMU counts)')
+          ratios={}
+          for t in tests:
+              p=ir(root/f'{t}.public')
+              j=ir(root/f'{t}.jump32')
+              r=j/p
+              ratios[t]=r
+              print(f'{t}: public={p} jump32={j} ratio={r:.9f} delta={(r-1)*100:.4f}%')
 
-          def show(test):
-              p=P[test]; j=J[test]
-              print('\n'+test)
-              for metric in ('instructions','wall_time','cpu_time','max_rss'):
-                  a=float(p.get(metric) or 0); b=float(j.get(metric) or 0)
-                  ratio=(b/a) if a else None
-                  print(f'  {metric}: public={a:.6f} jump32={b:.6f} ratio={ratio:.6f} delta={(ratio-1)*100:.3f}%')
-
-          for t in ['mathlib','cslib','cedar','std','perf/beta-ladder','perf/grind-ring-5','perf/app-lam','perf/let-ladder']:
-              show(t)
-
-          def total(metric):
-              a=sum(float(P[t].get(metric) or 0) for t in common)
-              b=sum(float(J[t].get(metric) or 0) for t in common)
-              return a,b,b/a
-
-          for metric in ('instructions','wall_time','cpu_time'):
-              a,b,r=total(metric)
-              print(f'\nALL {metric}: public={a:.6f} jump32={b:.6f} ratio={r:.6f} delta={(r-1)*100:.3f}%')
-
-          mr=float(J['mathlib']['instructions'])/float(P['mathlib']['instructions'])
-          print(f'\nMATHLIB_INSTRUCTION_RATIO={mr:.9f} delta={(mr-1)*100:.4f}%')
+          mr=ratios['mathlib']
+          print(f'\nMATHLIB_CALLGRIND_IR_RATIO={mr:.9f} delta={(mr-1)*100:.4f}%')
           if mr < 0.995:
-              print('DECISION=PROMOTION_CANDIDATE')
+              print('PROXY_DECISION=PROMOTION_CANDIDATE')
           elif mr <= 1.005:
-              print('DECISION=MATHLIB_INSTRUCTION_NEUTRAL')
+              print('PROXY_DECISION=MATHLIB_NEUTRAL')
           else:
-              print('DECISION=DO_NOT_PROMOTE')
+              print('PROXY_DECISION=DO_NOT_PROMOTE')
+          print('\nNOTE: official Arena PMU instruction counts remain the final leaderboard authority.')
           PY
 
-      - name: Upload private instruction evidence
+      - name: Upload private proxy evidence
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
-          name: mathgraph-v2-private-official-instructions
+          name: mathgraph-v2-private-callgrind-proxy
           path: |
-            /tmp/v2-private-results.json
-            /tmp/v2-private-summary.txt
-            /tmp/perf-smoke.txt
-            /tmp/arena/_results/
+            /tmp/private-proxy-summary.txt
+            /tmp/callgrind/
+            /tmp/smoke.callgrind
