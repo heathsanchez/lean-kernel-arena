@@ -1,0 +1,196 @@
+name: MathGraph V2 private official instruction gate
+
+on:
+  push:
+    branches: [mathgraph-v2-private-instructions]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  score:
+    # Same runner class used by the official Lean Kernel Arena checker matrix.
+    # It exposes a vPMU, so perf hardware instruction counts are available.
+    runs-on: nscloud-ubuntu-22.04-amd64-8x16
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout control branch
+        uses: actions/checkout@v7
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clone and pin official Arena revision
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git clone https://github.com/leanprover/lean-kernel-arena /tmp/arena
+          cd /tmp/arena
+          git checkout 73cb14f23f8e3c2a325557a4a2ee0aa9bf5d44f3
+          test "$(git rev-parse HEAD)" = "73cb14f23f8e3c2a325557a4a2ee0aa9bf5d44f3"
+
+      - name: Verify hardware performance counters
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        working-directory: /tmp/arena
+        run: |
+          echo "perf_event_paranoid=$(cat /proc/sys/kernel/perf_event_paranoid || true)"
+          perf --version
+          perf stat -e cycles,instructions -- true 2>&1 | tee /tmp/perf-smoke.txt
+          grep -Eq '[0-9][0-9,]*[[:space:]]+instructions' /tmp/perf-smoke.txt
+
+      - name: Define frozen public and jump32 checkers
+        shell: bash
+        working-directory: /tmp/arena
+        run: |
+          set -euxo pipefail
+          cat > checkers/mathgraph-public.yaml <<'EOF'
+          description: "Frozen published MathGraph checker for private V2 instruction comparison."
+          url: https://github.com/metalogiclabs/mathgraph-lean-kernel
+          ref: mathgraph
+          rev: 1e209dad266d59b4d43cdea189876bc6ea551339
+          build: |
+            cat > config.json <<__END__
+             {
+               "use_stdin": true,
+               "nat_extension": true,
+               "string_extension": true,
+               "unpermitted_axiom_hard_error": false,
+               "unsafe_permit_all_axioms": true,
+               "num_threads": 4
+             }
+            __END__
+            ROOT=$(cd ../../../.. && pwd)
+            "$ROOT/lka.py" build-test init-prelude
+            RUSTFLAGS="-C target-cpu=native -Cprofile-generate=$PWD/pgo" cargo build --release
+            target/release/sokonanoda config.json < "$ROOT/_build/tests/init-prelude.ndjson" >/dev/null
+            llvm-profdata merge -o "$PWD/pgo/merged.profdata" "$PWD/pgo"
+            RUSTFLAGS="-C target-cpu=native -Cprofile-use=$PWD/pgo/merged.profdata" cargo build --release
+          run: |
+            target/release/sokonanoda config.json < "$IN" || exit 1
+          EOF
+
+          cat > checkers/mathgraph-jump32.yaml <<'EOF'
+          description: "Frozen V2 candidate: published MathGraph plus only jump32 environment navigation."
+          url: https://github.com/metalogiclabs/mathgraph-lean-kernel
+          ref: mathgraph-v2-cost-separator
+          rev: cbd3d0902ae59fe0e38e7e40619355cb16290fa7
+          build: |
+            python3 scripts/v2_jump_patch.py . 32
+            cat > config.json <<__END__
+             {
+               "use_stdin": true,
+               "nat_extension": true,
+               "string_extension": true,
+               "unpermitted_axiom_hard_error": false,
+               "unsafe_permit_all_axioms": true,
+               "num_threads": 4
+             }
+            __END__
+            ROOT=$(cd ../../../.. && pwd)
+            "$ROOT/lka.py" build-test init-prelude
+            RUSTFLAGS="-C target-cpu=native -Cprofile-generate=$PWD/pgo" cargo build --release
+            target/release/sokonanoda config.json < "$ROOT/_build/tests/init-prelude.ndjson" >/dev/null
+            llvm-profdata merge -o "$PWD/pgo/merged.profdata" "$PWD/pgo"
+            RUSTFLAGS="-C target-cpu=native -Cprofile-use=$PWD/pgo/merged.profdata" cargo build --release
+          run: |
+            target/release/sokonanoda config.json < "$IN" || exit 1
+          EOF
+
+      - name: Build both checkers with official MathGraph PGO recipe
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        working-directory: /tmp/arena
+        run: |
+          ./lka.py build-checker mathgraph-public
+          ./lka.py build-checker mathgraph-jump32
+
+      - name: Generate full official supported corpus
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        working-directory: /tmp/arena
+        run: ./lka.py build-test
+
+      - name: Run frozen public MathGraph
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        working-directory: /tmp/arena
+        run: ./lka.py run --checker mathgraph-public
+
+      - name: Run frozen jump32 candidate
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        working-directory: /tmp/arena
+        run: ./lka.py run --checker mathgraph-jump32
+
+      - name: Emit machine-readable results
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        working-directory: /tmp/arena
+        run: ./lka.py write-results --out /tmp/v2-private-results.json
+
+      - name: Decide private promotion gate
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY' | tee /tmp/v2-private-summary.txt
+          import json
+          from collections import Counter
+
+          data=json.load(open('/tmp/v2-private-results.json'))
+          rows=data['results']
+          P={r['test']:r for r in rows if r.get('checker')=='mathgraph-public'}
+          J={r['test']:r for r in rows if r.get('checker')=='mathgraph-jump32'}
+          common=sorted(P.keys() & J.keys())
+          assert len(common)==189, len(common)
+
+          pc=Counter(P[t]['correctness'] for t in common)
+          jc=Counter(J[t]['correctness'] for t in common)
+          mismatches=[t for t in common if P[t]['correctness'] != J[t]['correctness']]
+          print('public correctness',dict(pc))
+          print('jump32 correctness',dict(jc))
+          print('correctness mismatches',mismatches)
+          assert not mismatches
+
+          # Hardware counters must be genuinely present; zero is inconclusive, not a win.
+          assert int(P['mathlib'].get('instructions') or 0) > 0, 'public mathlib instructions missing'
+          assert int(J['mathlib'].get('instructions') or 0) > 0, 'jump32 mathlib instructions missing'
+
+          def show(test):
+              p=P[test]; j=J[test]
+              print('\n'+test)
+              for metric in ('instructions','wall_time','cpu_time','max_rss'):
+                  a=float(p.get(metric) or 0); b=float(j.get(metric) or 0)
+                  ratio=(b/a) if a else None
+                  print(f'  {metric}: public={a:.6f} jump32={b:.6f} ratio={ratio:.6f} delta={(ratio-1)*100:.3f}%')
+
+          for t in ['mathlib','cslib','cedar','std','perf/beta-ladder','perf/grind-ring-5','perf/app-lam','perf/let-ladder']:
+              show(t)
+
+          def total(metric):
+              a=sum(float(P[t].get(metric) or 0) for t in common)
+              b=sum(float(J[t].get(metric) or 0) for t in common)
+              return a,b,b/a
+
+          for metric in ('instructions','wall_time','cpu_time'):
+              a,b,r=total(metric)
+              print(f'\nALL {metric}: public={a:.6f} jump32={b:.6f} ratio={r:.6f} delta={(r-1)*100:.3f}%')
+
+          mr=float(J['mathlib']['instructions'])/float(P['mathlib']['instructions'])
+          print(f'\nMATHLIB_INSTRUCTION_RATIO={mr:.9f} delta={(mr-1)*100:.4f}%')
+          if mr < 0.995:
+              print('DECISION=PROMOTION_CANDIDATE')
+          elif mr <= 1.005:
+              print('DECISION=MATHLIB_INSTRUCTION_NEUTRAL')
+          else:
+              print('DECISION=DO_NOT_PROMOTE')
+          PY
+
+      - name: Upload private instruction evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mathgraph-v2-private-official-instructions
+          path: |
+            /tmp/v2-private-results.json
+            /tmp/v2-private-summary.txt
+            /tmp/perf-smoke.txt
+            /tmp/arena/_results/
