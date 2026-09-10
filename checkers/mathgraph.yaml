@@ -18,9 +18,10 @@ description: |
   constraint → new residual
 
   Developed by [Metalogic Labs](https://mathgraph.org/).
+version: "dulce-de-leche"
 url: https://github.com/metalogiclabs/mathgraph-lean-kernel
-ref: mathgraph
-rev: 08ddb26718c86213262943ca19ae8cf1b03fa922
+ref: dulce-de-leche
+rev: d6a73279e6765e637f9741180cefbd7ef957d8e5
 build: |
   cat > config.json <<__END__
    {
