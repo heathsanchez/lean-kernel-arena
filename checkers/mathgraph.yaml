@@ -18,9 +18,10 @@ description: |
   constraint → new residual
 
   Developed by [Metalogic Labs](https://mathgraph.org/).
+version: "dulce-de-leche"
 url: https://github.com/metalogiclabs/mathgraph-lean-kernel
 ref: mathgraph
-rev: 2de1895a52d21ad266b77002defe3e6bc69bbcfd
+rev: d6a73279e6765e637f9741180cefbd7ef957d8e5
 build: |
   cat > config.json <<__END__
    {
@@ -40,4 +41,3 @@ build: |
   RUSTFLAGS="-C target-cpu=native -Cprofile-use=$PWD/pgo/merged.profdata" cargo build --release
 run: |
   target/release/sokonanoda config.json < "$IN" || exit 1
-declines: con-leche
