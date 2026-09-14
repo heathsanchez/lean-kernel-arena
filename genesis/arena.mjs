@@ -64,7 +64,7 @@ writeFileSync(new URL("./evidence/frontier.json",import.meta.url),JSON.stringify
 const inductiveFrontier=[];
 for(const row of rows) {
   const result=results.find(r=>r.name===row.name);
-  if(result?.status!=="UNKNOWN" || result.reason!=="declaration-frontier:inductive") continue;
+  if(result?.status!=="UNKNOWN" || !["declaration-frontier:inductive","inductive-semantics-frontier"].includes(result.reason)) continue;
   let first=null;
   for(const line of row.input.split(/\r?\n/)) {
     if(!line.trim()) continue;

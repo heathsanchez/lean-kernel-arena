@@ -304,6 +304,7 @@ function checkExport(input,capabilities,budget=200000) {
   if(input.length>2000000) return out(UNKNOWN,"input-budget");
   const names=new Map([[0,"[]"]]),levels=new Map([[0,0]]),exprs=new Map(),decls=[];
   const fail=reason=>{throw new Stop(UNKNOWN,reason);};
+  const reject=reason=>{throw new Stop(REJECT,reason);};
   const get=(m,n)=>{if(!Number.isSafeInteger(n)||n<0||!m.has(n)) fail("unresolved-reference");return m.get(n);};
   const put=(m,n,v)=>{if(!Number.isSafeInteger(n)||n<0||m.has(n)) fail("duplicate-or-invalid-index");m.set(n,v);};
   let header=false;
@@ -346,6 +347,21 @@ function checkExport(input,capabilities,budget=200000) {
         else if(tag==="mdata"&&v) e=get(exprs,v.expr);
         else fail("expression-frontier:"+tag);
         put(exprs,row.ie,e);
+      } else if(tag==="inductive") {
+        if(!capabilities.includes("inductive-envelope")) fail("declaration-frontier:inductive");
+        if(!v || !Array.isArray(v.types) || !Array.isArray(v.ctors) || !Array.isArray(v.recs))
+          fail("inductive-envelope-schema");
+        // These are representation invariants of a complete Lean inductive group,
+        // not positivity/elimination/typechecking claims.
+        if(v.recs.length!==v.types.length) reject("inductive-recursor-count");
+        const ctorNames=v.ctors.map(c=>c?.name);
+        if(ctorNames.some(n=>!Number.isSafeInteger(n)) || new Set(ctorNames).size!==ctorNames.length)
+          reject("inductive-constructor-identity");
+        for(const rec of v.recs) {
+          if(!rec || !Number.isSafeInteger(rec.numMinors)) fail("inductive-envelope-schema");
+          if(rec.numMinors!==v.ctors.length) reject("inductive-minor-count");
+        }
+        fail("inductive-semantics-frontier");
       } else if(tag==="axiom"||tag==="def"||tag==="thm") {
         if(tag==="thm"&&!capabilities.includes("theorems")) fail("declaration-frontier:thm");
         if(!v || !Array.isArray(v.levelParams)) fail("declaration-universes");

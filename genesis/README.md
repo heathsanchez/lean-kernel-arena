@@ -123,3 +123,18 @@ be definitionally equal because both results are proofs of the same proposition.
 The new capability recognizes exactly that condition during recursive conversion.
 Ablation restores conversion-frontier, while a negative control with ordinary data
 terms remains UNKNOWN rather than being collapsed. No inductive capability is used.
+
+
+## Fifth increment: the inductive envelope
+
+Once proof irrelevance dissolved, all 149 remaining Arena cases stopped at the
+first inductive record. A diagnostic pass over all 149 first records found a
+strictly smaller certified layer before inductive semantics: complete groups
+have one recursor per inductive type, every recursor has one minor premise per
+constructor, and constructor identities are unique within the group.
+
+This capability checks only those envelope invariants. Violations are REJECT;
+a structurally valid inductive is still UNKNOWN with
+`inductive-semantics-frontier`. It does not yet claim constructor typing,
+positivity, elimination, recursor typing, projection rules, eta, or recursor
+reduction. Ablation restores `declaration-frontier:inductive`.

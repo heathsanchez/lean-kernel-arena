@@ -242,6 +242,43 @@ function runProofIrrelevanceTests(base,emit=()=>{}) {
   return {capabilities:caps,cases:2};
 }
 
+
+function runInductiveEnvelopeTests(base,emit=()=>{}) {
+  const caps=[...base,"inductive-envelope"];
+  const meta={meta:{format:{version:"3.1.0"}}};
+  const nd=v=>[meta,{inductive:v}].map(JSON.stringify).join("\n");
+  const valid={
+    types:[{name:1}],ctors:[{name:2}],recs:[{name:3,numMinors:1}]
+  };
+  const ablated=checkExport(nd(valid),base);
+  assert(ablated.status===UNKNOWN && ablated.reason==="declaration-frontier:inductive",
+    "inductive envelope ablation did not restore the declaration frontier");
+  const bounded=checkExport(nd(valid),caps);
+  assert(bounded.status===UNKNOWN && bounded.reason==="inductive-semantics-frontier",
+    "structurally valid inductive escaped the semantic frontier");
+
+  const missingRec={types:[{name:1}],ctors:[],recs:[]};
+  assert(checkExport(nd(missingRec),caps).status===REJECT,
+    "inductive group missing its recursor was not rejected");
+
+  const wrongMinors={types:[{name:1}],ctors:[{name:2}],recs:[{name:3,numMinors:0}]};
+  assert(checkExport(nd(wrongMinors),caps).status===REJECT,
+    "recursor/minor mismatch was not rejected");
+
+  const dupCtor={
+    types:[{name:1}],
+    ctors:[{name:2},{name:2}],
+    recs:[{name:3,numMinors:2}]
+  };
+  assert(checkExport(nd(dupCtor),caps).status===REJECT,
+    "duplicate constructor identity was not rejected");
+
+  emit({event:"inductive-envelope-growth",ablation_unknown:true,
+    valid_remains_unknown:true,recursor_count:true,minor_count:true,
+    constructor_identity:true});
+  return {capabilities:caps,cases:4};
+}
+
 const target=new URL("./evidence/",import.meta.url);
 mkdirSync(target,{recursive:true});
 writeFileSync(new URL("events.jsonl",target),"");
@@ -262,12 +299,17 @@ const proofIrrelevance=runProofIrrelevanceTests(theorem.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const replay=evaluate(proofIrrelevance.capabilities,growthSuite());
+const inductiveEnvelope=runInductiveEnvelopeTests(proofIrrelevance.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const replay=evaluate(inductiveEnvelope.capabilities,growthSuite());
 assert(replay.covered===report.training && !replay.wrong.length,"later growth regressed protected cases");
-report.capabilities=proofIrrelevance.capabilities;
+report.capabilities=inductiveEnvelope.capabilities;
 report.universe_tests={laws:universe.laws,independent_pairs:universe.independent_pairs};
 report.theorem_tests={cases:theorem.cases};
 report.proof_irrelevance_tests={cases:proofIrrelevance.cases};
+report.inductive_envelope_tests={cases:inductiveEnvelope.cases};
 for(const name of ["level-index-out-of-order","sparse-name-index"]) {
   const raw=readFileSync(new URL("../tests/"+name+".ndjson",import.meta.url),"utf8");
   const r=checkExport(raw,report.capabilities);
