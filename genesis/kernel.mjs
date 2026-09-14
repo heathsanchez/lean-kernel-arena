@@ -413,7 +413,7 @@ class Kernel {
       this.reject("recursor-universe-parameters");
 
     for(const c of ctorInfos)
-      this.env.set(c.name,{kind:"ctor",name:c.name,type:c.type,levelParams:d.levelParams,induct:d.name,numFields:c.numFields});
+      this.env.set(c.name,{kind:"ctor",name:c.name,type:c.type,levelParams:d.levelParams,induct:d.name,numParams:d.numParams,numFields:c.numFields});
     this.params=new Set(rec.levelParams);
     const derived=this.deriveTypeRecursor(d,ctorInfos,rec);
     if(!this.same(rec.type,derived.recType)) this.reject("recursor-type:"+d.name);
@@ -539,6 +539,33 @@ class Kernel {
               let out=this.make("app",qargs[3],margs[2]);
               for(const extra of qargs.slice(5)) out=this.make("app",out,extra);
               return this.whnf(out);
+            }
+          }
+        }
+      }
+      const [rh,rargs]=this.getApp(e);
+      if(rh[0]==="const") {
+        const rd=this.env.get(rh[1]);
+        if(rd?.kind==="rec") {
+          const total=rd.numParams+1+rd.numMinors+rd.numIndices+1;
+          if(rargs.length>=total) {
+            const major=this.whnf(rargs[total-1]),[mh,margs]=this.getApp(major);
+            const md=mh[0]==="const"?this.env.get(mh[1]):null;
+            if(md?.kind==="ctor" && md.induct===rd.induct &&
+               margs.length===md.numParams+md.numFields) {
+              let paramsMatch=true;
+              for(let i=0;i<rd.numParams;i++) if(!this.same(margs[i],rargs[i])) { paramsMatch=false; break; }
+              if(paramsMatch) {
+                const rule=rd.rules.find(rr=>rr.ctor===md.name);
+                if(rule) {
+                  this.need("inductive-reduction"); this.need("reduction");
+                  let rhs=this.instantiateDeclaration(rh,rule.rhs);
+                  const prefix=rargs.slice(0,rd.numParams+1+rd.numMinors);
+                  rhs=this.appN(rhs,prefix.concat(margs.slice(md.numParams)));
+                  for(const extra of rargs.slice(total)) rhs=this.make("app",rhs,extra);
+                  return this.whnf(rhs);
+                }
+              }
             }
           }
         }

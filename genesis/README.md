@@ -213,3 +213,8 @@ String literals are retained as primitive literal expressions with exact literal
 ### Quotients
 
 The primitive `Quot` package is admitted only as the exact four-declaration kernel package `Quot`, `Quot.mk`, `Quot.lift`, and `Quot.ind`, with their types independently reconstructed from universe parameters. The two primitive computation rules reduce `Quot.lift` and `Quot.ind` on `Quot.mk`; no additional quotient equations are assumed.
+
+
+### Certified inductive computation
+
+Recursors generated and already certified by the single-inductive checker now compute on matching certified constructors. Reduction selects the validated exported rule, instantiates its universes, applies the recursor prefix and constructor fields, and recursively normalizes the result. Removing this capability restores an explicit UNKNOWN at the reducible recursor redex.

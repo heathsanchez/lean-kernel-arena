@@ -416,6 +416,25 @@ function runSingleInductiveTests(base,emit=()=>{}) {
     "negative recursive occurrence was not rejected: "+JSON.stringify(rejected));
   emit({event:"single-inductive-growth",ablation_unknown:true,recursive_type:true,
     derived_recursor:true,strict_positivity:true});
+  return {capabilities:caps,cases:2,fixture:good};
+}
+
+
+function runInductiveReductionTests(base,fixture,emit=()=>{}) {
+  const caps=[...base,"inductive-reduction"],n=fixture.name,z=fixture.ctors[0].name,s=fixture.ctors[1].name,rn=fixture.rec.name;
+  const I=["const",n],Z=["const",z],Succ=["const",s],Rec=["const",rn,[0]];
+  const motive=Lam(I,I),zeroMinor=Z,succMinor=Lam(I,Lam(I,V(0)));
+  const app=(f,...xs)=>xs.reduce((q,x)=>App(q,x),f);
+  const zeroTerm=app(Rec,motive,zeroMinor,succMinor,Z);
+  const before=new Kernel(base); assert(before.run(S(0),S(1),[fixture]).status===ACCEPT,"inductive reduction fixture failed before ablation");
+  before.steps=0;
+  let ablated=false; try { before.whnf(zeroTerm); } catch(e) { ablated=e instanceof Stop&&e.status===UNKNOWN&&e.message==="missing:inductive-reduction"; }
+  assert(ablated,"inductive reduction ablation did not restore missing capability");
+  const checker=new Kernel(caps); assert(checker.run(S(0),S(1),[fixture]).status===ACCEPT,"inductive reduction fixture failed");
+  checker.steps=0; assert(checker.same(checker.whnf(zeroTerm),Z),"zero recursor rule did not reduce");
+  const succTerm=app(Rec,motive,zeroMinor,succMinor,App(Succ,Z));
+  checker.steps=0; assert(checker.same(checker.whnf(succTerm),Z),"recursive recursor rule did not reduce");
+  emit({event:"inductive-reduction-growth",ablation_unknown:true,zero_rule:true,recursive_rule:true});
   return {capabilities:caps,cases:2};
 }
 
@@ -634,7 +653,11 @@ const singleInductive=runSingleInductiveTests(enumInductive.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const natLiteral=runNatLiteralTests(singleInductive.capabilities,row=>{
+const inductiveReduction=runInductiveReductionTests(singleInductive.capabilities,singleInductive.fixture,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const natLiteral=runNatLiteralTests(inductiveReduction.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
@@ -668,6 +691,7 @@ report.inductive_envelope_tests={cases:inductiveEnvelope.cases};
 report.empty_inductive_tests={cases:emptyInductive.cases};
 report.enum_inductive_tests={cases:enumInductive.cases};
 report.single_inductive_tests={cases:singleInductive.cases};
+report.inductive_reduction_tests={cases:inductiveReduction.cases};
 report.nat_literal_tests={cases:natLiteral.cases};
 report.string_literal_tests={cases:stringLiteral.cases};
 report.quotient_tests={cases:quotient.cases};
