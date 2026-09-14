@@ -461,7 +461,7 @@ function checkExport(input,capabilities,budget=200000) {
           }
         }
         frontierInductive={
-          name:v.types.length===1&&Number.isSafeInteger(v.types[0]?.name)?get(names,v.types[0].name):null,
+          name:v.types.length===1&&Number.isSafeInteger(v.types[0]?.name)?(names.get(v.types[0].name)??null):null,
           bundle:v
         };
         fail("inductive-semantics-frontier");
