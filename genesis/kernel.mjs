@@ -329,10 +329,17 @@ class Kernel {
     for(let i=0;i<idx;i++) {
       ctype=this.whnf(ctype);
       if(ctype[0]!=="pi") this.reject("projection-out-of-range");
+      // In Prop structures, traversing an intervening field type detects
+      // dependencies that would require exposing an earlier hidden data field.
+      if(ind.isProp) this.sortOf(ctype[1],ctx);
       ctype=this.substitute(ctype[2],this.make("proj",typeName,i,obj));
     }
     ctype=this.whnf(ctype);
     if(ctype[0]!=="pi") this.reject("projection-out-of-range");
+    if(ind.isProp) {
+      const u=this.sortOf(ctype[1],ctx);
+      if(!levelsEqual(u,0,()=>this.tick())) this.reject("projection-data-from-prop");
+    }
     return ctype[1];
   }
   addSingleInductive(d) {
@@ -376,7 +383,7 @@ class Kernel {
     for(const n of groupNames) if(this.env.has(n)) this.reject("duplicate-declaration");
 
     this.env.set(d.name,{kind:"inductive",name:d.name,type:d.type,levelParams:d.levelParams,
-      numParams:d.numParams,numIndices:d.numIndices,ctors:d.ctors.map(c=>c.name)});
+      numParams:d.numParams,numIndices:d.numIndices,ctors:d.ctors.map(c=>c.name),isProp});
 
     const ctorInfos=[]; let actualRec=false,recoverableData=true;
     for(let ciIndex=0;ciIndex<d.ctors.length;ciIndex++) {

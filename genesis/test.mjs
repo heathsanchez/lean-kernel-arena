@@ -609,9 +609,25 @@ function runProjectionTests(base,emit=()=>{}) {
   assert(inst[0]==="proj"&&inst[1]===B&&inst[2]===0&&inst[3][0]==="const"&&inst[3][2][0]===0,
     "projection universe traversal corrupted metadata or failed to instantiate its child");
 
+  const pc=new Kernel(caps),P="ProofField",D="DataField",PB="PropBox",PM="PropBox.mk",PX="propBoxValue";
+  const CP=["const",P],CD=["const",D],CI=["const",PB];
+  pc.steps=0; pc.params=new Set(); pc.env=new Map([
+    [P,{kind:"axiom",name:P,type:S(0),levelParams:[]}],
+    [D,{kind:"axiom",name:D,type:S(1),levelParams:[]}],
+    [PB,{kind:"inductive",name:PB,type:S(0),levelParams:[],numParams:0,numIndices:0,ctors:[PM],isProp:true}],
+    [PM,{kind:"ctor",name:PM,type:Pi(CP,Pi(CD,CI)),levelParams:[],induct:PB,numParams:0,numFields:2}],
+    [PX,{kind:"axiom",name:PX,type:CI,levelParams:[]}]
+  ]);
+  assert(pc.same(pc.inferProjection(PB,0,["const",PX],[]),CP),
+    "proof projection from Prop structure was rejected");
+  let dataRejected=false;
+  try { pc.inferProjection(PB,1,["const",PX],[]); }
+  catch(e) { dataRejected=e instanceof Stop&&e.status===REJECT&&e.message==="projection-data-from-prop"; }
+  assert(dataRejected,"data projection from Prop structure was not rejected");
+
   emit({event:"projection-growth",ablation_unknown:true,inference:true,reduction:true,
-    out_of_range_rejected:true,universe_traversal:true});
-  return {capabilities:caps,cases:4};
+    out_of_range_rejected:true,universe_traversal:true,prop_data_hidden:true});
+  return {capabilities:caps,cases:5};
 }
 
 
