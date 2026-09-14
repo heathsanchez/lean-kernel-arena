@@ -491,6 +491,7 @@ function runQuotientTests(base,emit=()=>{}) {
 
   const checker=new Kernel(caps); checker.steps=0; checker.env=new Map(decls.map(d=>[d.name,d])); checker.params=new Set();
   const A=["const","QA"],R=["const","QR"],B=["const","QB"],a=["const","qa"];
+  checker.env.set("qa",{kind:"axiom",name:"qa",levelParams:[],type:A});
   const mk=[["const",names.ctor,[["param",u]]],A,R,a].reduce((f,x,i)=>i===0?x:App(f,x));
   const ident=Lam(A,V(0)),dummy=["const","qh"];
   const lift=[["const",names.lift,[["param",u],["param",v]]],A,R,B,ident,dummy,mk].reduce((f,x,i)=>i===0?x:App(f,x));
