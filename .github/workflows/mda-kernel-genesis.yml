@@ -1,0 +1,39 @@
+name: MDA kernel short growth loops
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/**'
+      - '.github/workflows/mda-kernel-genesis.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: mda-kernel-genesis-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  grow:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Grow, replay, ablate, dissolve; fail within 15 seconds
+        run: timeout 15s node genesis/test.mjs
+      - name: Check independent Arena corpus; stop on first wrong verdict
+        run: timeout 45s node genesis/arena.mjs
+      - name: Publish compact result
+        if: always()
+        run: |
+          if [ -f genesis/evidence/summary.json ]; then
+            cat genesis/evidence/summary.json >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Preserve each loop and any counterexample
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-kernel-genesis-${{ github.sha }}
+          path: genesis/evidence/
+          if-no-files-found: error

@@ -1,0 +1,89 @@
+# Kernel genesis: short, falsifiable growth loops
+
+Experimental new implementation, written independently of the existing Rust checkers.
+The empty capability set returns UNKNOWN for every input. A developmental harness
+tries supplied rule implementations, retains coverage gains, replays prior results,
+ablates additions and attempts deletion after every growth step.
+
+## Run
+
+Requires Node.js 22; the independent corpus gate also uses Python 3 and internet.
+
+```sh
+node genesis/test.mjs
+node genesis/arena.mjs
+node genesis/check.mjs --state genesis/evidence/retained.json < tests/sparse-name-index.ndjson
+```
+
+Without --state, check.mjs runs the empty present. Exit codes are 0 ACCEPT,
+1 REJECT, 2 UNKNOWN, 3 usage failure. Unexpected programming errors are failures,
+not proof rejections. The core accepts a deliberately bounded monomorphic fragment:
+numeric universes, dependent binders, application, beta/let reduction, and validated
+axioms/definitions. Proof irrelevance, eta, polymorphic universe parameters,
+inductives, recursors, quotient rules, theorem declarations and primitive literal
+extensions remain explicit frontiers. Failed structural conversion returns UNKNOWN
+unless distinct numeric sorts supply a decisive mismatch.
+
+This is not a complete or formally verified Lean kernel and has no Mathlib speed claim.
+
+## What grows, and what is supplied
+
+The retained capability set starts empty. The host interpreter, typed-term input
+schema, budgets, test evaluator and candidate rule implementations are supplied.
+The current search enumerates single additions, then pairs if singles cannot
+progress; it is finite capability selection, not autonomous program synthesis.
+No test names, expected verdicts or corpus hashes are available to the checker.
+
+The smallest initial sort-only procedure can be retained, then dissolved when the
+general sort capability plus binder checking subsumes it. This is removal from
+the retained capability set; the candidate library remains available to the
+development process. Producing source code that physically omits all unretained
+procedures is a further compiler step, not claimed here.
+
+## Immediate feedback
+
+1. The seed must return UNKNOWN on all 16 training obligations.
+2. Each candidate gets the small corpus immediately; any wrong verdict vetoes it.
+3. Every accepted addition must increase coverage and preserve established verdicts.
+4. Removing the addition must restore the previous coverage.
+5. Each deletion must preserve all coverage with no increased counted work.
+6. 96 separate generated cases test new universes and capture-sensitive binders.
+7. Mutation, resource exhaustion, unsupported syntax, malformed axioms and process
+   exit-code controls run before any external download.
+8. Existing repository Arena fixtures check sparse and out-of-order references.
+9. The published small Arena corpus runs after the above, stopping immediately
+   on the first wrong verdict and saving the exact counterexample.
+
+The 16-case corpus participates in selection; the 96-case set is a held-out
+parameter expansion, not an independently authored theorem corpus. The downloaded
+Arena tests are independent integration evidence. Their exact SHA-256 and all
+declines are recorded. The download is not pinned across future runs; freeze its
+hash/corpus before claiming cross-commit benchmark comparisons.
+
+## Cost and trust
+
+Steps count explicitly instrumented core operations; they are not retired machine
+instructions. Constructed-node counts and elapsed milliseconds are separate.
+Parsing reports record counts and is included in end-to-end elapsed time; JSON
+decoding, host GC, context-array copies and toolchain costs are not captured by the
+step counter. No total-cost or universal optimality claim follows from these tests.
+
+Finite tests and source review do not prove soundness. Every extension needs a
+semantic argument and adversarial evidence before use as a trusted kernel. The
+checker never treats an unsupported feature or exhausted budget as mathematical
+invalidity. Inputs and traversals are bounded to keep this first feedback loop short.
+
+## Evidence
+
+The workflow prints every transition immediately and saves events.jsonl,
+retained.json, summary.json and arena.json. Local V8 execution during development
+showed coverage 0 -> 2 -> 5 -> 8 -> 12 -> 16 and one redundant capability removed.
+GitHub Actions is the reproducible check of the committed files and CLI.
+
+## Earlier workflow failure
+
+Run 34874829913, job 104079318875 reached `test -s /tmp/mathlib-warm.out`
+after the checker command returned zero under `set -e`. It failed because the
+output was empty, not because the checker returned rejection. The short harness
+contains a silent-success process control to prevent that gate error. The earlier
+expensive workflow is not rerun by this branch.
