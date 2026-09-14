@@ -447,8 +447,11 @@ class Kernel {
     // Large elimination is safe if the inductive can never be Prop, or for the
     // standard empty / eta-structure / K exceptions. A merely polymorphic Sort u
     // does not count as "never Prop".
-    const structureLarge=d.ctors.length===1 && !actualRec && recoverableData;
-    const largeElim=!mayBeProp || d.ctors.length===0 || structureLarge || expectedK;
+    // For a single-constructor predicate, recursion is not itself secret
+    // information. Every non-parameter field must either be proof-valued or
+    // occur directly in the constructor result indices.
+    const singletonLarge=d.ctors.length===1 && recoverableData;
+    const largeElim=!mayBeProp || d.ctors.length===0 || singletonLarge || expectedK;
     let motiveLevel;
     if(!largeElim) {
       if(!Array.isArray(rec.levelParams)||rec.levelParams.length!==d.levelParams.length||
