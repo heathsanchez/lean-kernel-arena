@@ -448,7 +448,7 @@ function runPropInductiveTests(base,emit=()=>{}) {
     isRec:false,isUnsafe:false,isReflexive:false,all:[n],ctorNames:[c],
     ctors:[{name:c,levelParams:[],type:I,induct:n,cidx:0,numParams:0,numFields:0,isUnsafe:false}],
     rec:{name:rn,levelParams:[u],type:recType,all:[n],numParams:0,numIndices:0,numMotives:1,
-      numMinors:1,k:false,isUnsafe:false,rules:[{ctor:c,nfields:0,rhs:rule}]}
+      numMinors:1,k:true,isUnsafe:false,rules:[{ctor:c,nfields:0,rhs:rule}]}
   };
   const before=new Kernel(base).run(S(0),S(1),[good]);
   assert(before.status===UNKNOWN&&before.reason==="missing:prop-inductives",
