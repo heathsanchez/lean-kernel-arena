@@ -899,11 +899,7 @@ const functionEta=runFunctionEtaTests(proofIrrelevance.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const rigidConversion=runRigidConversionTests(functionEta.capabilities,row=>{
-  console.log(JSON.stringify(row));
-  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
-});
-const inductiveEnvelope=runInductiveEnvelopeTests(rigidConversion.capabilities,row=>{
+const inductiveEnvelope=runInductiveEnvelopeTests(functionEta.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
@@ -959,7 +955,11 @@ const structureEta=runStructureEtaTests(projection.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const opaqueDeclaration=runOpaqueDeclarationTests(structureEta.capabilities,row=>{
+const rigidConversion=runRigidConversionTests(structureEta.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const opaqueDeclaration=runOpaqueDeclarationTests(rigidConversion.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
