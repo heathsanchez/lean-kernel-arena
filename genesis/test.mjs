@@ -1,7 +1,7 @@
 import {writeFileSync,appendFileSync,mkdirSync,readFileSync} from "node:fs";
 import {spawnSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
-import {levelsEqual,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,checkExport} from "./kernel.mjs";
+import {levelsEqual,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,checkExport} from "./kernel.mjs";
 
 function growthSuite() {
   const C=(name,term,type,expected=ACCEPT,declarations=[])=>({name,term,type,expected,declarations});
@@ -420,6 +420,29 @@ function runSingleInductiveTests(base,emit=()=>{}) {
 }
 
 
+function runNatLiteralTests(base,emit=()=>{}) {
+  const caps=[...base,"nat-literals"];
+  const name=(...parts)=>parts.reduce((pre,s)=>JSON.stringify([pre,"str",s]),"[]");
+  const N=name("Nat"),Z=name("Nat","zero"),Su=name("Nat","succ");
+  const Nat=["const",N];
+  const decls=[
+    {kind:"axiom",name:N,type:S(1),levelParams:[]},
+    {kind:"axiom",name:Z,type:Nat,levelParams:[]},
+    {kind:"axiom",name:Su,type:Pi(Nat,Nat),levelParams:[]}
+  ];
+  const before=new Kernel(base).run(NatLit(1),Nat,decls);
+  assert(before.status===UNKNOWN&&before.reason==="missing:nat-literals",
+    "nat literal ablation did not restore missing capability");
+  const one=new Kernel(caps).run(NatLit(1),Nat,decls);
+  assert(one.status===ACCEPT,"Nat literal did not typecheck: "+JSON.stringify(one));
+  const checker=new Kernel(caps);
+  checker.steps=0; checker.env=new Map(decls.map(d=>[d.name,d])); checker.params=new Set();
+  checker.equal(NatLit(1),App(["const",Su],["const",Z]),[]);
+  emit({event:"nat-literal-growth",ablation_unknown:true,typecheck:true,constructor_reduction:true});
+  return {capabilities:caps,cases:2};
+}
+
+
 function runDeclarationSafetyControls(base,emit=()=>{}) {
   const meta={meta:{format:{version:"3.1.0"}}};
   const mkDef=safety=>[
@@ -480,7 +503,11 @@ const singleInductive=runSingleInductiveTests(enumInductive.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const declarationSafety=runDeclarationSafetyControls(singleInductive.capabilities,row=>{
+const natLiteral=runNatLiteralTests(singleInductive.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const declarationSafety=runDeclarationSafetyControls(natLiteral.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
@@ -494,6 +521,7 @@ report.inductive_envelope_tests={cases:inductiveEnvelope.cases};
 report.empty_inductive_tests={cases:emptyInductive.cases};
 report.enum_inductive_tests={cases:enumInductive.cases};
 report.single_inductive_tests={cases:singleInductive.cases};
+report.nat_literal_tests={cases:natLiteral.cases};
 report.declaration_safety_controls={cases:declarationSafety.cases,retained_capability:false};
 for(const name of ["level-index-out-of-order","sparse-name-index"]) {
   const raw=readFileSync(new URL("../tests/"+name+".ndjson",import.meta.url),"utf8");

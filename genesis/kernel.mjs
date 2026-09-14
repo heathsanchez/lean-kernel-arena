@@ -71,6 +71,8 @@ const ACCEPT = "ACCEPT", REJECT = "REJECT", UNKNOWN = "UNKNOWN";
 const S = n => ["sort", n], V = n => ["var", n];
 const Pi = (a,b) => ["pi",a,b], Lam = (a,b) => ["lam",a,b];
 const App = (f,a) => ["app",f,a], Let = (a,v,b) => ["let",a,v,b];
+const NatLit = n => ["nat",n];
+const leanName = (...parts) => parts.reduce((pre,s)=>JSON.stringify([pre,"str",s]),"[]");
 class Stop extends Error { constructor(status, reason) { super(reason); this.status=status; } }
 class Kernel {
   constructor(capabilities=[], budget=50000) {
@@ -382,11 +384,15 @@ class Kernel {
   validate(e) {
     this.tick();
     if(!Array.isArray(e) || typeof e[0]!=="string") this.reject("malformed-term");
-    const arities={sort:2,var:2,const:2,pi:3,lam:3,app:3,let:4};
+    const arities={sort:2,var:2,const:2,nat:2,pi:3,lam:3,app:3,let:4};
     if(!(e[0] in arities)) this.unknown("syntax:"+e[0]);
     if(e.length!==arities[e[0]] && !(e[0]==="const"&&e.length===3)) this.reject("malformed-arity");
     if(e[0]==="sort"&&typeof e[1]!=="number") {
       this.need("universes");validateLevel(e[1],this.params,()=>this.tick());
+    } else if(e[0]==="nat") {
+      this.need("nat-literals");
+      if(!Number.isSafeInteger(e[1])||e[1]<0) this.reject("malformed-nat-literal");
+      if(e[1]>10) this.unknown("nat-literal-budget");
     } else if(e[0]==="sort" || e[0]==="var") {
       if(!Number.isSafeInteger(e[1]) || e[1]<0) this.reject("malformed-index");
       if(e[1]>1000000) this.unknown("index-limit");
@@ -401,7 +407,7 @@ class Kernel {
   shift(e,amount,cut=0) {
     this.tick();
     switch(e[0]) {
-      case "sort": case "const": return e;
+      case "sort": case "const": case "nat": return e;
       case "var": return e[1]<cut ? e : this.make("var",e[1]+amount);
       case "pi": case "lam": return this.make(e[0],this.shift(e[1],amount,cut),this.shift(e[2],amount,cut+1));
       case "app": return this.make("app",this.shift(e[1],amount,cut),this.shift(e[2],amount,cut));
@@ -412,7 +418,7 @@ class Kernel {
   substitute(e,arg,depth=0) {
     this.tick();
     switch(e[0]) {
-      case "sort": case "const": return e;
+      case "sort": case "const": case "nat": return e;
       case "var": return e[1]===depth ? this.shift(arg,depth) : e[1]>depth ? this.make("var",e[1]-1) : e;
       case "pi": case "lam": return this.make(e[0],this.substitute(e[1],arg,depth),this.substitute(e[2],arg,depth+1));
       case "app": return this.make("app",this.substitute(e[1],arg,depth),this.substitute(e[2],arg,depth));
@@ -422,6 +428,11 @@ class Kernel {
   }
   whnf(e) {
     this.tick();
+    if(e[0]==="nat") {
+      this.need("nat-literals");
+      const zero=["const",leanName("Nat","zero")],succ=["const",leanName("Nat","succ")];
+      return e[1]===0?zero:this.make("app",succ,this.make("nat",e[1]-1));
+    }
     if(e[0]==="const") {
       this.need("declarations");
       const d=this.env.get(e[1]);
@@ -450,7 +461,7 @@ class Kernel {
   }
   normal(e) {
     this.tick(); e=this.whnf(e);
-    if(["sort","var","const"].includes(e[0])) return e;
+    if(["sort","var","const","nat"].includes(e[0])) return e;
     return this.make(e[0],...e.slice(1).map(x=>this.normal(x)));
   }
   proofType(e,ctx) {
@@ -526,6 +537,12 @@ class Kernel {
         this.need("declarations");
         if(!this.env.has(e[1])) this.reject("undeclared-constant");
         return this.instantiateDeclaration(e,this.env.get(e[1]).type);
+      case "nat": {
+        this.need("nat-literals"); this.need("declarations");
+        const n=leanName("Nat");
+        if(!this.env.has(n)) this.reject("undeclared-nat");
+        return ["const",n];
+      }
       case "pi": {
         this.need("binders");
         const a=this.sortOf(e[1],ctx), b=this.sortOf(e[2],[...ctx,e[1]]);
@@ -549,7 +566,7 @@ class Kernel {
     }
   }
 }
-const API={Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let};
+const API={Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit};
 
 function checkExport(input,capabilities,budget=200000) {
   const start=Date.now();let parsed=0,frontierInductive=null;
@@ -600,7 +617,12 @@ function checkExport(input,capabilities,budget=200000) {
         else if(tag==="app"&&v) e=App(get(exprs,v.fn),get(exprs,v.arg));
         else if(tag==="letE"&&v&&typeof v.nondep==="boolean") e=Let(get(exprs,v.type),get(exprs,v.value),get(exprs,v.body));
         else if(tag==="mdata"&&v) e=get(exprs,v.expr);
-        else fail("expression-frontier:"+tag);
+        else if(tag==="natVal"&&typeof v==="string"&&/^[0-9]+$/.test(v)) {
+          if(!capabilities.includes("nat-literals")) fail("expression-frontier:natVal");
+          const n=Number(v);
+          if(!Number.isSafeInteger(n)||n>10) fail("nat-literal-budget");
+          e=NatLit(n);
+        } else fail("expression-frontier:"+tag);
         put(exprs,row.ie,e);
       } else if(tag==="inductive") {
         if(!capabilities.includes("inductive-envelope")) fail("declaration-frontier:inductive");
@@ -768,4 +790,4 @@ function checkExport(input,capabilities,budget=200000) {
   }
 }
 
-export {levelsEqual,levelSucc,levelIMax,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,checkExport};
+export {levelsEqual,levelSucc,levelIMax,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,checkExport};
