@@ -1,7 +1,7 @@
 import {writeFileSync,appendFileSync,mkdirSync,readFileSync} from "node:fs";
 import {spawnSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
-import {levelsEqual,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,checkExport} from "./kernel.mjs";
+import {levelsEqual,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,Proj,checkExport} from "./kernel.mjs";
 
 function growthSuite() {
   const C=(name,term,type,expected=ACCEPT,declarations=[])=>({name,term,type,expected,declarations});
@@ -443,6 +443,35 @@ function runNatLiteralTests(base,emit=()=>{}) {
 }
 
 
+function runProjectionTests(base,emit=()=>{}) {
+  const caps=[...base,"projections"],A="ProjA",a="projA",B="Box",mk="Box.mk",rn=JSON.stringify([B,"str","rec"]),u="u";
+  const AT=["const",A],av=["const",a],I=["const",B],Mk=["const",mk],Rec=["const",rn,[["param",u]]];
+  const motive=Pi(I,S(["param",u]));
+  const minor=Pi(AT,App(V(1),App(Mk,V(0))));
+  const recType=Pi(motive,Pi(minor,Pi(I,App(V(2),V(0)))));
+  const rule=Lam(motive,Lam(minor,Lam(AT,App(V(1),V(0)))));
+  const box={kind:"inductive",name:B,levelParams:[],type:S(1),numParams:0,numIndices:0,numNested:0,
+    isRec:false,isUnsafe:false,isReflexive:false,all:[B],ctorNames:[mk],
+    ctors:[{name:mk,levelParams:[],type:Pi(AT,I),induct:B,cidx:0,numParams:0,numFields:1,isUnsafe:false}],
+    rec:{name:rn,levelParams:[u],type:recType,all:[B],numParams:0,numIndices:0,numMotives:1,
+      numMinors:1,k:false,isUnsafe:false,rules:[{ctor:mk,nfields:1,rhs:rule}]}
+  };
+  const decls=[{kind:"axiom",name:A,type:S(1),levelParams:[]},{kind:"axiom",name:a,type:AT,levelParams:[]},box];
+  const p=Proj(B,0,App(Mk,av));
+  const before=new Kernel(base).run(p,AT,decls);
+  assert(before.status===UNKNOWN&&before.reason==="missing:projections",
+    "projection ablation did not restore missing capability");
+  const checker=new Kernel(caps),ok=checker.run(p,AT,decls);
+  assert(ok.status===ACCEPT,"structure projection did not typecheck: "+JSON.stringify(ok));
+  checker.equal(p,av,[]);
+  const bad=new Kernel(caps).run(Proj(B,1,App(Mk,av)),AT,decls);
+  assert(bad.status===REJECT&&bad.reason==="projection-out-of-range",
+    "out-of-range projection was not rejected: "+JSON.stringify(bad));
+  emit({event:"projection-growth",ablation_unknown:true,inference:true,reduction:true,out_of_range_rejected:true});
+  return {capabilities:caps,cases:3};
+}
+
+
 function runDeclarationSafetyControls(base,emit=()=>{}) {
   const meta={meta:{format:{version:"3.1.0"}}};
   const mkDef=safety=>[
@@ -507,7 +536,11 @@ const natLiteral=runNatLiteralTests(singleInductive.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const declarationSafety=runDeclarationSafetyControls(natLiteral.capabilities,row=>{
+const projection=runProjectionTests(natLiteral.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const declarationSafety=runDeclarationSafetyControls(projection.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
@@ -522,6 +555,7 @@ report.empty_inductive_tests={cases:emptyInductive.cases};
 report.enum_inductive_tests={cases:enumInductive.cases};
 report.single_inductive_tests={cases:singleInductive.cases};
 report.nat_literal_tests={cases:natLiteral.cases};
+report.projection_tests={cases:projection.cases};
 report.declaration_safety_controls={cases:declarationSafety.cases,retained_capability:false};
 for(const name of ["level-index-out-of-order","sparse-name-index"]) {
   const raw=readFileSync(new URL("../tests/"+name+".ndjson",import.meta.url),"utf8");

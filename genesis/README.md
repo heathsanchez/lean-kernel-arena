@@ -183,3 +183,8 @@ The checker now has a separately charged single-inductive semantic grain for non
 ### Natural-number literals
 
 Small exported natural literals are now a separately charged grain. They infer as `Nat` and reduce to the canonical `Nat.zero` / `Nat.succ` constructor form. Values above the certified bound remain UNKNOWN rather than being rejected.
+
+
+### Type-structure projections
+
+Projection expressions are now checked and reduced for certified single-constructor, zero-index Type structures. The result type is reconstructed from the constructor telescope with earlier projections substituted into dependent fields; constructor applications reduce to the corresponding field. Projections from propositions and indexed/non-structure inductives remain outside this grain.

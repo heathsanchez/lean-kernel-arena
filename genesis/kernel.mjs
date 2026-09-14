@@ -72,6 +72,7 @@ const S = n => ["sort", n], V = n => ["var", n];
 const Pi = (a,b) => ["pi",a,b], Lam = (a,b) => ["lam",a,b];
 const App = (f,a) => ["app",f,a], Let = (a,v,b) => ["let",a,v,b];
 const NatLit = n => ["nat",n];
+const Proj = (n,i,e) => ["proj",n,i,e];
 const leanName = (...parts) => parts.reduce((pre,s)=>JSON.stringify([pre,"str",s]),"[]");
 class Stop extends Error { constructor(status, reason) { super(reason); this.status=status; } }
 class Kernel {
@@ -274,6 +275,32 @@ class Kernel {
     }
     return {recType,ruleBodies};
   }
+  inferProjection(typeName,idx,obj,ctx) {
+    this.need("projections");
+    const objType=this.whnf(this.infer(obj,ctx));
+    const [head,args]=this.getApp(objType);
+    if(head[0]!=="const") this.reject("projection-non-inductive");
+    if(head[1]!==typeName) this.reject("projection-type-name");
+    const ind=this.env.get(typeName);
+    if(!ind||ind.kind!=="inductive") this.reject("projection-non-inductive");
+    if(ind.numIndices!==0||ind.ctors.length!==1) this.reject("projection-not-structure");
+    if(args.length!==ind.numParams) this.reject("projection-not-fully-applied");
+    const ctor=this.env.get(ind.ctors[0]);
+    if(!ctor||ctor.kind!=="ctor") this.reject("projection-constructor-missing");
+    const cref=this.constRef(ctor.name,head[2]?.map((_,i)=>ctor.levelParams[i])??ctor.levelParams);
+    // Instantiate the constructor type at the concrete universe levels carried by the object type.
+    const cLevels=head[2]??[];
+    let ctype=this.instantiateDeclaration(cLevels.length?["const",ctor.name,cLevels]:["const",ctor.name],ctor.type);
+    ctype=this.instantiateForalls(ctype,args.slice(0,ind.numParams));
+    for(let i=0;i<idx;i++) {
+      ctype=this.whnf(ctype);
+      if(ctype[0]!=="pi") this.reject("projection-out-of-range");
+      ctype=this.substitute(ctype[2],this.make("proj",typeName,i,obj));
+    }
+    ctype=this.whnf(ctype);
+    if(ctype[0]!=="pi") this.reject("projection-out-of-range");
+    return ctype[1];
+  }
   addSingleInductive(d) {
     this.tick();
     if(d.numNested!==0 || d.isUnsafe!==false) this.reject("unsupported-inductive-envelope");
@@ -384,7 +411,7 @@ class Kernel {
   validate(e) {
     this.tick();
     if(!Array.isArray(e) || typeof e[0]!=="string") this.reject("malformed-term");
-    const arities={sort:2,var:2,const:2,nat:2,pi:3,lam:3,app:3,let:4};
+    const arities={sort:2,var:2,const:2,nat:2,proj:4,pi:3,lam:3,app:3,let:4};
     if(!(e[0] in arities)) this.unknown("syntax:"+e[0]);
     if(e.length!==arities[e[0]] && !(e[0]==="const"&&e.length===3)) this.reject("malformed-arity");
     if(e[0]==="sort"&&typeof e[1]!=="number") {
@@ -393,6 +420,10 @@ class Kernel {
       this.need("nat-literals");
       if(!Number.isSafeInteger(e[1])||e[1]<0) this.reject("malformed-nat-literal");
       if(e[1]>10) this.unknown("nat-literal-budget");
+    } else if(e[0]==="proj") {
+      this.need("projections");
+      if(typeof e[1]!=="string"||!Number.isSafeInteger(e[2])||e[2]<0) this.reject("malformed-projection");
+      this.validate(e[3]); return;
     } else if(e[0]==="sort" || e[0]==="var") {
       if(!Number.isSafeInteger(e[1]) || e[1]<0) this.reject("malformed-index");
       if(e[1]>1000000) this.unknown("index-limit");
@@ -411,6 +442,7 @@ class Kernel {
       case "var": return e[1]<cut ? e : this.make("var",e[1]+amount);
       case "pi": case "lam": return this.make(e[0],this.shift(e[1],amount,cut),this.shift(e[2],amount,cut+1));
       case "app": return this.make("app",this.shift(e[1],amount,cut),this.shift(e[2],amount,cut));
+      case "proj": return this.make("proj",e[1],e[2],this.shift(e[3],amount,cut));
       case "let": return this.make("let",this.shift(e[1],amount,cut),this.shift(e[2],amount,cut),this.shift(e[3],amount,cut+1));
       default: this.unknown("shift-syntax");
     }
@@ -422,6 +454,7 @@ class Kernel {
       case "var": return e[1]===depth ? this.shift(arg,depth) : e[1]>depth ? this.make("var",e[1]-1) : e;
       case "pi": case "lam": return this.make(e[0],this.substitute(e[1],arg,depth),this.substitute(e[2],arg,depth+1));
       case "app": return this.make("app",this.substitute(e[1],arg,depth),this.substitute(e[2],arg,depth));
+      case "proj": return this.make("proj",e[1],e[2],this.substitute(e[3],arg,depth));
       case "let": return this.make("let",this.substitute(e[1],arg,depth),this.substitute(e[2],arg,depth),this.substitute(e[3],arg,depth+1));
       default: this.unknown("substitution-syntax");
     }
@@ -432,6 +465,19 @@ class Kernel {
       this.need("nat-literals");
       const zero=["const",leanName("Nat","zero")],succ=["const",leanName("Nat","succ")];
       return e[1]===0?zero:this.make("app",succ,this.make("nat",e[1]-1));
+    }
+    if(e[0]==="proj") {
+      this.need("projections");
+      const obj=this.whnf(e[3]),ind=this.env.get(e[1]);
+      if(ind?.kind==="inductive" && ind.ctors?.length===1) {
+        const [head,args]=this.getApp(obj),ctor=ind.ctors[0];
+        if(head[0]==="const"&&head[1]===ctor) {
+          const pos=ind.numParams+e[2];
+          if(pos>=args.length) this.reject("projection-out-of-range");
+          return this.whnf(args[pos]);
+        }
+      }
+      return obj===e[3]?e:this.make("proj",e[1],e[2],obj);
     }
     if(e[0]==="const") {
       this.need("declarations");
@@ -462,6 +508,7 @@ class Kernel {
   normal(e) {
     this.tick(); e=this.whnf(e);
     if(["sort","var","const","nat"].includes(e[0])) return e;
+    if(e[0]==="proj") return this.make("proj",e[1],e[2],this.normal(e[3]));
     return this.make(e[0],...e.slice(1).map(x=>this.normal(x)));
   }
   proofType(e,ctx) {
@@ -543,6 +590,7 @@ class Kernel {
         if(!this.env.has(n)) this.reject("undeclared-nat");
         return ["const",n];
       }
+      case "proj": return this.inferProjection(e[1],e[2],e[3],ctx);
       case "pi": {
         this.need("binders");
         const a=this.sortOf(e[1],ctx), b=this.sortOf(e[2],[...ctx,e[1]]);
@@ -566,7 +614,7 @@ class Kernel {
     }
   }
 }
-const API={Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit};
+const API={Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,Proj};
 
 function checkExport(input,capabilities,budget=200000) {
   const start=Date.now();let parsed=0,frontierInductive=null;
@@ -622,6 +670,10 @@ function checkExport(input,capabilities,budget=200000) {
           const n=Number(v);
           if(!Number.isSafeInteger(n)||n>10) fail("nat-literal-budget");
           e=NatLit(n);
+        } else if(tag==="proj"&&v) {
+          if(!capabilities.includes("projections")) fail("expression-frontier:proj");
+          if(!Number.isSafeInteger(v.idx)||v.idx<0) reject("malformed-projection");
+          e=Proj(get(names,v.typeName),v.idx,get(exprs,v.struct));
         } else fail("expression-frontier:"+tag);
         put(exprs,row.ie,e);
       } else if(tag==="inductive") {
@@ -790,4 +842,4 @@ function checkExport(input,capabilities,budget=200000) {
   }
 }
 
-export {levelsEqual,levelSucc,levelIMax,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,checkExport};
+export {levelsEqual,levelSucc,levelIMax,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,Proj,checkExport};
