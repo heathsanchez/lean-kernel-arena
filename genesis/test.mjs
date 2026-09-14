@@ -271,7 +271,7 @@ function runFunctionEtaTests(base,emit=()=>{}) {
 
 
 function runUnitEtaTests(base,emit=()=>{}) {
-  const caps=[...base,"unit-eta"],U="UnitLike",Mk="UnitLike.mk",R="UnitLike.rec",u="uu";
+  const caps=[...base,"unit-eta"],U="UnitLike",Mk="UnitLike.mk",R=JSON.stringify(["UnitLike","str","rec"]),u="uu";
   const I=["const",U],C=["const",Mk],motive=Pi(I,S(["param",u])),minor=App(V(0),C);
   const recType=Pi(motive,Pi(minor,Pi(I,App(V(2),V(0)))));
   const rule=Lam(motive,Lam(minor,V(0)));
