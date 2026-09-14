@@ -102,6 +102,16 @@ if(inductiveFrontier.length) {
   console.log("INDUCTIVE_FRONTIER_SHAPES "+JSON.stringify(
     Object.entries(signatures).sort((a,b)=>b[1]-a[1]).map(([signature,count])=>({count,signature}))));
   console.log("INDUCTIVE_FRONTIER_EXPECTED "+JSON.stringify(byExpected));
+  const actual={};
+  for(const x of inductiveFrontier) {
+    const n=x.result?.frontier_inductive?.name??"<unknown>";
+    const key=JSON.stringify([x.expected,n]);
+    actual[key]=(actual[key]??0)+1;
+  }
+  console.log("ACTUAL_INDUCTIVE_FRONTIER "+JSON.stringify(
+    Object.entries(actual).sort((a,b)=>b[1]-a[1]).map(([key,count])=>{
+      const [expected,name]=JSON.parse(key); return {count,expected,name};
+    })));
   console.log("INDUCTIVE_FRONTIER_PROFILES "+JSON.stringify(
     Object.entries(profiles).sort((a,b)=>b[1]-a[1]).map(([profile,count])=>({count,...JSON.parse(profile)}))));
   console.log("INDUCTIVE_FRONTIER_NAMES "+JSON.stringify(names));

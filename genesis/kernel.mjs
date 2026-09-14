@@ -298,8 +298,9 @@ class Kernel {
 const API={Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let};
 
 function checkExport(input,capabilities,budget=200000) {
-  const start=Date.now();let parsed=0;
-  const out=(status,reason)=>({status,reason,parse_records:parsed,elapsed_ms:Date.now()-start});
+  const start=Date.now();let parsed=0,frontierInductive=null;
+  const out=(status,reason)=>({status,reason,parse_records:parsed,elapsed_ms:Date.now()-start,
+    ...(frontierInductive?{frontier_inductive:frontierInductive}:{})});
   if(!capabilities.length) return out(UNKNOWN,"empty-present");
   if(input.length>2000000) return out(UNKNOWN,"input-budget");
   const names=new Map([[0,"[]"]]),levels=new Map([[0,0]]),exprs=new Map(),decls=[];
@@ -459,6 +460,10 @@ function checkExport(input,capabilities,budget=200000) {
             }
           }
         }
+        frontierInductive={
+          name:v.types.length===1&&Number.isSafeInteger(v.types[0]?.name)?get(names,v.types[0].name):null,
+          bundle:v
+        };
         fail("inductive-semantics-frontier");
       } else if(tag==="axiom"||tag==="def"||tag==="thm") {
         if(tag==="thm"&&!capabilities.includes("theorems")) fail("declaration-frontier:thm");
