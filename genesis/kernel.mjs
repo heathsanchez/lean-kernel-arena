@@ -190,7 +190,9 @@ class Kernel {
     let cur=d.type; const paramTypes=[];
     for(let i=0;i<nP;i++) {
       cur=this.whnf(cur); if(cur[0]!=="pi") this.reject("inductive-parameter-telescope");
-      paramTypes.push(cur[1]); cur=cur[2];
+      // Lean's generated recursor binds parameters at the weak-head-normal
+      // form of their domains (e.g. outParam wrappers disappear).
+      paramTypes.push(this.whnf(cur[1])); cur=cur[2];
     }
     const idxTypes=[]; let ix=cur;
     for(let i=0;i<nI;i++) {

@@ -188,3 +188,9 @@ Exported natural literals are a separately charged grain. Safe-integer literals 
 ### Type-structure projections
 
 Projection expressions are now checked and reduced for certified single-constructor, zero-index Type structures. The result type is reconstructed from the constructor telescope with earlier projections substituted into dependent fields; constructor applications reduce to the corresponding field. Projections from propositions and indexed/non-structure inductives remain outside this grain.
+
+
+Recursor parameter domains are derived at weak-head-normal form rather than copied
+syntactically from the inductive header. This is required for reducible parameter
+annotations such as `outParam`: the inductive declaration may retain the wrapper,
+while the generated recursor binds the definitionally equal reduced domain.
