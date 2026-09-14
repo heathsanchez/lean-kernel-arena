@@ -207,9 +207,10 @@ class Kernel {
     for(let i=d.numParams;i<args.length;i++)
       if(this.hasConst(args[i],d.name)) this.reject("inductive-in-index");
   }
-  deriveTypeRecursor(d,ctorInfos,rec) {
+  deriveTypeRecursor(d,ctorInfos,rec,motiveLevel=null) {
     const nC=ctorInfos.length,nP=d.numParams,nI=d.numIndices;
-    const u=rec.levelParams[0],motiveLevel=["param",u],I=this.constRef(d.name,d.levelParams);
+    if(motiveLevel===null) motiveLevel=["param",rec.levelParams[0]];
+    const I=this.constRef(d.name,d.levelParams);
     let cur=d.type; const paramTypes=[];
     for(let i=0;i<nP;i++) {
       cur=this.whnf(cur); if(cur[0]!=="pi") this.reject("inductive-parameter-telescope");
@@ -350,9 +351,10 @@ class Kernel {
     }
     if(actualIndices!==d.numIndices) this.reject("inductive-index-count");
     if(cur[0]!=="sort") this.reject("inductive-not-sort");
-    const indLevel=cur[1];
-    // Propositional elimination and reflexive inductives are separate grains.
-    if(levelsEqual(indLevel,0,()=>this.tick())) this.unknown("inductive-semantics-frontier");
+    const indLevel=cur[1],isProp=levelsEqual(indLevel,0,()=>this.tick());
+    // Prop declarations use the same constructor and positivity checks, but
+    // their eliminator universe is constrained below.
+    if(isProp) this.need("prop-inductives");
 
     if(!Array.isArray(d.all)||d.all.length!==1||d.all[0]!==d.name) this.reject("inductive-all");
     if(!Array.isArray(d.ctorNames)||d.ctorNames.length!==d.ctors.length ||
@@ -366,7 +368,7 @@ class Kernel {
     this.env.set(d.name,{kind:"inductive",name:d.name,type:d.type,levelParams:d.levelParams,
       numParams:d.numParams,numIndices:d.numIndices,ctors:d.ctors.map(c=>c.name)});
 
-    const ctorInfos=[]; let actualRec=false;
+    const ctorInfos=[]; let actualRec=false,propFieldsOnly=true;
     for(let ciIndex=0;ciIndex<d.ctors.length;ciIndex++) {
       const c=d.ctors[ciIndex];
       if(c.induct!==d.name||c.cidx!==ciIndex||c.numParams!==d.numParams||c.isUnsafe!==false ||
@@ -383,7 +385,9 @@ class Kernel {
       let fields=0;
       while(ct[0]==="pi") {
         const domain=ct[1],u=this.sortOf(domain,cctx);
-        if(!levelsLe(u,indLevel,()=>this.tick())) this.reject("constructor-field-universe");
+        if(isProp) {
+          if(!levelsEqual(u,0,()=>this.tick())) propFieldsOnly=false;
+        } else if(!levelsLe(u,indLevel,()=>this.tick())) this.reject("constructor-field-universe");
         const w=this.whnf(domain);
         if(this.hasConst(w,d.name)) {
           actualRec=true;
@@ -401,21 +405,34 @@ class Kernel {
 
     const rec=d.rec;
     if(!rec||rec.numParams!==d.numParams||rec.numIndices!==d.numIndices||
-       rec.numMotives!==1||rec.numMinors!==d.ctors.length||rec.k!==false||rec.isUnsafe!==false||
+       rec.numMotives!==1||rec.numMinors!==d.ctors.length||typeof rec.k!=="boolean"||rec.isUnsafe!==false||
        !Array.isArray(rec.all)||rec.all.length!==1||rec.all[0]!==d.name||
        !Array.isArray(rec.rules)||rec.rules.length!==d.ctors.length)
       this.reject("recursor-metadata");
     const expectedRecName=JSON.stringify([d.name,"str","rec"]);
     if(rec.name!==expectedRecName) this.reject("recursor-name");
-    if(!Array.isArray(rec.levelParams)||rec.levelParams.length!==d.levelParams.length+1||
-       rec.levelParams.slice(1).some((p,i)=>p!==d.levelParams[i])||
-       d.levelParams.includes(rec.levelParams[0]))
-      this.reject("recursor-universe-parameters");
+
+    // Large elimination from Prop is valid only for empty or singleton
+    // proof-only inductives. General Prop recursors must eliminate into Prop.
+    const singletonPropElim=isProp && (d.ctors.length===0 || (d.ctors.length===1 && propFieldsOnly));
+    let motiveLevel;
+    if(isProp && !singletonPropElim) {
+      if(!Array.isArray(rec.levelParams)||rec.levelParams.length!==d.levelParams.length||
+         rec.levelParams.some((p,i)=>p!==d.levelParams[i]))
+        this.reject("recursor-universe-parameters");
+      motiveLevel=0;
+    } else {
+      if(!Array.isArray(rec.levelParams)||rec.levelParams.length!==d.levelParams.length+1||
+         rec.levelParams.slice(1).some((p,i)=>p!==d.levelParams[i])||
+         d.levelParams.includes(rec.levelParams[0]))
+        this.reject("recursor-universe-parameters");
+      motiveLevel=["param",rec.levelParams[0]];
+    }
 
     for(const c of ctorInfos)
       this.env.set(c.name,{kind:"ctor",name:c.name,type:c.type,levelParams:d.levelParams,induct:d.name,numParams:d.numParams,numFields:c.numFields});
     this.params=new Set(rec.levelParams);
-    const derived=this.deriveTypeRecursor(d,ctorInfos,rec);
+    const derived=this.deriveTypeRecursor(d,ctorInfos,rec,motiveLevel);
     if(!this.same(rec.type,derived.recType)) this.reject("recursor-type:"+d.name);
     for(let i=0;i<rec.rules.length;i++) {
       const rr=rec.rules[i];

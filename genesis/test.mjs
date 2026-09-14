@@ -439,6 +439,42 @@ function runInductiveReductionTests(base,fixture,emit=()=>{}) {
 }
 
 
+function runPropInductiveTests(base,emit=()=>{}) {
+  const caps=[...base,"prop-inductives"],n="PTrue",c="PTrue.intro",rn=JSON.stringify([n,"str","rec"]),u="pu";
+  const I=["const",n],C=["const",c],motive=Pi(I,S(["param",u])),minor=App(V(0),C);
+  const recType=Pi(motive,Pi(minor,Pi(I,App(V(2),V(0)))));
+  const rule=Lam(motive,Lam(minor,V(0)));
+  const good={kind:"inductive",name:n,levelParams:[],type:S(0),numParams:0,numIndices:0,numNested:0,
+    isRec:false,isUnsafe:false,isReflexive:false,all:[n],ctorNames:[c],
+    ctors:[{name:c,levelParams:[],type:I,induct:n,cidx:0,numParams:0,numFields:0,isUnsafe:false}],
+    rec:{name:rn,levelParams:[u],type:recType,all:[n],numParams:0,numIndices:0,numMotives:1,
+      numMinors:1,k:false,isUnsafe:false,rules:[{ctor:c,nfields:0,rhs:rule}]}
+  };
+  const before=new Kernel(base).run(S(0),S(1),[good]);
+  assert(before.status===UNKNOWN&&before.reason==="missing:prop-inductives",
+    "Prop-inductive ablation did not restore missing capability");
+  const accepted=new Kernel(caps).run(S(0),S(1),[good]);
+  assert(accepted.status===ACCEPT,"singleton Prop inductive was rejected: "+JSON.stringify(accepted));
+
+  const A="PropData",Bad="BadProp",Mk="BadProp.mk",BadRec=JSON.stringify([Bad,"str","rec"]);
+  const badI=["const",Bad],bad={
+    kind:"inductive",name:Bad,levelParams:[],type:S(0),numParams:0,numIndices:0,numNested:0,
+    isRec:false,isUnsafe:false,isReflexive:false,all:[Bad],ctorNames:[Mk],
+    ctors:[{name:Mk,levelParams:[],type:Pi(["const",A],badI),induct:Bad,cidx:0,numParams:0,numFields:1,isUnsafe:false}],
+    rec:{name:BadRec,levelParams:[u],type:S(0),all:[Bad],numParams:0,numIndices:0,numMotives:1,
+      numMinors:1,k:false,isUnsafe:false,rules:[{ctor:Mk,nfields:1,rhs:V(0)}]}
+  };
+  const guarded=new Kernel(caps).run(S(0),S(1),[
+    {kind:"axiom",name:A,levelParams:[],type:S(1)},bad
+  ]);
+  assert(guarded.status===REJECT&&guarded.reason==="recursor-universe-parameters",
+    "data-carrying Prop incorrectly gained large elimination: "+JSON.stringify(guarded));
+  emit({event:"prop-inductive-growth",ablation_unknown:true,singleton_large_elimination:true,
+    general_prop_elimination_restricted:true});
+  return {capabilities:caps,cases:2};
+}
+
+
 function runNatLiteralTests(base,emit=()=>{}) {
   const caps=[...base,"nat-literals"];
   const name=(...parts)=>parts.reduce((pre,s)=>JSON.stringify([pre,"str",s]),"[]");
@@ -657,7 +693,11 @@ const inductiveReduction=runInductiveReductionTests(singleInductive.capabilities
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const natLiteral=runNatLiteralTests(inductiveReduction.capabilities,row=>{
+const propInductive=runPropInductiveTests(inductiveReduction.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const natLiteral=runNatLiteralTests(propInductive.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
@@ -692,6 +732,7 @@ report.empty_inductive_tests={cases:emptyInductive.cases};
 report.enum_inductive_tests={cases:enumInductive.cases};
 report.single_inductive_tests={cases:singleInductive.cases};
 report.inductive_reduction_tests={cases:inductiveReduction.cases};
+report.prop_inductive_tests={cases:propInductive.cases};
 report.nat_literal_tests={cases:natLiteral.cases};
 report.string_literal_tests={cases:stringLiteral.cases};
 report.quotient_tests={cases:quotient.cases};
