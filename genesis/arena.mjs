@@ -58,5 +58,33 @@ for(const r of results.filter(r=>r.status==="UNKNOWN")) {
   if(group.examples.length<3) group.examples.push(r.name);
 }
 writeFileSync(new URL("./evidence/frontier.json",import.meta.url),JSON.stringify(frontier,null,2));
+
+// Preserve the exact first blocked inductive record for diagnosis without changing
+// checker semantics. The next growth step is chosen from this residual, not guessed.
+const inductiveFrontier=[];
+for(const row of rows) {
+  const result=results.find(r=>r.name===row.name);
+  if(result?.status!=="UNKNOWN" || result.reason!=="declaration-frontier:inductive") continue;
+  let first=null;
+  for(const line of row.input.split(/\r?\n/)) {
+    if(!line.trim()) continue;
+    const record=JSON.parse(line);
+    if(Object.prototype.hasOwnProperty.call(record,"inductive")) { first=record.inductive; break; }
+  }
+  inductiveFrontier.push({name:row.name,expected:row.expected,first_inductive:first});
+}
+writeFileSync(new URL("./evidence/inductive-frontier.json",import.meta.url),
+  JSON.stringify(inductiveFrontier,null,2));
+
 for(const [reason,group] of Object.entries(frontier).sort((a,b)=>b[1].count-a[1].count))
   console.log("NEXT_RESIDUAL "+JSON.stringify({reason,...group}));
+if(inductiveFrontier.length) {
+  const signatures={};
+  for(const x of inductiveFrontier) {
+    const r=x.first_inductive??{};
+    const sig=JSON.stringify(Object.keys(r).sort().map(k=>[k,Array.isArray(r[k])?r[k].length:typeof r[k]]));
+    signatures[sig]=(signatures[sig]??0)+1;
+  }
+  console.log("INDUCTIVE_FRONTIER_SHAPES "+JSON.stringify(
+    Object.entries(signatures).sort((a,b)=>b[1]-a[1]).map(([signature,count])=>({count,signature}))));
+}
