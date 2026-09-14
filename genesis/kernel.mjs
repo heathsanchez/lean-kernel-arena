@@ -313,6 +313,10 @@ class Kernel {
   inferProjection(typeName,idx,obj,ctx) {
     this.need("projections");
     const objType=this.whnf(this.infer(obj,ctx));
+    // Projection safety belongs to the actual instantiated occurrence. Its
+    // result must itself still be a type, and its normalized sort decides Prop.
+    const objLevel=this.sortOf(objType,ctx);
+    const objIsProp=levelsEqual(objLevel,0,()=>this.tick());
     const [head,args]=this.getApp(objType);
     if(head[0]!=="const") this.reject("projection-non-inductive");
     if(head[1]!==typeName) this.reject("projection-type-name");
@@ -332,12 +336,12 @@ class Kernel {
       if(ctype[0]!=="pi") this.reject("projection-out-of-range");
       // In Prop structures, traversing an intervening field type detects
       // dependencies that would require exposing an earlier hidden data field.
-      if(ind.isProp) this.sortOf(ctype[1],ctx);
+      if(objIsProp) this.sortOf(ctype[1],ctx);
       ctype=this.substitute(ctype[2],this.make("proj",typeName,i,obj));
     }
     ctype=this.whnf(ctype);
     if(ctype[0]!=="pi") this.reject("projection-out-of-range");
-    if(ind.isProp) {
+    if(objIsProp) {
       const u=this.sortOf(ctype[1],ctx);
       if(!levelsEqual(u,0,()=>this.tick())) this.reject("projection-data-from-prop");
     }

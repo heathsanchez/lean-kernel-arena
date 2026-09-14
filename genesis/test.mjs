@@ -734,9 +734,22 @@ function runProjectionTests(base,emit=()=>{}) {
   catch(e) { dataRejected=e instanceof Stop&&e.status===REJECT&&e.message==="projection-data-from-prop"; }
   assert(dataRejected,"data projection from Prop structure was not rejected");
 
+  const PI="ImaxPropBox",PIM="ImaxPropBox.mk",PIX="imaxPropBoxValue",CPI=["const",PI];
+  pc.env.set(PI,{kind:"inductive",name:PI,type:S(["imax",1,0]),levelParams:[],
+    numParams:0,numIndices:0,ctors:[PIM],isProp:false});
+  pc.env.set(PIM,{kind:"ctor",name:PIM,type:Pi(CD,CPI),levelParams:[],
+    induct:PI,numParams:0,numFields:1});
+  pc.env.set(PIX,{kind:"axiom",name:PIX,type:CPI,levelParams:[]});
+  let normalizedPropRejected=false;
+  try { pc.inferProjection(PI,0,["const",PIX],[]); }
+  catch(e) { normalizedPropRejected=e instanceof Stop&&e.status===REJECT&&e.message==="projection-data-from-prop"; }
+  assert(normalizedPropRejected,
+    "projection trusted declaration metadata instead of the instantiated normalized sort");
+
   emit({event:"projection-growth",ablation_unknown:true,inference:true,reduction:true,
-    out_of_range_rejected:true,universe_traversal:true,prop_data_hidden:true});
-  return {capabilities:caps,cases:5};
+    out_of_range_rejected:true,universe_traversal:true,prop_data_hidden:true,
+    instantiated_sort_rechecked:true});
+  return {capabilities:caps,cases:6};
 }
 
 
