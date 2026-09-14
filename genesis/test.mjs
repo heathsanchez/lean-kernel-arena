@@ -467,8 +467,17 @@ function runProjectionTests(base,emit=()=>{}) {
   const bad=new Kernel(caps).run(Proj(B,1,App(Mk,av)),AT,decls);
   assert(bad.status===REJECT&&bad.reason==="projection-out-of-range",
     "out-of-range projection was not rejected: "+JSON.stringify(bad));
-  emit({event:"projection-growth",ablation_unknown:true,inference:true,reduction:true,out_of_range_rejected:true});
-  return {capabilities:caps,cases:3};
+
+  const poly=new Kernel(caps);
+  poly.steps=0; poly.env=new Map([["poly",{levelParams:["u"]}]]); poly.params=new Set(["u"]);
+  const projected=Proj(B,0,["const","Poly",[["param","u"]]]);
+  const inst=poly.instantiateDeclaration(["const","poly",[0]],projected);
+  assert(inst[0]==="proj"&&inst[1]===B&&inst[2]===0&&inst[3][0]==="const"&&inst[3][2][0]===0,
+    "projection universe traversal corrupted metadata or failed to instantiate its child");
+
+  emit({event:"projection-growth",ablation_unknown:true,inference:true,reduction:true,
+    out_of_range_rejected:true,universe_traversal:true});
+  return {capabilities:caps,cases:4};
 }
 
 

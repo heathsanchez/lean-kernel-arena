@@ -561,7 +561,8 @@ class Kernel {
       this.tick();
       if(e[0]==="sort") return this.make("sort",levelSub(e[1],sub,()=>this.tick()));
       if(e[0]==="const") return e.length===2?e:this.make("const",e[1],e[2].map(u=>levelSub(u,sub,()=>this.tick())));
-      if(e[0]==="var") return e;
+      if(e[0]==="var"||e[0]==="nat") return e;
+      if(e[0]==="proj") return this.make("proj",e[1],e[2],walk(e[3]));
       return this.make(e[0],...e.slice(1).map(walk));
     };
     return walk(term);
