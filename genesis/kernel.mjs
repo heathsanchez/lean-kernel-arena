@@ -419,7 +419,6 @@ class Kernel {
     } else if(e[0]==="nat") {
       this.need("nat-literals");
       if(!Number.isSafeInteger(e[1])||e[1]<0) this.reject("malformed-nat-literal");
-      if(e[1]>10) this.unknown("nat-literal-budget");
     } else if(e[0]==="proj") {
       this.need("projections");
       if(typeof e[1]!=="string"||!Number.isSafeInteger(e[2])||e[2]<0) this.reject("malformed-projection");
@@ -631,7 +630,7 @@ function checkExport(input,capabilities,budget=200000) {
   try {
     for(const line of input.split(/\r?\n/)) {
       if(!line.trim()) continue;
-      if(++parsed>20000) fail("record-budget");
+      if(++parsed>100000) fail("record-budget");
       const row=JSON.parse(line);
       if(!row || Array.isArray(row)||typeof row!=="object") fail("record-schema");
       const keys=Object.keys(row);
@@ -668,7 +667,7 @@ function checkExport(input,capabilities,budget=200000) {
         else if(tag==="natVal"&&typeof v==="string"&&/^[0-9]+$/.test(v)) {
           if(!capabilities.includes("nat-literals")) fail("expression-frontier:natVal");
           const n=Number(v);
-          if(!Number.isSafeInteger(n)||n>10) fail("nat-literal-budget");
+          if(!Number.isSafeInteger(n)) fail("nat-literal-budget");
           e=NatLit(n);
         } else if(tag==="proj"&&v) {
           if(!capabilities.includes("projections")) fail("expression-frontier:proj");

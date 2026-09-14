@@ -30,7 +30,7 @@ const rows=JSON.parse(execFileSync("python3",["-c",python],{input:data,maxBuffer
 if(!rows.length) throw new Error("empty Arena corpus");
 const counts={ACCEPT:0,REJECT:0,UNKNOWN:0};const results=[];const start=Date.now();
 for(const row of rows) {
-  const r=checkExport(row.input,caps,50000);
+  const r=checkExport(row.input,caps,1000000);
   const before=previousCheckExport(row.input,caps.filter(c=>c!=="universes"),50000);
   if(before.status!=="UNKNOWN" && r.status!==before.status) {
     console.error("PROTECTED_ARENA_REGRESSION "+JSON.stringify({name:row.name,before,after:r}));

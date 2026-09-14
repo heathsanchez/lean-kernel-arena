@@ -182,7 +182,7 @@ The checker now has a separately charged single-inductive semantic grain for non
 
 ### Natural-number literals
 
-Small exported natural literals are now a separately charged grain. They infer as `Nat` and reduce to the canonical `Nat.zero` / `Nat.succ` constructor form. Values above the certified bound remain UNKNOWN rather than being rejected.
+Exported natural literals are a separately charged grain. Safe-integer literals infer as `Nat` and reduce to the canonical `Nat.zero` / `Nat.succ` constructor form. Resource limits are charged by the ordinary kernel budget rather than an arbitrary semantic cutoff on the numeral value.
 
 
 ### Type-structure projections
