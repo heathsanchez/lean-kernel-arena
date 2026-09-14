@@ -481,6 +481,37 @@ function runProjectionTests(base,emit=()=>{}) {
 }
 
 
+
+function runOpaqueDeclarationTests(base,emit=()=>{}) {
+  const caps=[...base,"opaque-declarations"];
+  const O="OpaqueType",p="opaqueWitness";
+  const opaque={kind:"opaque",name:O,levelParams:[],type:S(1),value:S(0)};
+  const before=new Kernel(base).run(S(0),S(1),[opaque]);
+  assert(before.status===UNKNOWN&&before.reason==="missing:opaque-declarations",
+    "opaque ablation did not restore missing capability");
+  const accepted=new Kernel(caps).run(S(0),S(1),[opaque]);
+  assert(accepted.status===ACCEPT,"well-typed opaque declaration was rejected: "+JSON.stringify(accepted));
+
+  const hidden=[
+    {kind:"axiom",name:p,levelParams:[],type:S(0)},
+    opaque,
+    {kind:"def",name:"opaqueUse",levelParams:[],type:["const",O],value:["const",p]}
+  ];
+  const noLeak=new Kernel(caps).run(S(0),S(1),hidden);
+  assert(noLeak.status===UNKNOWN&&noLeak.reason==="conversion-frontier",
+    "opaque body leaked into definitional equality: "+JSON.stringify(noLeak));
+
+  const bad={kind:"opaque",name:"badOpaque",levelParams:[],type:S(0),value:S(0)};
+  const mismatch=new Kernel(caps).run(S(0),S(1),[bad]);
+  assert(mismatch.status===REJECT,
+    "ill-typed opaque body was not rejected: "+JSON.stringify(mismatch));
+
+  emit({event:"opaque-declaration-growth",ablation_unknown:true,
+    body_checked:true,conversion_hidden:true,ill_typed_body_rejected:true});
+  return {capabilities:caps,cases:3};
+}
+
+
 function runDeclarationSafetyControls(base,emit=()=>{}) {
   const meta={meta:{format:{version:"3.1.0"}}};
   const mkDef=safety=>[
@@ -549,7 +580,11 @@ const projection=runProjectionTests(natLiteral.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const declarationSafety=runDeclarationSafetyControls(projection.capabilities,row=>{
+const opaqueDeclaration=runOpaqueDeclarationTests(projection.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const declarationSafety=runDeclarationSafetyControls(opaqueDeclaration.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
@@ -565,6 +600,7 @@ report.enum_inductive_tests={cases:enumInductive.cases};
 report.single_inductive_tests={cases:singleInductive.cases};
 report.nat_literal_tests={cases:natLiteral.cases};
 report.projection_tests={cases:projection.cases};
+report.opaque_declaration_tests={cases:opaqueDeclaration.cases};
 report.declaration_safety_controls={cases:declarationSafety.cases,retained_capability:false};
 for(const name of ["level-index-out-of-order","sparse-name-index"]) {
   const raw=readFileSync(new URL("../tests/"+name+".ndjson",import.meta.url),"utf8");

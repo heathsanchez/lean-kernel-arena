@@ -194,3 +194,12 @@ Recursor parameter domains are derived at weak-head-normal form rather than copi
 syntactically from the inductive header. This is required for reducible parameter
 annotations such as `outParam`: the inductive declaration may retain the wrapper,
 while the generated recursor binds the definitionally equal reduced domain.
+
+
+### Opaque declarations
+
+Opaque definitions are now admitted as a separate declaration grain. Their declared
+type and body are checked exactly once at admission, unsafe opaque declarations are
+rejected, and the body is thereafter unavailable to conversion. This differs from
+ordinary `def`, which remains unfoldable by weak-head reduction. A control verifies
+that downstream typing cannot succeed merely by exposing an opaque body.

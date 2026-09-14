@@ -88,13 +88,14 @@ class Kernel {
       if (declarations.length) this.need("declarations");
       for (const d of declarations) {
         this.tick();
-        if (!d || typeof d.name!=="string" || !["axiom","def","thm","inductive"].includes(d.kind)) this.unknown("declaration-kind");
+        if (!d || typeof d.name!=="string" || !["axiom","def","opaque","thm","inductive"].includes(d.kind)) this.unknown("declaration-kind");
         if(d.kind==="inductive") {
           this.need("single-inductives");
           this.addSingleInductive(d);
           continue;
         }
         if(d.kind==="thm") this.need("theorems");
+        if(d.kind==="opaque") this.need("opaque-declarations");
         if (this.env.has(d.name)) this.reject("duplicate-declaration");
         const ps=d.levelParams??[];
         if(!Array.isArray(ps)||ps.some(p=>typeof p!=="string")||new Set(ps).size!==ps.length) this.reject("invalid-universe-parameters");
@@ -103,7 +104,7 @@ class Kernel {
         this.validate(d.type);
         const declSort=this.sortOf(d.type,[]);
         if(d.kind==="thm" && !levelsEqual(declSort,0,()=>this.tick())) this.reject("theorem-not-proposition");
-        if (d.kind==="def" || d.kind==="thm") {
+        if (d.kind==="def" || d.kind==="opaque" || d.kind==="thm") {
           this.validate(d.value);
           this.equal(this.infer(d.value,[]),d.type);
         }
@@ -821,16 +822,18 @@ function checkExport(input,capabilities,budget=200000) {
           bundle:v
         };
         fail("inductive-semantics-frontier");
-      } else if(tag==="axiom"||tag==="def"||tag==="thm") {
+      } else if(tag==="axiom"||tag==="def"||tag==="opaque"||tag==="thm") {
         if(tag==="thm"&&!capabilities.includes("theorems")) fail("declaration-frontier:thm");
+        if(tag==="opaque"&&!capabilities.includes("opaque-declarations")) fail("declaration-frontier:opaque");
         if(!v || !Array.isArray(v.levelParams)) fail("declaration-universes");
         if(v.levelParams.length&&!capabilities.includes("universes")) fail("declaration-universes");
         // Export safety is a validity invariant, not a learned capability.
         // Unsafe/partial declarations cannot enter the trusted environment.
         if(tag==="axiom" && v.isUnsafe!==false) reject("unsafe-axiom");
         if(tag==="def" && v.safety!=="safe") reject("unsafe-definition");
+        if(tag==="opaque" && v.isUnsafe!==false) reject("unsafe-opaque");
         const d={kind:tag,name:get(names,v.name),type:get(exprs,v.type),levelParams:v.levelParams.map(n=>get(names,n))};
-        if(tag==="def"||tag==="thm") d.value=get(exprs,v.value);
+        if(tag==="def"||tag==="opaque"||tag==="thm") d.value=get(exprs,v.value);
         decls.push(d);
       } else fail("declaration-frontier:"+tag);
     }
