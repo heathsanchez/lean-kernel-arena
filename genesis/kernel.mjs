@@ -100,7 +100,7 @@ class Kernel {
     this.caps=new Set(capabilities); this.budget=budget;
   }
   run(term, expected, declarations=[], parameters=[]) {
-    this.steps=0; this.env=new Map(); this.allocations=0; this.params=new Set(parameters); this.currentDeclaration=null; this.conversionFrontier=null;
+    this.steps=0; this.env=new Map(); this.allocations=0; this.params=new Set(parameters); this.currentDeclaration=null; this.conversionFrontier=null; this.inferCache=new WeakMap();
     const start=Date.now();
     try {
       if (!this.caps.size) this.unknown("empty-present");
@@ -660,6 +660,16 @@ class Kernel {
   }
   infer(e,ctx) {
     this.tick();
+    let byCtx=this.inferCache?.get(e);
+    if(byCtx?.has(ctx)) return byCtx.get(ctx);
+    const result=this.inferUncached(e,ctx);
+    if(this.inferCache) {
+      if(!byCtx) { byCtx=new WeakMap(); this.inferCache.set(e,byCtx); }
+      byCtx.set(ctx,result);
+    }
+    return result;
+  }
+  inferUncached(e,ctx) {
     switch(e[0]) {
       case "sort": this.need("sort"); return this.make("sort",levelSucc(e[1]));
       case "var":
@@ -698,10 +708,12 @@ class Kernel {
         this.equal(this.infer(e[2],ctx),f[1],ctx);
         return this.substitute(f[2],e[2]);
       }
-      case "let":
+      case "let": {
         this.need("reduction"); this.sortOf(e[1],ctx);
         this.equal(this.infer(e[2],ctx),e[1],ctx);
-        return this.infer(this.substitute(e[3],e[2]),ctx);
+        const bodyType=this.infer(e[3],[...ctx,e[1]]);
+        return this.substitute(bodyType,e[2]);
+      }
       default: this.unknown("inference-frontier");
     }
   }

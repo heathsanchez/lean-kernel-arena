@@ -218,3 +218,8 @@ The primitive `Quot` package is admitted only as the exact four-declaration kern
 ### Certified inductive computation
 
 Recursors generated and already certified by the single-inductive checker now compute on matching certified constructors. Reduction selects the validated exported rule, instantiates its universes, applies the recursor prefix and constructor fields, and recursively normalizes the result. Removing this capability restores an explicit UNKNOWN at the reducible recursor redex.
+
+
+### Compiled local inference
+
+Performance residuals do not authorize new semantics. Let-bound terms are now checked under a local binder and substituted only into the inferred result type, avoiding traversal of the entire body at every let. Inference results are memoized by shared expression identity and immutable local context, so exported DAG sharing is preserved rather than re-expanded by the checker.
