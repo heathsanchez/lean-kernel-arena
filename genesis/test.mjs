@@ -201,6 +201,47 @@ function runTheoremTests(base,emit=()=>{}) {
   return {capabilities:caps,cases:7};
 }
 
+
+function runProofIrrelevanceTests(base,emit=()=>{}) {
+  const caps=[...base,"proof-irrelevance"];
+  const C=n=>["const",n];
+  const AtoP=Pi(C("A"),C("P"));
+  const qAt=x=>App(C("Q"),x);
+  const hAt=x=>App(V(0),C(x));
+  const fooType=Pi(AtoP,qAt(hAt("b")));
+  const barType=Pi(AtoP,qAt(hAt("a")));
+  const decls=[
+    {kind:"axiom",name:"A",levelParams:[],type:S(1)},
+    {kind:"axiom",name:"a",levelParams:[],type:C("A")},
+    {kind:"axiom",name:"b",levelParams:[],type:C("A")},
+    {kind:"axiom",name:"P",levelParams:[],type:S(0)},
+    {kind:"axiom",name:"Q",levelParams:[],type:Pi(C("P"),S(0))},
+    {kind:"axiom",name:"foo",levelParams:[],type:fooType},
+    {kind:"thm",name:"bar",levelParams:[],type:barType,value:C("foo")}
+  ];
+  const before=new Kernel(base).run(S(0),S(1),decls);
+  assert(before.status===UNKNOWN && before.reason==="conversion-frontier",
+    "proof-irrelevance ablation did not restore the exact conversion frontier");
+  assert(new Kernel(caps).run(S(0),S(1),decls).status===ACCEPT,
+    "proof irrelevance under a binder failed");
+
+  // Negative control: ordinary data terms a,b : A must not become definitionally equal.
+  const nonProof=[
+    {kind:"axiom",name:"A",levelParams:[],type:S(1)},
+    {kind:"axiom",name:"a",levelParams:[],type:C("A")},
+    {kind:"axiom",name:"b",levelParams:[],type:C("A")},
+    {kind:"axiom",name:"R",levelParams:[],type:Pi(C("A"),S(0))},
+    {kind:"axiom",name:"ra",levelParams:[],type:App(C("R"),C("a"))}
+  ];
+  const guard=new Kernel(caps).run(C("ra"),App(C("R"),C("b")),nonProof);
+  assert(guard.status===UNKNOWN && guard.reason==="conversion-frontier",
+    "proof irrelevance collapsed non-proof terms");
+
+  emit({event:"proof-irrelevance-growth",ablation_unknown:true,
+    binder_case:true,nonproof_negative_control:true});
+  return {capabilities:caps,cases:2};
+}
+
 const target=new URL("./evidence/",import.meta.url);
 mkdirSync(target,{recursive:true});
 writeFileSync(new URL("events.jsonl",target),"");
@@ -217,11 +258,16 @@ const theorem=runTheoremTests(universe.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const replay=evaluate(theorem.capabilities,growthSuite());
+const proofIrrelevance=runProofIrrelevanceTests(theorem.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const replay=evaluate(proofIrrelevance.capabilities,growthSuite());
 assert(replay.covered===report.training && !replay.wrong.length,"later growth regressed protected cases");
-report.capabilities=theorem.capabilities;
+report.capabilities=proofIrrelevance.capabilities;
 report.universe_tests={laws:universe.laws,independent_pairs:universe.independent_pairs};
 report.theorem_tests={cases:theorem.cases};
+report.proof_irrelevance_tests={cases:proofIrrelevance.cases};
 for(const name of ["level-index-out-of-order","sparse-name-index"]) {
   const raw=readFileSync(new URL("../tests/"+name+".ndjson",import.meta.url),"utf8");
   const r=checkExport(raw,report.capabilities);

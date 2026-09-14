@@ -19,7 +19,7 @@ Without --state, check.mjs runs the empty present. Exit codes are 0 ACCEPT,
 1 REJECT, 2 UNKNOWN, 3 usage failure. Unexpected programming errors are failures,
 not proof rejections. The core accepts a deliberately bounded monomorphic fragment:
 numeric and symbolic universes (at most eight parameters per equality), dependent binders, application, beta/let reduction, and validated
-axioms, definitions and opaque theorem declarations. Proof irrelevance, eta,
+axioms, definitions, opaque theorem declarations and proof irrelevance. Eta,
 inductives, recursors, quotient rules and primitive literal extensions remain explicit
 frontiers. Failed structural conversion returns UNKNOWN
 unless distinct numeric sorts supply a decisive mismatch.
@@ -112,3 +112,14 @@ theorems may be referenced, self/forward references are rejected because install
 still happens only after validation, and theorem bodies remain opaque to conversion.
 Hand-written format-3.1 exports exercise both acceptance and rejection before the
 protected replay and pinned Arena corpus. Removing the capability restores UNKNOWN.
+
+
+## Fourth increment: proof irrelevance
+
+The theorem increment closed six of seven theorem-frontier cases and exposed the
+seventh as a different obstruction: conversion under a binder. The isolated Arena
+case requires two applications of the same function to different data arguments to
+be definitionally equal because both results are proofs of the same proposition.
+The new capability recognizes exactly that condition during recursive conversion.
+Ablation restores conversion-frontier, while a negative control with ordinary data
+terms remains UNKNOWN rather than being collapsed. No inductive capability is used.

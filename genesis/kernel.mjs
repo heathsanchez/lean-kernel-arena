@@ -199,7 +199,13 @@ class Kernel {
     if(["sort","var","const"].includes(e[0])) return e;
     return this.make(e[0],...e.slice(1).map(x=>this.normal(x)));
   }
-  equal(a,b) {
+  proofType(e,ctx) {
+    this.tick();
+    const t=this.infer(e,ctx);
+    const u=this.sortOf(t,ctx);
+    return levelsEqual(u,0,()=>this.tick()) ? t : null;
+  }
+  equal(a,b,ctx=[]) {
     this.tick();
     if(this.same(a,b)) return;
     const x=this.normal(a),y=this.normal(b);
@@ -210,7 +216,27 @@ class Kernel {
       if(levelsEqual(x[1],y[1],()=>this.tick())) return;
       this.reject("universe-mismatch");
     }
-    // Eta and proof irrelevance are not implemented. A failed comparison is not evidence of inequality.
+    if(this.caps.has("proof-irrelevance")) {
+      const tx=this.proofType(x,ctx),ty=this.proofType(y,ctx);
+      if(tx!==null && ty!==null) {
+        this.equal(tx,ty,ctx);
+        return;
+      }
+    }
+    if(x[0]===y[0]) {
+      if(x[0]==="app") {
+        this.equal(x[1],y[1],ctx);
+        this.equal(x[2],y[2],ctx);
+        return;
+      }
+      if(x[0]==="pi" || x[0]==="lam") {
+        this.equal(x[1],y[1],ctx);
+        this.equal(x[2],y[2],[...ctx,x[1]]);
+        return;
+      }
+    }
+    // Eta and the remaining conversion rules are not implemented.
+    // A failed comparison is not evidence of inequality.
     this.unknown("conversion-frontier");
   }
   instantiateDeclaration(ref,term) {
@@ -258,12 +284,12 @@ class Kernel {
         this.need("application");
         const f=this.whnf(this.infer(e[1],ctx));
         if(f[0]!=="pi") this.reject("not-a-function");
-        this.equal(this.infer(e[2],ctx),f[1]);
+        this.equal(this.infer(e[2],ctx),f[1],ctx);
         return this.substitute(f[2],e[2]);
       }
       case "let":
         this.need("reduction"); this.sortOf(e[1],ctx);
-        this.equal(this.infer(e[2],ctx),e[1]);
+        this.equal(this.infer(e[2],ctx),e[1],ctx);
         return this.infer(this.substitute(e[3],e[2]),ctx);
       default: this.unknown("inference-frontier");
     }
