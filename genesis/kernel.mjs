@@ -116,7 +116,7 @@ class Kernel {
       if (declarations.length) this.need("declarations");
       for (const d of declarations) {
         this.tick(); this.currentDeclaration=d?.name??null;
-        if (!d || typeof d.name!=="string" || !["axiom","def","opaque","thm","quot","inductive"].includes(d.kind)) this.unknown("declaration-kind");
+        if (!d || typeof d.name!=="string" || !["axiom","def","opaque","thm","quot","inductive","ctor","rec"].includes(d.kind)) this.unknown("declaration-kind");
         if(d.kind==="inductive") {
           this.need("single-inductives");
           this.addSingleInductive(d);
@@ -125,6 +125,7 @@ class Kernel {
         if(d.kind==="thm") this.need("theorems");
         if(d.kind==="opaque") this.need("opaque-declarations");
         if(d.kind==="quot") this.need("quotients");
+        if(d.kind==="ctor"||d.kind==="rec") this.need("enum-inductives");
         if (this.env.has(d.name)) this.reject("duplicate-declaration");
         const ps=d.levelParams??[];
         if(!Array.isArray(ps)||ps.some(p=>typeof p!=="string")||new Set(ps).size!==ps.length) this.reject("invalid-universe-parameters");
@@ -945,9 +946,18 @@ function checkExport(input,capabilities,budget=200000) {
                 if(JSON.stringify(get(exprs,rr.rhs))!==JSON.stringify(rhs))
                   reject("enum-inductive-recursor-rule");
               }
+              // Preserve the semantic metadata already certified above. Treating
+              // constructors and recursors as plain axioms would force later
+              // reduction to rediscover a lesson this grain has already proved.
               decls.push({kind:"axiom",name:tn,type:typeExpr,levelParams:[]});
-              for(const c of ctors) decls.push({kind:"axiom",name:c.name,type:c.type,levelParams:[]});
-              decls.push({kind:"axiom",name:rn,type:get(exprs,rec.type),levelParams:[u]});
+              for(const c of ctors)
+                decls.push({kind:"ctor",name:c.name,type:c.type,levelParams:[],
+                  induct:tn,numParams:0,numFields:0});
+              decls.push({kind:"rec",name:rn,type:get(exprs,rec.type),levelParams:[u],
+                induct:tn,numParams:0,numIndices:0,numMinors:ctors.length,
+                rules:rec.rules.map((rr,j)=>({
+                  ctor:ctors[j].name,nfields:0,rhs:get(exprs,rr.rhs)
+                }))});
               continue;
             }
           }
