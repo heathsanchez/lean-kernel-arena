@@ -397,14 +397,10 @@ function checkExport(input,capabilities,budget=200000) {
         if(tag==="thm"&&!capabilities.includes("theorems")) fail("declaration-frontier:thm");
         if(!v || !Array.isArray(v.levelParams)) fail("declaration-universes");
         if(v.levelParams.length&&!capabilities.includes("universes")) fail("declaration-universes");
-        if(tag==="axiom" && v.isUnsafe!==false) {
-          if(capabilities.includes("declaration-safety")) reject("unsafe-axiom");
-          fail("unsafe-axiom");
-        }
-        if(tag==="def" && v.safety!=="safe") {
-          if(capabilities.includes("declaration-safety")) reject("unsafe-definition");
-          fail("unsafe-definition");
-        }
+        // Export safety is a validity invariant, not a learned capability.
+        // Unsafe/partial declarations cannot enter the trusted environment.
+        if(tag==="axiom" && v.isUnsafe!==false) reject("unsafe-axiom");
+        if(tag==="def" && v.safety!=="safe") reject("unsafe-definition");
         const d={kind:tag,name:get(names,v.name),type:get(exprs,v.type),levelParams:v.levelParams.map(n=>get(names,n))};
         if(tag==="def"||tag==="thm") d.value=get(exprs,v.value);
         decls.push(d);
