@@ -75,6 +75,25 @@ const NatLit = n => ["nat",n];
 const StrLit = s => ["strlit",s];
 const Proj = (n,i,e) => ["proj",n,i,e];
 const leanName = (...parts) => parts.reduce((pre,s)=>JSON.stringify([pre,"str",s]),"[]");
+function quotientType(kind,lps) {
+  const expected={type:1,ctor:1,lift:2,ind:1}[kind];
+  if(expected===undefined||!Array.isArray(lps)||lps.length!==expected) return null;
+  const u=["param",lps[0]],Q=["const",leanName("Quot"),[u]],Mk=["const",leanName("Quot","mk"),[u]];
+  const rel=Pi(V(0),Pi(V(1),S(0)));
+  if(kind==="type") return Pi(S(u),Pi(rel,S(u)));
+  if(kind==="ctor") return Pi(S(u),Pi(rel,Pi(V(1),App(App(Q,V(2)),V(1)))));
+  if(kind==="lift") {
+    const v=["param",lps[1]],Eq=["const",leanName("Eq"),[v]];
+    const h=Pi(V(3),Pi(V(4),Pi(App(App(V(4),V(1)),V(0)),
+      App(App(App(Eq,V(4)),App(V(3),V(2))),App(V(3),V(1))))));
+    return Pi(S(u),Pi(rel,Pi(S(v),Pi(Pi(V(2),V(1)),
+      Pi(h,Pi(App(App(Q,V(4)),V(3)),V(3)))))));
+  }
+  const motive=Pi(App(App(Q,V(1)),V(0)),S(0));
+  const minor=Pi(V(2),App(V(1),App(App(App(Mk,V(3)),V(2)),V(0))));
+  return Pi(S(u),Pi(rel,Pi(motive,Pi(minor,
+    Pi(App(App(Q,V(3)),V(2)),App(V(2),V(0)))))));
+}
 class Stop extends Error { constructor(status, reason) { super(reason); this.status=status; } }
 class Kernel {
   constructor(capabilities=[], budget=50000) {
@@ -89,7 +108,7 @@ class Kernel {
       if (declarations.length) this.need("declarations");
       for (const d of declarations) {
         this.tick();
-        if (!d || typeof d.name!=="string" || !["axiom","def","opaque","thm","inductive"].includes(d.kind)) this.unknown("declaration-kind");
+        if (!d || typeof d.name!=="string" || !["axiom","def","opaque","thm","quot","inductive"].includes(d.kind)) this.unknown("declaration-kind");
         if(d.kind==="inductive") {
           this.need("single-inductives");
           this.addSingleInductive(d);
@@ -97,11 +116,13 @@ class Kernel {
         }
         if(d.kind==="thm") this.need("theorems");
         if(d.kind==="opaque") this.need("opaque-declarations");
+        if(d.kind==="quot") this.need("quotients");
         if (this.env.has(d.name)) this.reject("duplicate-declaration");
         const ps=d.levelParams??[];
         if(!Array.isArray(ps)||ps.some(p=>typeof p!=="string")||new Set(ps).size!==ps.length) this.reject("invalid-universe-parameters");
         this.params=new Set(ps);
         if(ps.length) this.need("universes");
+        if(d.kind==="quot") { this.env.set(d.name,d); continue; }
         this.validate(d.type);
         const declSort=this.sortOf(d.type,[]);
         if(d.kind==="thm" && !levelsEqual(declSort,0,()=>this.tick())) this.reject("theorem-not-proposition");
@@ -494,6 +515,30 @@ class Kernel {
     if(e[0]==="let") {this.need("reduction");return this.whnf(this.substitute(e[3],e[2]));}
     if(e[0]==="app") {
       this.need("application");
+      if(this.caps.has("quotients")) {
+        const [qh,qargs]=this.getApp(e);
+        if(qh[0]==="const") {
+          const qd=this.env.get(qh[1]);
+          if(qd?.kind==="quot" && qd.quotKind==="lift" && qargs.length>=6) {
+            const major=this.whnf(qargs[5]),[mh,margs]=this.getApp(major),md=mh[0]==="const"?this.env.get(mh[1]):null;
+            if(md?.kind==="quot" && md.quotKind==="ctor" && margs.length===3 &&
+               this.same(margs[0],qargs[0]) && this.same(margs[1],qargs[1])) {
+              let out=this.make("app",qargs[3],margs[2]);
+              for(const extra of qargs.slice(6)) out=this.make("app",out,extra);
+              return this.whnf(out);
+            }
+          }
+          if(qd?.kind==="quot" && qd.quotKind==="ind" && qargs.length>=5) {
+            const major=this.whnf(qargs[4]),[mh,margs]=this.getApp(major),md=mh[0]==="const"?this.env.get(mh[1]):null;
+            if(md?.kind==="quot" && md.quotKind==="ctor" && margs.length===3 &&
+               this.same(margs[0],qargs[0]) && this.same(margs[1],qargs[1])) {
+              let out=this.make("app",qargs[3],margs[2]);
+              for(const extra of qargs.slice(5)) out=this.make("app",out,extra);
+              return this.whnf(out);
+            }
+          }
+        }
+      }
       const f=this.whnf(e[1]);
       if(f[0]==="lam") {this.need("reduction");return this.whnf(this.substitute(f[2],e[2]));}
       return f===e[1] ? e : this.make("app",f,e[2]);
@@ -640,7 +685,8 @@ function checkExport(input,capabilities,budget=200000) {
   const reject=reason=>{throw new Stop(REJECT,reason);};
   const get=(m,n)=>{if(!Number.isSafeInteger(n)||n<0||!m.has(n)) fail("unresolved-reference");return m.get(n);};
   const put=(m,n,v)=>{if(!Number.isSafeInteger(n)||n<0||m.has(n)) fail("duplicate-or-invalid-index");m.set(n,v);};
-  let header=false;
+  let header=false,quotStage=0;
+  const quotKinds=["type","ctor","lift","ind"];
   try {
     for(const line of input.split(/\r?\n/)) {
       if(!line.trim()) continue;
@@ -693,6 +739,24 @@ function checkExport(input,capabilities,budget=200000) {
           e=Proj(get(names,v.typeName),v.idx,get(exprs,v.struct));
         } else fail("expression-frontier:"+tag);
         put(exprs,row.ie,e);
+      } else if(tag==="quot") {
+        if(!capabilities.includes("quotients")) fail("declaration-frontier:quot");
+        if(!v || !quotKinds.includes(v.kind) || !Array.isArray(v.levelParams) ||
+           !Number.isSafeInteger(v.name) || !Number.isSafeInteger(v.type))
+          fail("quotient-schema");
+        if(quotStage>=quotKinds.length || v.kind!==quotKinds[quotStage])
+          reject("quotient-package-order");
+        const expectedName={
+          type:leanName("Quot"),ctor:leanName("Quot","mk"),
+          lift:leanName("Quot","lift"),ind:leanName("Quot","ind")
+        }[v.kind];
+        const name=get(names,v.name),lps=v.levelParams.map(n=>get(names,n)),type=get(exprs,v.type);
+        if(name!==expectedName) reject("quotient-name");
+        const expectedType=quotientType(v.kind,lps);
+        if(expectedType===null) reject("quotient-universe-parameters");
+        if(JSON.stringify(type)!==JSON.stringify(expectedType)) reject("quotient-type");
+        decls.push({kind:"quot",quotKind:v.kind,name,type,levelParams:lps});
+        quotStage++;
       } else if(tag==="inductive") {
         if(!capabilities.includes("inductive-envelope")) fail("declaration-frontier:inductive");
         if(!v || !Array.isArray(v.types) || !Array.isArray(v.ctors) || !Array.isArray(v.recs))
@@ -852,6 +916,7 @@ function checkExport(input,capabilities,budget=200000) {
       } else fail("declaration-frontier:"+tag);
     }
     if(!header) fail("missing-header");
+    if(quotStage!==0 && quotStage!==quotKinds.length) reject("quotient-package-incomplete");
     const result=new Kernel(capabilities,budget).run(S(0),S(1),decls);
     return {...result,parse_records:parsed,elapsed_ms:Date.now()-start};
   } catch(e) {
@@ -863,4 +928,4 @@ function checkExport(input,capabilities,budget=200000) {
   }
 }
 
-export {levelsEqual,levelSucc,levelIMax,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,StrLit,Proj,checkExport};
+export {levelsEqual,levelSucc,levelIMax,quotientType,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,StrLit,Proj,checkExport};

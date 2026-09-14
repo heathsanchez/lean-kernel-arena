@@ -1,7 +1,7 @@
 import {writeFileSync,appendFileSync,mkdirSync,readFileSync} from "node:fs";
 import {spawnSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
-import {levelsEqual,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,StrLit,Proj,checkExport} from "./kernel.mjs";
+import {levelsEqual,quotientType,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,StrLit,Proj,checkExport} from "./kernel.mjs";
 
 function growthSuite() {
   const C=(name,term,type,expected=ACCEPT,declarations=[])=>({name,term,type,expected,declarations});
@@ -473,6 +473,37 @@ function runStringLiteralTests(base,emit=()=>{}) {
 }
 
 
+function runQuotientTests(base,emit=()=>{}) {
+  const caps=[...base,"quotients"],u="qu",v="qv";
+  const names={type:JSON.stringify(["[]","str","Quot"]),
+    ctor:JSON.stringify([JSON.stringify(["[]","str","Quot"]),"str","mk"]),
+    lift:JSON.stringify([JSON.stringify(["[]","str","Quot"]),"str","lift"]),
+    ind:JSON.stringify([JSON.stringify(["[]","str","Quot"]),"str","ind"])};
+  const decls=["type","ctor","lift","ind"].map(kind=>({
+    kind:"quot",quotKind:kind,name:names[kind],
+    levelParams:kind==="lift"?[u,v]:[u],type:quotientType(kind,kind==="lift"?[u,v]:[u])
+  }));
+  const before=new Kernel(base).run(S(0),S(1),decls);
+  assert(before.status===UNKNOWN&&before.reason==="missing:quotients",
+    "quotient ablation did not restore missing capability");
+  const accepted=new Kernel(caps).run(S(0),S(1),decls);
+  assert(accepted.status===ACCEPT,"canonical quotient package rejected: "+JSON.stringify(accepted));
+
+  const checker=new Kernel(caps); checker.steps=0; checker.env=new Map(decls.map(d=>[d.name,d])); checker.params=new Set();
+  const A=["const","QA"],R=["const","QR"],B=["const","QB"],a=["const","qa"];
+  const mk=[["const",names.ctor,[["param",u]]],A,R,a].reduce((f,x,i)=>i===0?x:App(f,x));
+  const ident=Lam(A,V(0)),dummy=["const","qh"];
+  const lift=[["const",names.lift,[["param",u],["param",v]]],A,R,B,ident,dummy,mk].reduce((f,x,i)=>i===0?x:App(f,x));
+  assert(checker.same(checker.whnf(lift),a),"Quot.lift did not reduce on Quot.mk");
+  const minor=Lam(A,V(0));
+  const ind=[["const",names.ind,[["param",u]]],A,R,Pi(App(App(["const",names.type,[["param",u]]],A),R),S(0)),minor,mk]
+    .reduce((f,x,i)=>i===0?x:App(f,x));
+  assert(checker.same(checker.whnf(ind),a),"Quot.ind did not reduce on Quot.mk");
+  emit({event:"quotient-growth",ablation_unknown:true,exact_package:true,lift_reduction:true,ind_reduction:true});
+  return {capabilities:caps,cases:3};
+}
+
+
 function runProjectionTests(base,emit=()=>{}) {
   const caps=[...base,"projections"],A="ProjA",a="projA",B="Box",mk="Box.mk",rn=JSON.stringify([B,"str","rec"]),u="u";
   const AT=["const",A],av=["const",a],I=["const",B],Mk=["const",mk],Rec=["const",rn,[["param",u]]];
@@ -610,7 +641,11 @@ const stringLiteral=runStringLiteralTests(natLiteral.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const projection=runProjectionTests(stringLiteral.capabilities,row=>{
+const quotient=runQuotientTests(stringLiteral.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const projection=runProjectionTests(quotient.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
@@ -634,6 +669,7 @@ report.enum_inductive_tests={cases:enumInductive.cases};
 report.single_inductive_tests={cases:singleInductive.cases};
 report.nat_literal_tests={cases:natLiteral.cases};
 report.string_literal_tests={cases:stringLiteral.cases};
+report.quotient_tests={cases:quotient.cases};
 report.projection_tests={cases:projection.cases};
 report.opaque_declaration_tests={cases:opaqueDeclaration.cases};
 report.declaration_safety_controls={cases:declarationSafety.cases,retained_capability:false};

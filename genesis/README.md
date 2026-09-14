@@ -208,3 +208,8 @@ that downstream typing cannot succeed merely by exposing an opaque body.
 ### String literals
 
 String literals are retained as primitive literal expressions with exact literal identity and type `String`. No constructor expansion or additional string reduction is assumed; unsupported consequences remain UNKNOWN.
+
+
+### Quotients
+
+The primitive `Quot` package is admitted only as the exact four-declaration kernel package `Quot`, `Quot.mk`, `Quot.lift`, and `Quot.ind`, with their types independently reconstructed from universe parameters. The two primitive computation rules reduce `Quot.lift` and `Quot.ind` on `Quot.mk`; no additional quotient equations are assumed.
