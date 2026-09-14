@@ -869,12 +869,13 @@ class Kernel {
         this.equal(this.infer(e[2],ctx),f[1],ctx);
         return this.substitute(f[2],e[2]);
       }
-      case "let": {
+      case "let":
         this.need("reduction"); this.sortOf(e[1],ctx);
         this.equal(this.infer(e[2],ctx),e[1],ctx);
-        const bodyType=this.infer(e[3],[...ctx,e[1]]);
-        return this.substitute(bodyType,e[2]);
-      }
+        // A let introduces a local definition, not merely a local type.
+        // Until the context representation retains that definition safely,
+        // preserve exact semantics by substituting the checked value.
+        return this.infer(this.substitute(e[3],e[2]),ctx);
       default: this.unknown("inference-frontier");
     }
   }

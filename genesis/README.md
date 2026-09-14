@@ -220,6 +220,6 @@ The primitive `Quot` package is admitted only as the exact four-declaration kern
 Recursors generated and already certified by the single-inductive checker now compute on matching certified constructors. Reduction selects the validated exported rule, instantiates its universes, applies the recursor prefix and constructor fields, and recursively normalizes the result. Removing this capability restores an explicit UNKNOWN at the reducible recursor redex.
 
 
-### Compiled local inference
+### Local definitions remain semantic state
 
-Performance residuals do not authorize new semantics. Let-bound terms are now checked under a local binder and substituted only into the inferred result type, avoiding traversal of the entire body at every let. Inference results are memoized by shared expression identity and immutable local context, so exported DAG sharing is preserved rather than re-expanded by the checker.
+A let-bound value is part of the local conversion state, not merely its type. An attempted compilation that retained only the binder type lost definitional equality inside the body. The kernel therefore substitutes the checked let value before body inference until a future optimization can retain local definitions without changing consequence. The earlier expression/context-identity memoizer was also removed after Arena separated contexts that it had falsely merged.
