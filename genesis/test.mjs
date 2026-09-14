@@ -243,6 +243,33 @@ function runProofIrrelevanceTests(base,emit=()=>{}) {
 }
 
 
+function runFunctionEtaTests(base,emit=()=>{}) {
+  const caps=[...base,"function-eta"],A="EtaA",F="etaF",G="etaG";
+  const AT=["const",A],FT=Pi(AT,AT),CF=["const",F],CG=["const",G];
+  const decls=[
+    {kind:"axiom",name:A,levelParams:[],type:S(1)},
+    {kind:"axiom",name:F,levelParams:[],type:FT},
+    {kind:"axiom",name:G,levelParams:[],type:FT}
+  ];
+  const setup=cset=>{
+    const q=new Kernel(cset); q.steps=0; q.params=new Set(); q.env=new Map(decls.map(d=>[d.name,d])); return q;
+  };
+  const eta=Lam(AT,App(CF,V(0)));
+  let ablated=false;
+  try { setup(base).equal(eta,CF,[]); }
+  catch(e) { ablated=e instanceof Stop&&e.status===UNKNOWN&&e.message==="conversion-frontier"; }
+  assert(ablated,"function eta ablation did not restore conversion frontier");
+  setup(caps).equal(eta,CF,[]);
+  const near=Lam(AT,App(CF,App(CG,V(0))));
+  let guarded=false;
+  try { setup(caps).equal(near,CF,[]); }
+  catch(e) { guarded=e instanceof Stop&&e.status===UNKNOWN&&e.message==="conversion-frontier"; }
+  assert(guarded,"non-eta lambda was collapsed");
+  emit({event:"function-eta-growth",ablation_unknown:true,eta_contracts:true,near_eta_guarded:true});
+  return {capabilities:caps,cases:2};
+}
+
+
 function runInductiveEnvelopeTests(base,emit=()=>{}) {
   const caps=[...base,"inductive-envelope"];
   const meta={meta:{format:{version:"3.1.0"}}};
@@ -706,7 +733,11 @@ const proofIrrelevance=runProofIrrelevanceTests(theorem.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const inductiveEnvelope=runInductiveEnvelopeTests(proofIrrelevance.capabilities,row=>{
+const functionEta=runFunctionEtaTests(proofIrrelevance.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const inductiveEnvelope=runInductiveEnvelopeTests(functionEta.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
@@ -760,6 +791,7 @@ report.capabilities=declarationSafety.capabilities;
 report.universe_tests={laws:universe.laws,independent_pairs:universe.independent_pairs};
 report.theorem_tests={cases:theorem.cases};
 report.proof_irrelevance_tests={cases:proofIrrelevance.cases};
+report.function_eta_tests={cases:functionEta.cases};
 report.inductive_envelope_tests={cases:inductiveEnvelope.cases};
 report.empty_inductive_tests={cases:emptyInductive.cases};
 report.enum_inductive_tests={cases:enumInductive.cases};

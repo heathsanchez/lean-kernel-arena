@@ -538,6 +538,38 @@ class Kernel {
       default: this.unknown("substitution-syntax");
     }
   }
+  lowerBound(e,cut=0) {
+    this.tick();
+    switch(e[0]) {
+      case "sort": case "const": case "nat": case "strlit": return e;
+      case "var":
+        if(e[1]<cut) return e;
+        if(e[1]===cut) return null;
+        return this.make("var",e[1]-1);
+      case "pi": case "lam": {
+        const a=this.lowerBound(e[1],cut),b=this.lowerBound(e[2],cut+1);
+        return a===null||b===null?null:this.make(e[0],a,b);
+      }
+      case "app": {
+        const f=this.lowerBound(e[1],cut),a=this.lowerBound(e[2],cut);
+        return f===null||a===null?null:this.make("app",f,a);
+      }
+      case "proj": {
+        const x=this.lowerBound(e[3],cut);
+        return x===null?null:this.make("proj",e[1],e[2],x);
+      }
+      case "let": {
+        const a=this.lowerBound(e[1],cut),v=this.lowerBound(e[2],cut),b=this.lowerBound(e[3],cut+1);
+        return a===null||v===null||b===null?null:this.make("let",a,v,b);
+      }
+      default: this.unknown("eta-syntax");
+    }
+  }
+  functionEtaContract(e) {
+    this.tick();
+    if(e[0]!=="lam"||e[2]?.[0]!=="app"||e[2]?.[2]?.[0]!=="var"||e[2][2][1]!==0) return null;
+    return this.lowerBound(e[2][1],0);
+  }
   whnf(e) {
     this.tick();
     if(e[0]==="nat") {
@@ -664,6 +696,12 @@ class Kernel {
         this.equal(tx,ty,ctx);
         return;
       }
+    }
+    if(this.caps.has("function-eta")) {
+      const ex=this.functionEtaContract(x);
+      if(ex!==null) { this.equal(ex,y,ctx); return; }
+      const ey=this.functionEtaContract(y);
+      if(ey!==null) { this.equal(x,ey,ctx); return; }
     }
     if(x[0]===y[0]) {
       if(x[0]==="app") {
