@@ -1,0 +1,246 @@
+name: MathGraph warm projection deterministic instruction gate
+
+on:
+  push:
+    branches: [mathgraph-warm-projection-callgrind]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mathgraph-warm-projection-callgrind
+  cancel-in-progress: true
+
+jobs:
+  score:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout control branch
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install deterministic instruction counter
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y valgrind
+          valgrind --version
+
+      - name: Clone and pin official Arena revision
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git clone https://github.com/leanprover/lean-kernel-arena /tmp/arena
+          cd /tmp/arena
+          git checkout ac1c13762de41b594fa24b90ede8cfd97ac6a765
+          test "$(git rev-parse HEAD)" = "ac1c13762de41b594fa24b90ede8cfd97ac6a765"
+
+      - name: Define frozen base and warm-projection candidate
+        shell: bash
+        working-directory: /tmp/arena
+        run: |
+          set -euxo pipefail
+          cat > checkers/mathgraph-base.yaml <<'EOF'
+          description: "Frozen MathGraph d6a baseline for deterministic private instruction comparison."
+          url: https://github.com/metalogiclabs/mathgraph-lean-kernel
+          ref: open-development-core-v1
+          rev: d6a73279e6765e637f9741180cefbd7ef957d8e5
+          build: |
+            cat > config.json <<__END__
+             {
+               "use_stdin": true,
+               "nat_extension": true,
+               "string_extension": true,
+               "unpermitted_axiom_hard_error": false,
+               "unsafe_permit_all_axioms": true,
+               "num_threads": 4
+             }
+            __END__
+            ROOT=$(cd ../../../.. && pwd)
+            "$ROOT/lka.py" build-test init-prelude
+            RUSTFLAGS="-C target-cpu=native -Cprofile-generate=$PWD/pgo" cargo build --release
+            target/release/sokonanoda config.json < "$ROOT/_build/tests/init-prelude.ndjson" >/dev/null
+            llvm-profdata merge -o "$PWD/pgo/merged.profdata" "$PWD/pgo"
+            RUSTFLAGS="-C target-cpu=native -Cprofile-use=$PWD/pgo/merged.profdata" cargo build --release
+          run: |
+            target/release/sokonanoda config.json < "$IN" || exit 1
+          EOF
+
+          cat > checkers/mathgraph-warm.yaml <<'EOF'
+          description: "Frozen warm-projection candidate c6d445 for deterministic private instruction comparison."
+          url: https://github.com/metalogiclabs/mathgraph-lean-kernel
+          ref: candidate/warm-projection-v1
+          rev: c6d445a954def8922490d0cd874ea134b45463dd
+          build: |
+            cat > config.json <<__END__
+             {
+               "use_stdin": true,
+               "nat_extension": true,
+               "string_extension": true,
+               "unpermitted_axiom_hard_error": false,
+               "unsafe_permit_all_axioms": true,
+               "num_threads": 4
+             }
+            __END__
+            ROOT=$(cd ../../../.. && pwd)
+            "$ROOT/lka.py" build-test init-prelude
+            RUSTFLAGS="-C target-cpu=native -Cprofile-generate=$PWD/pgo" cargo build --release
+            target/release/sokonanoda config.json < "$ROOT/_build/tests/init-prelude.ndjson" >/dev/null
+            llvm-profdata merge -o "$PWD/pgo/merged.profdata" "$PWD/pgo"
+            RUSTFLAGS="-C target-cpu=native -Cprofile-use=$PWD/pgo/merged.profdata" cargo build --release
+          run: |
+            target/release/sokonanoda config.json < "$IN" || exit 1
+          EOF
+
+      - name: Build both checkers with official MathGraph PGO recipe
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        working-directory: /tmp/arena
+        run: |
+          ./lka.py build-checker mathgraph-base
+          ./lka.py build-checker mathgraph-warm
+
+      - name: Generate deciding official tests
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        working-directory: /tmp/arena
+        run: |
+          for test in mathlib cslib cedar std con-leche perf/beta-ladder perf/app-lam perf/let-ladder; do
+            ./lka.py build-test "$test"
+          done
+
+      - name: Locate checker binaries
+        shell: bash
+        working-directory: /tmp/arena
+        run: |
+          set -euxo pipefail
+          BASE=$(find _build/checkers/mathgraph-base -type f -path '*/target/release/sokonanoda' -perm -111 | head -1)
+          WARM=$(find _build/checkers/mathgraph-warm -type f -path '*/target/release/sokonanoda' -perm -111 | head -1)
+          test -n "$BASE" && test -n "$WARM"
+          echo "BASE=$PWD/$BASE" >> "$GITHUB_ENV"
+          echo "WARM=$PWD/$WARM" >> "$GITHUB_ENV"
+          echo "BASE_CFG=$(dirname "$BASE")/../../config.json" >> "$GITHUB_ENV"
+          echo "WARM_CFG=$(dirname "$WARM")/../../config.json" >> "$GITHUB_ENV"
+
+      - name: Semantic smoke and Callgrind smoke
+        shell: bash
+        working-directory: /tmp/arena
+        run: |
+          set -euxo pipefail
+          "$BASE" "$BASE_CFG" < _build/tests/perf/beta-ladder.ndjson >/tmp/base.out
+          "$WARM" "$WARM_CFG" < _build/tests/perf/beta-ladder.ndjson >/tmp/warm.out
+          diff -u /tmp/base.out /tmp/warm.out
+          valgrind --tool=callgrind --callgrind-out-file=/tmp/smoke.callgrind             "$BASE" "$BASE_CFG" < _build/tests/perf/beta-ladder.ndjson >/dev/null
+          grep '^summary:' /tmp/smoke.callgrind
+
+      - name: Count deterministic guest instructions
+        shell: bash
+        working-directory: /tmp/arena
+        run: |
+          set -euxo pipefail
+          mkdir -p /tmp/callgrind
+          for test in perf/beta-ladder perf/app-lam perf/let-ladder std cedar cslib con-leche mathlib; do
+            safe=${test//\//_}
+            infile="_build/tests/$test.ndjson"
+
+            echo "=== $test base semantic ==="
+            "$BASE" "$BASE_CFG" < "$infile" >"/tmp/callgrind/${safe}.base.out"
+            echo "=== $test warm semantic ==="
+            "$WARM" "$WARM_CFG" < "$infile" >"/tmp/callgrind/${safe}.warm.out"
+            diff -u "/tmp/callgrind/${safe}.base.out" "/tmp/callgrind/${safe}.warm.out"
+
+            echo "=== $test base callgrind ==="
+            /usr/bin/time -f '%e %U %S %M' -o "/tmp/callgrind/${safe}.base.time"               valgrind --tool=callgrind --callgrind-out-file="/tmp/callgrind/${safe}.base"               "$BASE" "$BASE_CFG" < "$infile" >/dev/null
+
+            echo "=== $test warm callgrind ==="
+            /usr/bin/time -f '%e %U %S %M' -o "/tmp/callgrind/${safe}.warm.time"               valgrind --tool=callgrind --callgrind-out-file="/tmp/callgrind/${safe}.warm"               "$WARM" "$WARM_CFG" < "$infile" >/dev/null
+          done
+
+      - name: Decide deterministic private instruction gate
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 - <<'PY' | tee /tmp/warm-projection-callgrind-summary.txt
+          import json
+          from pathlib import Path
+
+          root=Path('/tmp/callgrind')
+          tests=[
+              'perf_beta-ladder','perf_app-lam','perf_let-ladder',
+              'std','cedar','cslib','con-leche','mathlib'
+          ]
+
+          def ir(path):
+              events=None
+              summary=None
+              for line in Path(path).read_text(errors='replace').splitlines():
+                  if line.startswith('events:'):
+                      events=line.split(':',1)[1].split()
+                  elif line.startswith('summary:'):
+                      summary=[int(x) for x in line.split(':',1)[1].split()]
+              assert events and summary,path
+              assert 'Ir' in events,(path,events)
+              return summary[events.index('Ir')]
+
+          out={
+              'arena':'ac1c13762de41b594fa24b90ede8cfd97ac6a765',
+              'base_rev':'d6a73279e6765e637f9741180cefbd7ef957d8e5',
+              'candidate_rev':'c6d445a954def8922490d0cd874ea134b45463dd',
+              'metric':'Callgrind Ir deterministic software instruction proxy',
+              'tests':{},
+              'claim_boundary':'Not official PMU retired instructions; deterministic private proxy on official pinned Arena inputs/build recipe.'
+          }
+
+          print('CALLGRIND Ir comparison')
+          for t in tests:
+              b=ir(root/f'{t}.base')
+              w=ir(root/f'{t}.warm')
+              r=w/b
+              out['tests'][t]={
+                  'base_ir':b,
+                  'warm_ir':w,
+                  'ratio':r,
+                  'reduction_pct':100*(1-r),
+              }
+              print(f'{t}: base={b} warm={w} ratio={r:.9f} reduction={100*(1-r):.4f}%')
+
+          mr=out['tests']['mathlib']['ratio']
+          out['mathlib_ratio']=mr
+          out['mathlib_reduction_pct']=100*(1-mr)
+
+          if mr < 0.995:
+              decision='PROXY_PROMOTION_CANDIDATE'
+          elif mr <= 1.005:
+              decision='PROXY_MATHLIB_NEUTRAL'
+          else:
+              decision='PROXY_DO_NOT_PROMOTE'
+          out['decision']=decision
+
+          total_b=sum(out['tests'][t]['base_ir'] for t in tests)
+          total_w=sum(out['tests'][t]['warm_ir'] for t in tests)
+          out['all_selected_ratio']=total_w/total_b
+          out['all_selected_reduction_pct']=100*(1-total_w/total_b)
+
+          print(f"\nMATHLIB_CALLGRIND_IR_RATIO={mr:.9f} reduction={100*(1-mr):.4f}%")
+          print(f"ALL_SELECTED_RATIO={out['all_selected_ratio']:.9f} reduction={out['all_selected_reduction_pct']:.4f}%")
+          print('PROXY_DECISION='+decision)
+          print('NOTE=official Arena PMU retired instructions remain the final leaderboard authority')
+
+          Path('/tmp/warm-projection-callgrind-result.json').write_text(json.dumps(out,indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Upload deterministic instruction evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mathgraph-warm-projection-callgrind
+          path: |
+            /tmp/warm-projection-callgrind-summary.txt
+            /tmp/warm-projection-callgrind-result.json
+            /tmp/callgrind/
+            /tmp/smoke.callgrind
+          retention-days: 90
