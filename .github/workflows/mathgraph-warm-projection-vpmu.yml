@@ -1,0 +1,132 @@
+name: MathGraph warm projection vPMU gate
+
+on:
+  push:
+    branches: [mathgraph-warm-projection-vpmu]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  score:
+    runs-on: nscloud-ubuntu-22.04-amd64-8x16
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clone exact pinned Arena
+        run: |
+          set -euo pipefail
+          git clone -q https://github.com/leanprover/lean-kernel-arena /tmp/arena
+          git -C /tmp/arena checkout -q ac1c13762de41b594fa24b90ede8cfd97ac6a765
+          cd /tmp/arena
+          echo "ARENA=$(git rev-parse HEAD)"
+          sed -n '1,120p' checkers/mathgraph.yaml
+
+      - name: Check vPMU instruction authority
+        run: |
+          cd /tmp/arena
+          perf --version
+          cat /proc/sys/kernel/perf_event_paranoid || true
+          perf stat -e instructions -- true 2>&1 | tee /tmp/perf-smoke.txt
+          grep -Eq '[0-9][0-9,]*[[:space:]]+instructions' /tmp/perf-smoke.txt
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Define paired base and candidate checkers
+        run: |
+          set -euo pipefail
+          cd /tmp/arena
+          cp checkers/mathgraph.yaml checkers/mathgraph-base.yaml
+          cp checkers/mathgraph.yaml checkers/mathgraph-candidate.yaml
+          sed -i 's/^rev: .*/rev: d6a73279e6765e637f9741180cefbd7ef957d8e5/' checkers/mathgraph-base.yaml
+          sed -i 's/^ref: .*/ref: open-development-core-v1/' checkers/mathgraph-base.yaml || true
+          sed -i 's/^rev: .*/rev: c6d445a954def8922490d0cd874ea134b45463dd/' checkers/mathgraph-candidate.yaml
+          sed -i 's/^ref: .*/ref: candidate\/warm-projection-v1/' checkers/mathgraph-candidate.yaml || true
+          echo BASE
+          grep -E '^(url|ref|rev):' checkers/mathgraph-base.yaml
+          echo CANDIDATE
+          grep -E '^(url|ref|rev):' checkers/mathgraph-candidate.yaml
+
+      - name: Build both checkers
+        run: |
+          cd /tmp/arena
+          ./lka.py build-checker mathgraph-base
+          ./lka.py build-checker mathgraph-candidate
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Generate deciding Mathlib test
+        run: |
+          cd /tmp/arena
+          ./lka.py build-test mathlib
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Run paired authoritative Mathlib measurements
+        run: |
+          set -euo pipefail
+          cd /tmp/arena
+          rm -rf _results _build/results || true
+
+          ./lka.py run --checker mathgraph-base --test mathlib
+          mkdir -p /tmp/evidence/base
+          find _build -path '*results*' -type f -name '*.json' -print -exec cp {} /tmp/evidence/base/ \; || true
+
+          ./lka.py run --checker mathgraph-candidate --test mathlib
+          mkdir -p /tmp/evidence/candidate
+          find _build -path '*results*' -type f -name '*.json' -print -exec cp {} /tmp/evidence/candidate/ \; || true
+
+          python3 - <<'PY'
+          import json,glob,os
+          rows={}
+          for label in ('base','candidate'):
+              fs=glob.glob(f'/tmp/evidence/{label}/*.json')
+              vals=[]
+              for f in fs:
+                  try:
+                      d=json.load(open(f))
+                  except Exception:
+                      continue
+                  if isinstance(d,dict) and d.get('test')=='mathlib':
+                      vals.append(d)
+              if not vals:
+                  raise SystemExit(f'NO_MATHLIB_RESULT_{label}')
+              d=vals[-1]
+              rows[label]={
+                  'status':d.get('status'),
+                  'correctness':d.get('correctness'),
+                  'wall_time':d.get('wall_time'),
+                  'cpu_time':d.get('cpu_time'),
+                  'max_rss':d.get('max_rss'),
+                  'instructions':d.get('instructions'),
+              }
+          b=rows['base']['instructions']; c=rows['candidate']['instructions']
+          if not b or not c:
+              raise SystemExit(f'NO_INSTRUCTION_AUTHORITY {rows}')
+          out={
+              'arena':'ac1c13762de41b594fa24b90ede8cfd97ac6a765',
+              'base_rev':'d6a73279e6765e637f9741180cefbd7ef957d8e5',
+              'candidate_rev':'c6d445a954def8922490d0cd874ea134b45463dd',
+              'base':rows['base'],
+              'candidate':rows['candidate'],
+              'instruction_delta':c-b,
+              'candidate_reduction_from_base_pct':100*(b-c)/b,
+              'candidate_vs_sokonanoda_745176418740_pct':100*(c-745176418740)/745176418740,
+          }
+          os.makedirs('/tmp/evidence/final',exist_ok=True)
+          json.dump(out,open('/tmp/evidence/final/result.json','w'),indent=2)
+          print('MDA_VPMU_RESULT='+json.dumps(out,sort_keys=True))
+          PY
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Upload authoritative evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mathgraph-warm-projection-vpmu
+          path: /tmp/evidence/
+          retention-days: 90
