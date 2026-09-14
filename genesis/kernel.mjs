@@ -813,6 +813,10 @@ class Kernel {
         this.reject("universe-mismatch");
       }
       if((x[0]==="sort")!==(y[0]==="sort")) this.reject("rigid-sort-mismatch");
+      const rigidHeads=new Set(["var","const","app","pi","lam","proj","nat","strlit"]);
+      const localVsGlobal=(x[0]==="var"&&y[0]==="const")||(x[0]==="const"&&y[0]==="var");
+      if(x[0]!==y[0] && rigidHeads.has(x[0]) && rigidHeads.has(y[0]) && !localVsGlobal)
+        this.reject("rigid-head-mismatch");
       if(x[0]===y[0] && (x[0]==="nat"||x[0]==="strlit"))
         this.reject("rigid-literal-mismatch");
     }

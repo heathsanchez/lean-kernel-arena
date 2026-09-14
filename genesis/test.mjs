@@ -271,10 +271,12 @@ function runFunctionEtaTests(base,emit=()=>{}) {
 
 
 function runRigidConversionTests(base,emit=()=>{}) {
-  const caps=[...base,"rigid-conversion"],A="RigidA",B="RigidB";
+  const caps=[...base,"rigid-conversion"],A="RigidA",B="RigidB",F="RigidF";
+  const CA=["const",A],CF=["const",F];
   const decls=[
     {kind:"axiom",name:A,levelParams:[],type:S(1)},
-    {kind:"axiom",name:B,levelParams:[],type:S(1)}
+    {kind:"axiom",name:B,levelParams:[],type:S(1)},
+    {kind:"axiom",name:F,levelParams:[],type:Pi(CA,CA)}
   ];
   const setup=cset=>{
     const q=new Kernel(cset); q.steps=0; q.params=new Set();
@@ -294,9 +296,28 @@ function runRigidConversionTests(base,emit=()=>{}) {
   try { setup(caps).equal(V(1),V(0),ctx); }
   catch(e) { varRejected=e instanceof Stop&&e.status===REJECT&&e.message==="rigid-variable-mismatch"; }
   assert(varRejected,"distinct rigid variables were not rejected");
+
+  const structuralCtx=[Pi(CA,CA),CA],structural=App(V(1),V(0));
+  let structuralUnknown=false;
+  try { setup(base).equal(V(0),structural,structuralCtx); }
+  catch(e) { structuralUnknown=e instanceof Stop&&e.status===UNKNOWN&&e.message==="conversion-frontier"; }
+  assert(structuralUnknown,"rigid head ablation did not restore the structural frontier");
+  let structuralRejected=false;
+  try { setup(caps).equal(V(0),structural,structuralCtx); }
+  catch(e) { structuralRejected=e instanceof Stop&&e.status===REJECT&&e.message==="rigid-head-mismatch"; }
+  assert(structuralRejected,"disjoint structural rigid heads were not rejected");
+
+  let localGlobalUnknown=false;
+  try { setup(caps).equal(V(0),["const",A],[S(1)]); }
+  catch(e) { localGlobalUnknown=e instanceof Stop&&e.status===UNKNOWN&&e.message==="conversion-frontier"; }
+  assert(localGlobalUnknown,"local/global rigidity was guessed without a context proof");
+
+  setup(caps).equal(Lam(CA,App(CF,V(0))),CF,[]);
   emit({event:"rigid-conversion-growth",ablation_unknown:true,
-    distinct_constants_rejected:true,distinct_variables_rejected:true});
-  return {capabilities:caps,cases:2};
+    distinct_constants_rejected:true,distinct_variables_rejected:true,
+    structural_head_rejected:true,local_global_preserved_unknown:true,
+    eta_first_refusal:true});
+  return {capabilities:caps,cases:5};
 }
 
 
@@ -837,8 +858,8 @@ function runOpaqueDeclarationTests(base,emit=()=>{}) {
     {kind:"def",name:"opaqueUse",levelParams:[],type:["const",O],value:["const",p]}
   ];
   const noLeak=new Kernel(caps).run(S(0),S(1),hidden);
-  assert(noLeak.status===UNKNOWN&&noLeak.reason==="conversion-frontier",
-    "opaque body leaked into definitional equality: "+JSON.stringify(noLeak));
+  assert(noLeak.status===REJECT&&noLeak.reason==="rigid-sort-mismatch",
+    "opaque body was unfolded or rigid mismatch was not detected: "+JSON.stringify(noLeak));
 
   const bad={kind:"opaque",name:"badOpaque",levelParams:[],type:S(0),value:S(0)};
   const mismatch=new Kernel(caps).run(S(0),S(1),[bad]);
