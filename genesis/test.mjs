@@ -321,8 +321,13 @@ function runEmptyInductiveTests(base,emit=()=>{}) {
   assert(checkExport(bad.map(JSON.stringify).join("\n"),caps).status===REJECT,
     "forged empty recursor type was accepted");
 
+  const badK=rows.map(x=>JSON.parse(JSON.stringify(x)));
+  badK[badK.length-1].inductive.recs[0].k=true;
+  assert(checkExport(badK.map(JSON.stringify).join("\n"),caps).status===REJECT,
+    "empty recursor with bogus K flag was accepted");
+
   emit({event:"empty-inductive-growth",ablation_unknown:true,
-    exact_recursor:true,forged_recursor_rejected:true});
+    exact_recursor:true,forged_recursor_rejected:true,bogus_k_rejected:true});
   return {capabilities:caps,cases:2};
 }
 

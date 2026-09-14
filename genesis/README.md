@@ -154,11 +154,17 @@ recursor is REJECT, and removing the capability restores
 index, recursion, nesting, or reflexivity remains outside this fragment.
 
 
-## Seventh increment: declaration safety
+## Seventh increment: declaration safety dissolved into validity
 
 Certifying empty inductives exposed two cases whose next obstruction was no longer
-inductive: unsafe and partial definitions. Declaration safety is therefore a
-separate retained capability. With it active, unsafe/partial definitions and unsafe
-axioms are REJECT rather than being treated as unsupported. Ablating the capability
-restores UNKNOWN at the same declarations. No extra inductive semantics are charged
-to this gain.
+inductive: unsafe and partial definitions. The temporary ablatable implementation
+was contracted away: unsafe/partial definitions and unsafe axioms are invalid trusted
+environment inputs, so rejection belongs to the fixed validity boundary rather than
+constructive reach. The retained capability set therefore does not pay for it.
+
+
+The certified empty fragment is also closed on its own metadata. Once the
+zero-parameter/zero-index/zero-constructor type header matches, incompatible
+recursor metadata is REJECT rather than deferred; in particular an empty recursor
+cannot claim the K rule. This narrows malformed members of the already-admitted
+fragment without broadening the inductive language.

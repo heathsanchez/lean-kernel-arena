@@ -368,18 +368,20 @@ function checkExport(input,capabilities,budget=200000) {
         if(capabilities.includes("empty-inductives") && v.types.length===1 &&
            v.ctors.length===0 && v.recs.length===1) {
           const t=v.types[0],rec=v.recs[0];
-          const exactMeta=
+          const exactTypeMeta=
             t.numParams===0 && t.numIndices===0 && t.numNested===0 &&
             t.isRec===false && t.isReflexive===false && t.isUnsafe===false &&
             Array.isArray(t.levelParams) && t.levelParams.length===0 &&
             Array.isArray(t.all) && t.all.length===1 && t.all[0]===t.name &&
-            Array.isArray(t.ctors) && t.ctors.length===0 &&
-            rec.numParams===0 && rec.numIndices===0 && rec.numMotives===1 &&
-            rec.numMinors===0 && rec.k===false && rec.isUnsafe===false &&
-            Array.isArray(rec.rules) && rec.rules.length===0 &&
-            Array.isArray(rec.all) && rec.all.length===1 && rec.all[0]===t.name &&
-            Array.isArray(rec.levelParams) && rec.levelParams.length===1;
-          if(exactMeta) {
+            Array.isArray(t.ctors) && t.ctors.length===0;
+          if(exactTypeMeta) {
+            const exactRecMeta=
+              rec.numParams===0 && rec.numIndices===0 && rec.numMotives===1 &&
+              rec.numMinors===0 && rec.k===false && rec.isUnsafe===false &&
+              Array.isArray(rec.rules) && rec.rules.length===0 &&
+              Array.isArray(rec.all) && rec.all.length===1 && rec.all[0]===t.name &&
+              Array.isArray(rec.levelParams) && rec.levelParams.length===1;
+            if(!exactRecMeta) reject("empty-inductive-recursor-metadata");
             const tn=get(names,t.name),rn=get(names,rec.name),u=get(names,rec.levelParams[0]);
             const typeExpr=get(exprs,t.type),recExpr=get(exprs,rec.type);
             if(typeExpr?.[0]!=="sort") fail("empty-inductive-type-frontier");
