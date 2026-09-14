@@ -440,10 +440,11 @@ class Kernel {
   same(a,b) {
     this.tick();
     if(a===b) return true;
-    if(a.length!==b.length || a[0]!==b[0]) return false;
-    for(let i=1;i<a.length;i++) {
-      if(Array.isArray(a[i])) {if(!Array.isArray(b[i]) || !this.same(a[i],b[i])) return false;}
-      else if(a[i]!==b[i]) return false;
+    if(!Array.isArray(a)||!Array.isArray(b)||a.length!==b.length) return false;
+    for(let i=0;i<a.length;i++) {
+      if(Array.isArray(a[i])||Array.isArray(b[i])) {
+        if(!Array.isArray(a[i])||!Array.isArray(b[i])||!this.same(a[i],b[i])) return false;
+      } else if(a[i]!==b[i]) return false;
     }
     return true;
   }
