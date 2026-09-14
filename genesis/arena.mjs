@@ -104,7 +104,8 @@ if(inductiveFrontier.length) {
   console.log("INDUCTIVE_FRONTIER_EXPECTED "+JSON.stringify(byExpected));
   const actual={};
   for(const x of inductiveFrontier) {
-    const n=x.result?.frontier_inductive?.name??"<unknown>";
+    const rr=results.find(r=>r.name===x.name);
+    const n=rr?.frontier_inductive?.name??"<unknown>";
     const key=JSON.stringify([x.expected,n]);
     actual[key]=(actual[key]??0)+1;
   }
