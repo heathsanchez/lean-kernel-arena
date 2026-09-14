@@ -79,12 +79,30 @@ writeFileSync(new URL("./evidence/inductive-frontier.json",import.meta.url),
 for(const [reason,group] of Object.entries(frontier).sort((a,b)=>b[1].count-a[1].count))
   console.log("NEXT_RESIDUAL "+JSON.stringify({reason,...group}));
 if(inductiveFrontier.length) {
-  const signatures={};
+  const signatures={},profiles={},byExpected={ACCEPT:0,REJECT:0};
+  const names={ACCEPT:[],REJECT:[]};
   for(const x of inductiveFrontier) {
     const r=x.first_inductive??{};
+    byExpected[x.expected]=(byExpected[x.expected]??0)+1;
+    names[x.expected].push(x.name);
     const sig=JSON.stringify(Object.keys(r).sort().map(k=>[k,Array.isArray(r[k])?r[k].length:typeof r[k]]));
     signatures[sig]=(signatures[sig]??0)+1;
+    const t=r.types?.[0]??{}, rec=r.recs?.[0]??{};
+    const profile=JSON.stringify({
+      expected:x.expected,ctors:r.ctors?.length??-1,
+      params:t.numParams??null,indices:t.numIndices??null,
+      levels:t.levelParams?.length??null,nested:t.numNested??null,
+      recursive:t.isRec??null,reflexive:t.isReflexive??null,
+      recParams:rec.numParams??null,recIndices:rec.numIndices??null,
+      motives:rec.numMotives??null,minors:rec.numMinors??null,
+      rules:rec.rules?.length??null,k:rec.k??null
+    });
+    profiles[profile]=(profiles[profile]??0)+1;
   }
   console.log("INDUCTIVE_FRONTIER_SHAPES "+JSON.stringify(
     Object.entries(signatures).sort((a,b)=>b[1]-a[1]).map(([signature,count])=>({count,signature}))));
+  console.log("INDUCTIVE_FRONTIER_EXPECTED "+JSON.stringify(byExpected));
+  console.log("INDUCTIVE_FRONTIER_PROFILES "+JSON.stringify(
+    Object.entries(profiles).sort((a,b)=>b[1]-a[1]).map(([profile,count])=>({count,...JSON.parse(profile)}))));
+  console.log("INDUCTIVE_FRONTIER_NAMES "+JSON.stringify(names));
 }
