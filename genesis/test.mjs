@@ -326,6 +326,34 @@ function runEmptyInductiveTests(base,emit=()=>{}) {
   return {capabilities:caps,cases:2};
 }
 
+
+function runDeclarationSafetyTests(base,emit=()=>{}) {
+  const caps=[...base,"declaration-safety"];
+  const meta={meta:{format:{version:"3.1.0"}}};
+  const mkDef=safety=>[
+    meta,{"in":1,str:{pre:0,str:"d"}},
+    {"ie":0,sort:1},{"ie":1,sort:0},
+    {def:{name:1,levelParams:[],type:0,value:1,hints:"opaque",safety,all:[1]}}
+  ].map(JSON.stringify).join("\n");
+  for(const safety of ["unsafe","partial"]) {
+    const before=checkExport(mkDef(safety),base);
+    assert(before.status===UNKNOWN && before.reason==="unsafe-definition",
+      "declaration-safety ablation did not restore UNKNOWN");
+    const after=checkExport(mkDef(safety),caps);
+    assert(after.status===REJECT && after.reason==="unsafe-definition",
+      safety+" definition was not rejected");
+  }
+  const unsafeAxiom=[
+    meta,{"in":1,str:{pre:0,str:"a"}},{"ie":0,sort:0},
+    {axiom:{name:1,levelParams:[],type:0,isUnsafe:true}}
+  ].map(JSON.stringify).join("\n");
+  assert(checkExport(unsafeAxiom,caps).status===REJECT,"unsafe axiom was not rejected");
+  emit({event:"declaration-safety-growth",ablation_unknown:true,
+    unsafe_definition_rejected:true,partial_definition_rejected:true,
+    unsafe_axiom_rejected:true});
+  return {capabilities:caps,cases:3};
+}
+
 const target=new URL("./evidence/",import.meta.url);
 mkdirSync(target,{recursive:true});
 writeFileSync(new URL("events.jsonl",target),"");
@@ -354,14 +382,19 @@ const emptyInductive=runEmptyInductiveTests(inductiveEnvelope.capabilities,row=>
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const replay=evaluate(emptyInductive.capabilities,growthSuite());
+const declarationSafety=runDeclarationSafetyTests(emptyInductive.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const replay=evaluate(declarationSafety.capabilities,growthSuite());
 assert(replay.covered===report.training && !replay.wrong.length,"later growth regressed protected cases");
-report.capabilities=emptyInductive.capabilities;
+report.capabilities=declarationSafety.capabilities;
 report.universe_tests={laws:universe.laws,independent_pairs:universe.independent_pairs};
 report.theorem_tests={cases:theorem.cases};
 report.proof_irrelevance_tests={cases:proofIrrelevance.cases};
 report.inductive_envelope_tests={cases:inductiveEnvelope.cases};
 report.empty_inductive_tests={cases:emptyInductive.cases};
+report.declaration_safety_tests={cases:declarationSafety.cases};
 for(const name of ["level-index-out-of-order","sparse-name-index"]) {
   const raw=readFileSync(new URL("../tests/"+name+".ndjson",import.meta.url),"utf8");
   const r=checkExport(raw,report.capabilities);

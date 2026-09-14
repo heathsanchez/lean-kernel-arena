@@ -152,3 +152,13 @@ Only after that comparison are the type constant and recursor installed. A forge
 recursor is REJECT, and removing the capability restores
 `inductive-semantics-frontier`. Any inductive carrying a constructor, parameter,
 index, recursion, nesting, or reflexivity remains outside this fragment.
+
+
+## Seventh increment: declaration safety
+
+Certifying empty inductives exposed two cases whose next obstruction was no longer
+inductive: unsafe and partial definitions. Declaration safety is therefore a
+separate retained capability. With it active, unsafe/partial definitions and unsafe
+axioms are REJECT rather than being treated as unsupported. Ablating the capability
+restores UNKNOWN at the same declarations. No extra inductive semantics are charged
+to this gain.
