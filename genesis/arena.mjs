@@ -41,3 +41,13 @@ const report={url,sha256:createHash("sha256").update(data).digest("hex"),counts,
   scope:"Finite Arena integration. UNKNOWN is explicit missing coverage, never a correctness pass."};
 writeFileSync(new URL("./evidence/arena.json",import.meta.url),JSON.stringify(report,null,2));
 console.log("ARENA_FRAGMENT_PASS "+JSON.stringify({counts,total:rows.length,elapsed_ms:report.elapsed_ms,corpus_sha256:report.sha256}));
+
+const frontier={};
+for(const r of results.filter(r=>r.status==="UNKNOWN")) {
+  const group=frontier[r.reason]??={count:0,examples:[]};
+  group.count++;
+  if(group.examples.length<3) group.examples.push(r.name);
+}
+writeFileSync(new URL("./evidence/frontier.json",import.meta.url),JSON.stringify(frontier,null,2));
+for(const [reason,group] of Object.entries(frontier).sort((a,b)=>b[1].count-a[1].count))
+  console.log("NEXT_RESIDUAL "+JSON.stringify({reason,...group}));
