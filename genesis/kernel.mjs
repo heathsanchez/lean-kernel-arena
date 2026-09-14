@@ -391,7 +391,7 @@ class Kernel {
       this.env.set(c.name,{kind:"ctor",name:c.name,type:c.type,levelParams:d.levelParams,induct:d.name,numFields:c.numFields});
     this.params=new Set(rec.levelParams);
     const derived=this.deriveTypeRecursor(d,ctorInfos,rec);
-    if(!this.same(rec.type,derived.recType)) this.reject("recursor-type");
+    if(!this.same(rec.type,derived.recType)) this.reject("recursor-type:"+d.name);
     for(let i=0;i<rec.rules.length;i++) {
       const rr=rec.rules[i];
       if(rr.ctor!==ctorInfos[i].name||rr.nfields!==ctorInfos[i].numFields)
