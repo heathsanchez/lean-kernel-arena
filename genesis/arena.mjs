@@ -105,4 +105,14 @@ if(inductiveFrontier.length) {
   console.log("INDUCTIVE_FRONTIER_PROFILES "+JSON.stringify(
     Object.entries(profiles).sort((a,b)=>b[1]-a[1]).map(([profile,count])=>({count,...JSON.parse(profile)}))));
   console.log("INDUCTIVE_FRONTIER_NAMES "+JSON.stringify(names));
+  const wanted=new Set([
+    "good/tutorial/037_boolType.ndjson",
+    "good/tutorial/040_prodType.ndjson",
+    "good/tutorial/043_eqType.ndjson",
+    "good/tutorial/044_natDef.ndjson",
+    "bad/bogus1.ndjson",
+    "bad/nat-rec-rules.ndjson"
+  ]);
+  for(const x of inductiveFrontier.filter(x=>wanted.has(x.name)))
+    console.log("INDUCTIVE_SAMPLE "+JSON.stringify({name:x.name,expected:x.expected,bundle:x.first_inductive}));
 }
