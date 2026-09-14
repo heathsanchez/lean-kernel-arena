@@ -270,6 +270,39 @@ function runFunctionEtaTests(base,emit=()=>{}) {
 }
 
 
+function runUnitEtaTests(base,emit=()=>{}) {
+  const caps=[...base,"unit-eta"],U="UnitLike",Mk="UnitLike.mk",R="UnitLike.rec",u="uu";
+  const I=["const",U],C=["const",Mk],motive=Pi(I,S(["param",u])),minor=App(V(0),C);
+  const recType=Pi(motive,Pi(minor,Pi(I,App(V(2),V(0)))));
+  const rule=Lam(motive,Lam(minor,V(0)));
+  const decls=[
+    {kind:"inductive",name:U,levelParams:[],type:S(1),numParams:0,numIndices:0,numNested:0,
+      isRec:false,isUnsafe:false,isReflexive:false,all:[U],ctorNames:[Mk],
+      ctors:[{name:Mk,levelParams:[],type:I,induct:U,cidx:0,numParams:0,numFields:0,isUnsafe:false}],
+      rec:{name:R,levelParams:[u],type:recType,all:[U],numParams:0,numIndices:0,numMotives:1,
+        numMinors:1,k:false,isUnsafe:false,rules:[{ctor:Mk,nfields:0,rhs:rule}]}}
+  ];
+  const setup=cset=>{
+    const q=new Kernel(cset); const ok=q.run(S(0),S(1),decls); assert(ok.status===ACCEPT,"unit fixture rejected");
+    q.steps=0; return q;
+  };
+  const x=V(1),y=V(0),ctx=[I,I];
+  let ablated=false;
+  try { setup(base).equal(x,y,ctx); }
+  catch(e) { ablated=e instanceof Stop&&e.status===UNKNOWN&&e.message==="conversion-frontier"; }
+  assert(ablated,"unit eta ablation did not restore conversion frontier");
+  setup(caps).equal(x,y,ctx);
+
+  const indexed={...decls[0],name:"IndexedUnitLike",numIndices:1};
+  const guard=new Kernel(caps);
+  guard.steps=0; guard.env=new Map([["IndexedUnitLike",{kind:"inductive",name:"IndexedUnitLike",numIndices:1,isRec:false,ctors:["IndexedUnitLike.mk"]}],
+    ["IndexedUnitLike.mk",{kind:"ctor",name:"IndexedUnitLike.mk",numFields:0}]]);
+  assert(!guard.isUnitLikeName("IndexedUnitLike"),"indexed singleton incorrectly gained unit eta");
+  emit({event:"unit-eta-growth",ablation_unknown:true,unit_like_equal:true,indexed_guarded:true});
+  return {capabilities:caps,cases:2};
+}
+
+
 function runInductiveEnvelopeTests(base,emit=()=>{}) {
   const caps=[...base,"inductive-envelope"];
   const meta={meta:{format:{version:"3.1.0"}}};
@@ -737,7 +770,11 @@ const functionEta=runFunctionEtaTests(proofIrrelevance.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const inductiveEnvelope=runInductiveEnvelopeTests(functionEta.capabilities,row=>{
+const unitEta=runUnitEtaTests(functionEta.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const inductiveEnvelope=runInductiveEnvelopeTests(unitEta.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
@@ -792,6 +829,7 @@ report.universe_tests={laws:universe.laws,independent_pairs:universe.independent
 report.theorem_tests={cases:theorem.cases};
 report.proof_irrelevance_tests={cases:proofIrrelevance.cases};
 report.function_eta_tests={cases:functionEta.cases};
+report.unit_eta_tests={cases:unitEta.cases};
 report.inductive_envelope_tests={cases:inductiveEnvelope.cases};
 report.empty_inductive_tests={cases:emptyInductive.cases};
 report.enum_inductive_tests={cases:enumInductive.cases};

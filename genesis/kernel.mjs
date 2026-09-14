@@ -384,7 +384,7 @@ class Kernel {
     for(const n of groupNames) if(this.env.has(n)) this.reject("duplicate-declaration");
 
     this.env.set(d.name,{kind:"inductive",name:d.name,type:d.type,levelParams:d.levelParams,
-      numParams:d.numParams,numIndices:d.numIndices,ctors:d.ctors.map(c=>c.name),isProp});
+      numParams:d.numParams,numIndices:d.numIndices,ctors:d.ctors.map(c=>c.name),isProp,isRec:d.isRec});
 
     const ctorInfos=[]; let actualRec=false,recoverableData=true;
     for(let ciIndex=0;ciIndex<d.ctors.length;ciIndex++) {
@@ -647,6 +647,16 @@ class Kernel {
                 }
               }
             }
+            if(this.caps.has("unit-eta") && rd.numIndices===0 && rd.rules.length===1 &&
+               this.isUnitLikeName(rd.induct)) {
+              this.need("inductive-reduction"); this.need("reduction");
+              const rule=rd.rules[0];
+              let rhs=this.instantiateDeclaration(rh,rule.rhs);
+              const prefix=rargs.slice(0,rd.numParams+1+rd.numMinors);
+              rhs=this.appN(rhs,prefix);
+              for(const extra of rargs.slice(total)) rhs=this.make("app",rhs,extra);
+              return this.whnf(rhs);
+            }
           }
         }
       }
@@ -666,6 +676,19 @@ class Kernel {
       } else if(a[i]!==b[i]) return false;
     }
     return true;
+  }
+  isUnitLikeName(name) {
+    this.tick();
+    const d=this.env.get(name);
+    if(d?.unitLike===true) return true;
+    if(d?.kind!=="inductive"||d.numIndices!==0||d.isRec!==false||d.ctors?.length!==1) return false;
+    const c=this.env.get(d.ctors[0]);
+    return c?.kind==="ctor"&&c.numFields===0;
+  }
+  isUnitLikeType(t) {
+    this.tick();
+    const [h]=this.getApp(this.whnf(t));
+    return h[0]==="const"&&this.isUnitLikeName(h[1]);
   }
   normal(e) {
     this.tick(); e=this.whnf(e);
@@ -702,6 +725,10 @@ class Kernel {
       if(ex!==null) { this.equal(ex,y,ctx); return; }
       const ey=this.functionEtaContract(y);
       if(ey!==null) { this.equal(x,ey,ctx); return; }
+    }
+    if(this.caps.has("unit-eta")) {
+      const tx=this.normal(this.infer(x,ctx)),ty=this.normal(this.infer(y,ctx));
+      if(this.same(tx,ty)&&this.isUnitLikeType(tx)) return;
     }
     if(x[0]===y[0]) {
       if(x[0]==="app") {
@@ -987,7 +1014,7 @@ function checkExport(input,capabilities,budget=200000) {
               // Preserve the semantic metadata already certified above. Treating
               // constructors and recursors as plain axioms would force later
               // reduction to rediscover a lesson this grain has already proved.
-              decls.push({kind:"axiom",name:tn,type:typeExpr,levelParams:[]});
+              decls.push({kind:"axiom",name:tn,type:typeExpr,levelParams:[],unitLike:ctors.length===1});
               for(const c of ctors)
                 decls.push({kind:"ctor",name:c.name,type:c.type,levelParams:[],
                   induct:tn,numParams:0,numFields:0});
