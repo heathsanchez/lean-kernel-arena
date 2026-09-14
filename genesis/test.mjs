@@ -499,6 +499,41 @@ function runInductiveReductionTests(base,fixture,emit=()=>{}) {
 }
 
 
+function runRuleKTests(base,emit=()=>{}) {
+  const caps=[...base,"rule-k"],K="KTest",Mk="KTest.mk",R="KTest.rec",T="KTrue",F="KFalse";
+  const KT=["const",K],CT=["const",T],CF=["const",F],M=["const",Mk],Rec=["const",R];
+  const motive=Pi(KT,S(1)),minor=["const","kMinor"],major=V(0);
+  const rule=Lam(motive,Lam(["const","KMinorType"],V(0)));
+  const setup=(cset,kflag=true)=>{
+    const q=new Kernel(cset); q.steps=0; q.params=new Set(); q.env=new Map([
+      [K,{kind:"inductive",name:K,type:Pi(["const","KIdx"],S(0)),levelParams:[],
+        numParams:0,numIndices:1,isRec:false,ctors:[Mk]}],
+      [Mk,{kind:"ctor",name:Mk,type:App(KT,CT),levelParams:[],induct:K,numParams:0,numFields:0}],
+      [R,{kind:"rec",name:R,type:S(1),levelParams:[],induct:K,numParams:0,numIndices:1,
+        numMinors:1,k:kflag,rules:[{ctor:Mk,nfields:0,rhs:rule}]}],
+      [T,{kind:"axiom",name:T,type:["const","KIdx"],levelParams:[]}],
+      [F,{kind:"axiom",name:F,type:["const","KIdx"],levelParams:[]}],
+      ["kMinor",{kind:"axiom",name:"kMinor",type:["const","KMinorType"],levelParams:[]}],
+      ["KIdx",{kind:"axiom",name:"KIdx",type:S(1),levelParams:[]}],
+      ["KMinorType",{kind:"axiom",name:"KMinorType",type:S(1),levelParams:[]}]
+    ]); return q;
+  };
+  const app=(f,...xs)=>xs.reduce((q,x)=>App(q,x),f);
+  const good=app(Rec,motive,minor,CT,major);
+  const ablated=setup(base).whnf(good);
+  assert(ablated[0]==="app","rule K ablation unexpectedly reduced");
+  const reduced=setup(caps).whnf(good);
+  assert(setup(caps).same(reduced,minor),"rule K did not reduce matching index");
+  const bad=setup(caps).whnf(app(Rec,motive,minor,CF,major));
+  assert(bad[0]==="app","rule K fired across mismatched index");
+  const nonK=setup(caps,false).whnf(good);
+  assert(nonK[0]==="app","rule K fired for k:false recursor");
+  emit({event:"rule-k-growth",ablation_stuck:true,matching_index_reduces:true,
+    mismatched_index_guarded:true,non_k_guarded:true});
+  return {capabilities:caps,cases:3};
+}
+
+
 function runPropInductiveTests(base,emit=()=>{}) {
   const caps=[...base,"prop-inductives"],n="PTrue",c="PTrue.intro",rn=JSON.stringify([n,"str","rec"]),u="pu";
   const I=["const",n],C=["const",c],motive=Pi(I,S(["param",u])),minor=App(V(0),C);
@@ -827,7 +862,11 @@ const inductiveReduction=runInductiveReductionTests(singleInductive.capabilities
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const unitEta=runUnitEtaTests(inductiveReduction.capabilities,row=>{
+const ruleK=runRuleKTests(inductiveReduction.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const unitEta=runUnitEtaTests(ruleK.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
@@ -876,6 +915,7 @@ report.empty_inductive_tests={cases:emptyInductive.cases};
 report.enum_inductive_tests={cases:enumInductive.cases};
 report.single_inductive_tests={cases:singleInductive.cases};
 report.inductive_reduction_tests={cases:inductiveReduction.cases};
+report.rule_k_tests={cases:ruleK.cases};
 report.prop_inductive_tests={cases:propInductive.cases};
 report.nat_literal_tests={cases:natLiteral.cases};
 report.string_literal_tests={cases:stringLiteral.cases};

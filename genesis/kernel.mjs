@@ -473,7 +473,8 @@ class Kernel {
     }
     this.validate(derived.recType); this.sortOf(derived.recType,[]);
     this.env.set(rec.name,{kind:"rec",name:rec.name,type:derived.recType,levelParams:rec.levelParams,
-      numParams:d.numParams,numIndices:d.numIndices,numMinors:d.ctors.length,rules:rec.rules,induct:d.name});
+      numParams:d.numParams,numIndices:d.numIndices,numMinors:d.ctors.length,rules:rec.rules,
+      induct:d.name,k:rec.k});
   }
   result(status,reason,start) {
     return {status,reason,steps:this.steps,constructed:this.allocations,elapsed_ms:Date.now()-start,
@@ -642,6 +643,29 @@ class Kernel {
                   let rhs=this.instantiateDeclaration(rh,rule.rhs);
                   const prefix=rargs.slice(0,rd.numParams+1+rd.numMinors);
                   rhs=this.appN(rhs,prefix.concat(margs.slice(md.numParams)));
+                  for(const extra of rargs.slice(total)) rhs=this.make("app",rhs,extra);
+                  return this.whnf(rhs);
+                }
+              }
+            }
+            if(this.caps.has("rule-k") && rd.k===true && rd.rules.length===1) {
+              const ind=this.env.get(rd.induct),ctor=ind?.ctors?.length===1?this.env.get(ind.ctors[0]):null;
+              if(ind?.kind==="inductive" && ctor?.kind==="ctor" && ctor.numFields===0) {
+                const prefixLen=rd.numParams+1+rd.numMinors;
+                const idxArgs=rargs.slice(prefixLen,prefixLen+rd.numIndices);
+                const recUs=rh[2]??[],ctorUs=ctor.levelParams?.length?recUs.slice(-ctor.levelParams.length):[];
+                let ct=this.instantiateDeclaration(
+                  ctorUs.length?["const",ctor.name,ctorUs]:["const",ctor.name],ctor.type);
+                ct=this.instantiateForalls(ct,rargs.slice(0,rd.numParams));
+                const [resHead,resArgs]=this.getApp(this.whnf(ct));
+                const derivedIdx=resHead[0]==="const"&&resHead[1]===rd.induct
+                  ?resArgs.slice(rd.numParams,rd.numParams+rd.numIndices):null;
+                if(derivedIdx && derivedIdx.length===idxArgs.length &&
+                   derivedIdx.every((x,i)=>this.same(this.normal(x),this.normal(idxArgs[i])))) {
+                  this.need("inductive-reduction"); this.need("reduction");
+                  const rule=rd.rules[0];
+                  let rhs=this.instantiateDeclaration(rh,rule.rhs);
+                  rhs=this.appN(rhs,rargs.slice(0,prefixLen));
                   for(const extra of rargs.slice(total)) rhs=this.make("app",rhs,extra);
                   return this.whnf(rhs);
                 }
@@ -1040,7 +1064,7 @@ function checkExport(input,capabilities,budget=200000) {
                 decls.push({kind:"ctor",name:c.name,type:c.type,levelParams:[],
                   induct:tn,numParams:0,numFields:0});
               decls.push({kind:"rec",name:rn,type:get(exprs,rec.type),levelParams:[u],
-                induct:tn,numParams:0,numIndices:0,numMinors:ctors.length,
+                induct:tn,numParams:0,numIndices:0,numMinors:ctors.length,k:false,
                 rules:rec.rules.map((rr,j)=>({
                   ctor:ctors[j].name,nfields:0,rhs:get(exprs,rr.rhs)
                 }))});
