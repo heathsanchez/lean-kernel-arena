@@ -71,7 +71,7 @@ for(const row of rows) {
     const record=JSON.parse(line);
     if(Object.prototype.hasOwnProperty.call(record,"inductive")) { first=record.inductive; break; }
   }
-  inductiveFrontier.push({name:row.name,expected:row.expected,first_inductive:first});
+  inductiveFrontier.push({name:row.name,expected:row.expected,first_inductive:first,input:row.input});
 }
 writeFileSync(new URL("./evidence/inductive-frontier.json",import.meta.url),
   JSON.stringify(inductiveFrontier,null,2));
