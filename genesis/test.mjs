@@ -332,6 +332,57 @@ function runEmptyInductiveTests(base,emit=()=>{}) {
 }
 
 
+function runEnumInductiveTests(base,emit=()=>{}) {
+  const caps=[...base,"enum-inductives"];
+  const meta={meta:{format:{version:"3.1.0"}}};
+  const rows=[
+    meta,
+    {"in":1,str:{pre:0,str:"Bit"}},
+    {"in":2,str:{pre:1,str:"mk"}},
+    {"in":3,str:{pre:1,str:"rec"}},
+    {"in":4,str:{pre:0,str:"u"}},
+    {"il":1,succ:0},
+    {"il":2,param:4},
+    {"ie":0,sort:1},
+    {"ie":1,const:{name:1,us:[]}},
+    {"ie":2,sort:2},
+    {"ie":3,forallE:{name:0,type:1,body:2,binderInfo:"default"}},
+    {"ie":4,bvar:0},
+    {"ie":5,const:{name:2,us:[]}},
+    {"ie":6,app:{fn:4,arg:5}},
+    {"ie":7,bvar:2},
+    {"ie":8,bvar:0},
+    {"ie":9,app:{fn:7,arg:8}},
+    {"ie":10,forallE:{name:0,type:1,body:9,binderInfo:"default"}},
+    {"ie":11,forallE:{name:0,type:6,body:10,binderInfo:"default"}},
+    {"ie":12,forallE:{name:0,type:3,body:11,binderInfo:"default"}},
+    {"ie":13,bvar:0},
+    {"ie":14,lam:{name:0,type:6,body:13,binderInfo:"default"}},
+    {"ie":15,lam:{name:0,type:3,body:14,binderInfo:"default"}},
+    {inductive:{
+      types:[{name:1,levelParams:[],type:0,numParams:0,numIndices:0,all:[1],
+        ctors:[2],numNested:0,isRec:false,isUnsafe:false,isReflexive:false}],
+      ctors:[{name:2,levelParams:[],type:1,induct:1,cidx:0,numParams:0,numFields:0,isUnsafe:false}],
+      recs:[{name:3,levelParams:[4],type:12,all:[1],numParams:0,numIndices:0,
+        numMotives:1,numMinors:1,rules:[{ctor:2,nfields:0,rhs:15}],k:false,isUnsafe:false}]
+    }}
+  ];
+  const good=rows.map(JSON.stringify).join("\n");
+  const before=checkExport(good,base);
+  assert(before.status===UNKNOWN && before.reason==="inductive-semantics-frontier",
+    "enum-inductive ablation did not restore semantic frontier");
+  assert(checkExport(good,caps).status===ACCEPT,"derived enum recursor was not accepted");
+  const bad=rows.map(x=>JSON.parse(JSON.stringify(x)));
+  bad[bad.length-1].inductive.recs[0].k=true;
+  const forged=checkExport(bad.map(JSON.stringify).join("\n"),caps);
+  assert(forged.status===REJECT && forged.reason==="enum-inductive-recursor-metadata",
+    "forged enum K metadata was not rejected");
+  emit({event:"enum-inductive-growth",ablation_unknown:true,
+    derived_recursor:true,forged_k_rejected:true});
+  return {capabilities:caps,cases:2};
+}
+
+
 function runDeclarationSafetyControls(base,emit=()=>{}) {
   const meta={meta:{format:{version:"3.1.0"}}};
   const mkDef=safety=>[
@@ -384,7 +435,11 @@ const emptyInductive=runEmptyInductiveTests(inductiveEnvelope.capabilities,row=>
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const declarationSafety=runDeclarationSafetyControls(emptyInductive.capabilities,row=>{
+const enumInductive=runEnumInductiveTests(emptyInductive.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const declarationSafety=runDeclarationSafetyControls(enumInductive.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
@@ -396,6 +451,7 @@ report.theorem_tests={cases:theorem.cases};
 report.proof_irrelevance_tests={cases:proofIrrelevance.cases};
 report.inductive_envelope_tests={cases:inductiveEnvelope.cases};
 report.empty_inductive_tests={cases:emptyInductive.cases};
+report.enum_inductive_tests={cases:enumInductive.cases};
 report.declaration_safety_controls={cases:declarationSafety.cases,retained_capability:false};
 for(const name of ["level-index-out-of-order","sparse-name-index"]) {
   const raw=readFileSync(new URL("../tests/"+name+".ndjson",import.meta.url),"utf8");

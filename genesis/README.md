@@ -168,3 +168,8 @@ zero-parameter/zero-index/zero-constructor type header matches, incompatible
 recursor metadata is REJECT rather than deferred; in particular an empty recursor
 cannot claim the K rule. This narrows malformed members of the already-admitted
 fragment without broadening the inductive language.
+
+
+### Finite-enumeration inductives
+
+The next retained semantic grain derives and verifies recursors for single, non-dependent, non-Propositional finite enumerations with nullary constructors. Exported recursor metadata, type and rule bodies are treated as redundant evidence and must match the derivation exactly. Recursive, indexed, parameterized, propositional and level-polymorphic inductives remain at the semantic frontier until separately earned.

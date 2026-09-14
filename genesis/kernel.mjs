@@ -394,6 +394,71 @@ function checkExport(input,capabilities,budget=200000) {
             continue;
           }
         }
+        // Next semantic grain: a single, non-dependent finite enumeration.
+        // Derive the recursor from the inductive itself and validate the exporter's
+        // redundant recursor data against that derivation before installing anything.
+        if(capabilities.includes("enum-inductives") && v.types.length===1 &&
+           v.ctors.length>0 && v.recs.length===1) {
+          const it=v.types[0],rec=v.recs[0],typeExpr=get(exprs,it.type);
+          const exactTypeMeta=
+            it.numParams===0 && it.numIndices===0 && it.numNested===0 &&
+            it.isRec===false && it.isReflexive===false && it.isUnsafe===false &&
+            Array.isArray(it.levelParams) && it.levelParams.length===0 &&
+            Array.isArray(it.all) && it.all.length===1 && it.all[0]===it.name &&
+            Array.isArray(it.ctors) && it.ctors.length===v.ctors.length &&
+            it.ctors.every((n,i)=>n===v.ctors[i]?.name);
+          // This increment deliberately excludes Prop and level-polymorphic
+          // enumerations; their elimination laws are a later residual.
+          if(exactTypeMeta && typeExpr?.[0]==="sort" &&
+             typeof typeExpr[1]==="number" && typeExpr[1]>0) {
+            const tn=get(names,it.name),I=["const",tn];
+            const ctors=[];
+            let exactCtors=true;
+            for(let i=0;i<v.ctors.length;i++) {
+              const c=v.ctors[i];
+              if(!c || c.induct!==it.name || c.cidx!==i || c.numParams!==0 ||
+                 c.numFields!==0 || c.isUnsafe!==false ||
+                 !Array.isArray(c.levelParams) || c.levelParams.length!==0) {
+                exactCtors=false; break;
+              }
+              const cn=get(names,c.name),ce=get(exprs,c.type);
+              if(JSON.stringify(ce)!==JSON.stringify(I)) { exactCtors=false; break; }
+              ctors.push({name:cn,type:ce});
+            }
+            if(exactCtors) {
+              if(!Array.isArray(rec.levelParams) || rec.levelParams.length!==1 ||
+                 rec.numParams!==0 || rec.numIndices!==0 || rec.numMotives!==1 ||
+                 rec.numMinors!==ctors.length || rec.k!==false || rec.isUnsafe!==false ||
+                 !Array.isArray(rec.all) || rec.all.length!==1 || rec.all[0]!==it.name ||
+                 !Array.isArray(rec.rules) || rec.rules.length!==ctors.length)
+                reject("enum-inductive-recursor-metadata");
+              const rn=get(names,rec.name),expectedRn=JSON.stringify([tn,"str","rec"]);
+              if(rn!==expectedRn) reject("enum-inductive-recursor-name");
+              const u=get(names,rec.levelParams[0]),motive=Pi(I,S(["param",u]));
+              let expectedRec=Pi(I,App(V(ctors.length+1),V(0)));
+              for(let i=ctors.length-1;i>=0;i--)
+                expectedRec=Pi(App(V(i),["const",ctors[i].name]),expectedRec);
+              expectedRec=Pi(motive,expectedRec);
+              if(JSON.stringify(get(exprs,rec.type))!==JSON.stringify(expectedRec))
+                reject("enum-inductive-recursor-type");
+              for(let j=0;j<ctors.length;j++) {
+                const rr=rec.rules[j];
+                if(!rr || rr.ctor!==v.ctors[j].name || rr.nfields!==0)
+                  reject("enum-inductive-recursor-rule-metadata");
+                let rhs=V(ctors.length-1-j);
+                for(let i=ctors.length-1;i>=0;i--)
+                  rhs=Lam(App(V(i),["const",ctors[i].name]),rhs);
+                rhs=Lam(motive,rhs);
+                if(JSON.stringify(get(exprs,rr.rhs))!==JSON.stringify(rhs))
+                  reject("enum-inductive-recursor-rule");
+              }
+              decls.push({kind:"axiom",name:tn,type:typeExpr,levelParams:[]});
+              for(const c of ctors) decls.push({kind:"axiom",name:c.name,type:c.type,levelParams:[]});
+              decls.push({kind:"axiom",name:rn,type:get(exprs,rec.type),levelParams:[u]});
+              continue;
+            }
+          }
+        }
         fail("inductive-semantics-frontier");
       } else if(tag==="axiom"||tag==="def"||tag==="thm") {
         if(tag==="thm"&&!capabilities.includes("theorems")) fail("declaration-frontier:thm");
