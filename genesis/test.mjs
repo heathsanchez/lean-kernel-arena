@@ -332,7 +332,7 @@ function runDeclarationSafetyTests(base,emit=()=>{}) {
   const meta={meta:{format:{version:"3.1.0"}}};
   const mkDef=safety=>[
     meta,{"in":1,str:{pre:0,str:"d"}},
-    {"ie":0,sort:1},{"ie":1,sort:0},
+    {"il":1,succ:0},{"ie":0,sort:1},{"ie":1,sort:0},
     {def:{name:1,levelParams:[],type:0,value:1,hints:"opaque",safety,all:[1]}}
   ].map(JSON.stringify).join("\n");
   for(const safety of ["unsafe","partial"]) {
