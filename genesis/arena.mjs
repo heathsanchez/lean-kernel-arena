@@ -58,7 +58,13 @@ for(const r of results.filter(r=>r.status==="UNKNOWN")) {
   if(group.examples.length<3) group.examples.push(r.name);
 }
 writeFileSync(new URL("./evidence/frontier.json",import.meta.url),JSON.stringify(frontier,null,2));
-const noninductiveFrontier=rows.flatMap(row=>{\n  const result=results.find(r=>r.name===row.name);\n  if(result?.status!=="UNKNOWN" || ["declaration-frontier:inductive","inductive-semantics-frontier"].includes(result.reason)) return [];\n  return [{name:row.name,expected:row.expected,reason:result.reason,input:row.input}];\n});\nwriteFileSync(new URL("./evidence/noninductive-frontier.json",import.meta.url),\n  JSON.stringify(noninductiveFrontier,null,2));
+const noninductiveFrontier=rows.flatMap(row=>{
+  const result=results.find(r=>r.name===row.name);
+  if(result?.status!=="UNKNOWN" || ["declaration-frontier:inductive","inductive-semantics-frontier"].includes(result.reason)) return [];
+  return [{name:row.name,expected:row.expected,reason:result.reason,input:row.input}];
+});
+writeFileSync(new URL("./evidence/noninductive-frontier.json",import.meta.url),
+  JSON.stringify(noninductiveFrontier,null,2));
 
 // Preserve the exact first blocked inductive record for diagnosis without changing
 // checker semantics. The next growth step is chosen from this residual, not guessed.
