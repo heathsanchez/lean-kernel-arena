@@ -1,7 +1,7 @@
 import {writeFileSync,appendFileSync,mkdirSync,readFileSync} from "node:fs";
 import {spawnSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
-import {Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,checkExport} from "./kernel.mjs";
+import {levelsEqual,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,checkExport} from "./kernel.mjs";
 
 function growthSuite() {
   const C=(name,term,type,expected=ACCEPT,declarations=[])=>({name,term,type,expected,declarations});
@@ -97,6 +97,52 @@ function runGrowth(emit=()=>{}) {
     capabilities:caps,training:cases.length,heldout:heldout.length,history};
 }
 
+
+function runUniverseTests(emit=()=>{}) {
+  const base=["sort","binders","application","reduction","declarations"],caps=[...base,"universes"];
+  const u=["param","u"],v=["param","v"],succ=x=>["succ",x],max=(a,b)=>["max",a,b],imax=(a,b)=>["imax",a,b];
+  const pairs=[
+    ["commutativity",max(u,v),max(v,u),true],
+    ["absorption",max(u,succ(u)),succ(u),true],
+    ["imax-zero",imax(u,0),0,true],
+    ["imax-one",imax(u,1),max(u,1),true],
+    ["imax-param",imax(0,u),u,true],
+    ["zero-branch-trap",imax(1,u),max(1,u),false],
+    ["distinct-parameters",u,v,false],
+    ["successor-trap",succ(u),u,false],
+    ["nested-imax",imax(u,imax(v,u)),imax(max(u,v),u),true],
+    ["empty-name",["param",""],0,false],
+  ];
+  for(const [name,a,b,expected] of pairs) assert(levelsEqual(a,b)===expected,"level law failed: "+name);
+  const judgment={term:S(u),type:S(succ(u))};
+  assert(new Kernel(base).run(judgment.term,judgment.type,[],["u"]).status===UNKNOWN,"ablation did not restore universe frontier");
+  assert(new Kernel(caps).run(judgment.term,judgment.type,[],["u"]).status===ACCEPT,"polymorphic sort failed");
+  assert(new Kernel(caps).run(S(u),S(u),[],["u"]).status===REJECT,"Sort u : Sort u accepted");
+  assert(new Kernel(caps).run(S(u),S(succ(u))).status===REJECT,"undeclared universe accepted");
+  const declarations=[{name:"poly",kind:"def",levelParams:["u"],type:Pi(S(u),S(u)),value:Lam(S(u),V(0))}];
+  assert(new Kernel(caps).run(["const","poly",[1]],Pi(S(1),S(1)),declarations).status===ACCEPT,"universe instantiation failed");
+  assert(new Kernel(caps).run(["const","poly"],Pi(S(1),S(1)),declarations).status===REJECT,"wrong universe arity accepted");
+  // Independent numeric denotation checks never authorize equality; they refute a broken algorithm.
+  function numeric(e,env) {
+    if(typeof e==="number") return e;
+    if(e[0]==="param") return env[e[1]];
+    if(e[0]==="succ") return numeric(e[1],env)+1;
+    const a=numeric(e[1],env),b=numeric(e[2],env);
+    return e[0]==="imax"&&b===0?0:Math.max(a,b);
+  }
+  const es=[0,1,2,u,v,succ(u),succ(v),imax(1,u),max(u,v),imax(u,v),imax(v,u),succ(imax(u,v)),max(succ(u),v),imax(max(2,u),succ(v))];
+  let checked=0;
+  for(const a of es) for(const b of es) {
+    const eq=levelsEqual(a,b); let witnessed=false;
+    for(let x=0;x<=5;x++) for(let y=0;y<=5;y++) if(numeric(a,{u:x,v:y})!==numeric(b,{u:x,v:y})) witnessed=true;
+    assert(eq?!witnessed:witnessed,"finite independent cross-check disagreed");
+    checked++;
+  }
+  emit({event:"universe-growth",laws:pairs.length,independent_pairs:checked,ablation_unknown:true,
+    undeclared_parameter_rejected:true,wrong_arity_rejected:true});
+  return {capabilities:caps,laws:pairs.length,independent_pairs:checked};
+}
+
 const target=new URL("./evidence/",import.meta.url);
 mkdirSync(target,{recursive:true});
 writeFileSync(new URL("events.jsonl",target),"");
@@ -105,6 +151,14 @@ const report=runGrowth(row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
+const universe=runUniverseTests(row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const replay=evaluate(universe.capabilities,growthSuite());
+assert(replay.covered===report.training && !replay.wrong.length,"universe growth regressed protected cases");
+report.capabilities=universe.capabilities;
+report.universe_tests={laws:universe.laws,independent_pairs:universe.independent_pairs};
 for(const name of ["level-index-out-of-order","sparse-name-index"]) {
   const raw=readFileSync(new URL("../tests/"+name+".ndjson",import.meta.url),"utf8");
   const r=checkExport(raw,report.capabilities);

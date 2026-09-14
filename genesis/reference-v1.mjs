@@ -1,68 +1,3 @@
-const ZERO_LEVEL=Symbol("level-constant");
-
-// Exact level equality by zero/positive case splitting, then max-of-affine forms.
-// Positive parameter p is represented as q_p + 1, with q_p ranging over N.
-// On each branch imax's right argument is identically zero or strictly positive.
-// At most 8 parameters; resource exhaustion remains UNKNOWN.
-function levelParams(u,out=new Set(),tick=()=>{}) {
-  tick();
-  if(typeof u==="number") return out;
-  if(u[0]==="param") out.add(u[1]);
-  else for(let i=1;i<u.length;i++) levelParams(u[i],out,tick);
-  return out;
-}
-function validateLevel(u,allowed,tick) {
-  tick();
-  if(Number.isSafeInteger(u)&&u>=0&&u<=1000000) return;
-  if(!Array.isArray(u)) throw new Stop(REJECT,"malformed-universe");
-  if(u[0]==="param"&&u.length===2&&typeof u[1]==="string") {
-    if(!allowed.has(u[1])) throw new Stop(REJECT,"undeclared-universe");
-    return;
-  }
-  const n=u[0]==="succ"?2:(u[0]==="max"||u[0]==="imax")?3:0;
-  if(!n||u.length!==n) throw new Stop(REJECT,"malformed-universe");
-  for(let i=1;i<u.length;i++) validateLevel(u[i],allowed,tick);
-}
-function levelSucc(u) { return typeof u==="number"?u+1:["succ",u]; }
-function levelIMax(a,b) { return typeof a==="number"&&typeof b==="number"?(b===0?0:Math.max(a,b)):["imax",a,b]; }
-function levelSub(u,sub,tick) {
-  tick();
-  if(typeof u==="number") return u;
-  if(u[0]==="param") return sub.has(u[1])?sub.get(u[1]):u;
-  return [u[0],...u.slice(1).map(x=>levelSub(x,sub,tick))];
-}
-function levelsEqual(a,b,tick=()=>{}) {
-  const params=[...levelParams(b,levelParams(a,new Set(),tick),tick)].sort();
-  if(params.length>8) throw new Stop(UNKNOWN,"universe-case-budget");
-  const clean=m=>{
-    let top=-1;
-    for(const [k,v] of m) {tick();if(k!==ZERO_LEVEL) top=Math.max(top,v);}
-    if(top>=(m.get(ZERO_LEVEL)??0)) m.delete(ZERO_LEVEL);
-    return m;
-  };
-  const join=(a,b)=>{
-    const r=new Map(a);
-    for(const [k,v] of b) {tick();r.set(k,Math.max(r.get(k)??-1,v));}
-    return clean(r);
-  };
-  function nf(u,positive) {
-    tick();
-    if(typeof u==="number") return new Map([[ZERO_LEVEL,u]]);
-    if(u[0]==="param") return positive.has(u[1])?new Map([[u[1],1]]):new Map([[ZERO_LEVEL,0]]);
-    if(u[0]==="succ") return new Map([...nf(u[1],positive)].map(([k,v])=>[k,v+1]));
-    const x=nf(u[1],positive),y=nf(u[2],positive);
-    if(u[0]==="imax" && y.size===1 && y.get(ZERO_LEVEL)===0) return y;
-    return join(x,y);
-  }
-  for(let bits=0;bits<(1<<params.length);bits++) {
-    tick();
-    const positive=new Set(params.filter((_,i)=>bits&(1<<i)));
-    const x=clean(nf(a,positive)),y=clean(nf(b,positive));
-    if(x.size!==y.size) return false;
-    for(const [k,v] of x) {tick();if(y.get(k)!==v) return false;}
-  }
-  return true;
-}
 // Experimental monomorphic Lean fragment. No claim of complete Lean soundness.
 // The host supplies parsing, budgets and candidate rules; retained capabilities start empty.
 const ACCEPT = "ACCEPT", REJECT = "REJECT", UNKNOWN = "UNKNOWN";
@@ -74,8 +9,8 @@ class Kernel {
   constructor(capabilities=[], budget=50000) {
     this.caps=new Set(capabilities); this.budget=budget;
   }
-  run(term, expected, declarations=[], parameters=[]) {
-    this.steps=0; this.env=new Map(); this.allocations=0; this.params=new Set(parameters);
+  run(term, expected, declarations=[]) {
+    this.steps=0; this.env=new Map(); this.allocations=0;
     const start=Date.now();
     try {
       if (!this.caps.size) this.unknown("empty-present");
@@ -85,10 +20,6 @@ class Kernel {
         this.tick();
         if (!d || typeof d.name!=="string" || !["axiom","def"].includes(d.kind)) this.unknown("declaration-kind");
         if (this.env.has(d.name)) this.reject("duplicate-declaration");
-        const ps=d.levelParams??[];
-        if(!Array.isArray(ps)||ps.some(p=>typeof p!=="string")||new Set(ps).size!==ps.length) this.reject("invalid-universe-parameters");
-        this.params=new Set(ps);
-        if(ps.length) this.need("universes");
         this.validate(d.type);
         this.sortOf(d.type,[]);
         if (d.kind==="def") {
@@ -98,14 +29,8 @@ class Kernel {
         // Install only after validation; self and forward references cannot be used.
         this.env.set(d.name,d);
       }
-      this.params=new Set(parameters);
       if ((this.caps.has("sort-direct") || this.caps.has("sort")) && term[0]==="sort" && expected[0]==="sort") {
-        if(typeof term[1]==="number"&&typeof expected[1]==="number") {
-          if(term[1]+1!==expected[1]) this.reject("sort-mismatch");
-        } else {
-          this.need("universes");
-          if(!levelsEqual(levelSucc(term[1]),expected[1],()=>this.tick())) this.reject("universe-mismatch");
-        }
+        if(term[1]+1!==expected[1]) this.reject("sort-mismatch");
       } else {
         this.sortOf(expected,[]);
         this.equal(this.infer(term,[]),expected);
@@ -128,18 +53,12 @@ class Kernel {
     if(!Array.isArray(e) || typeof e[0]!=="string") this.reject("malformed-term");
     const arities={sort:2,var:2,const:2,pi:3,lam:3,app:3,let:4};
     if(!(e[0] in arities)) this.unknown("syntax:"+e[0]);
-    if(e.length!==arities[e[0]] && !(e[0]==="const"&&e.length===3)) this.reject("malformed-arity");
-    if(e[0]==="sort"&&typeof e[1]!=="number") {
-      this.need("universes");validateLevel(e[1],this.params,()=>this.tick());
-    } else if(e[0]==="sort" || e[0]==="var") {
+    if(e.length!==arities[e[0]]) this.reject("malformed-arity");
+    if(e[0]==="sort" || e[0]==="var") {
       if(!Number.isSafeInteger(e[1]) || e[1]<0) this.reject("malformed-index");
       if(e[1]>1000000) this.unknown("index-limit");
     } else if(e[0]==="const") {
       if(typeof e[1]!=="string") this.reject("malformed-name");
-      if(e.length===3) {
-        if(!Array.isArray(e[2])) this.reject("malformed-universe-arguments");
-        this.need("universes");for(const u of e[2]) validateLevel(u,this.params,()=>this.tick());
-      }
     } else for(let i=1;i<e.length;i++) this.validate(e[i]);
   }
   shift(e,amount,cut=0) {
@@ -170,7 +89,7 @@ class Kernel {
       this.need("declarations");
       const d=this.env.get(e[1]);
       if(!d) this.reject("undeclared-constant");
-      if(d.kind==="def") {this.need("reduction"); return this.whnf(this.instantiateDeclaration(e,d.value));}
+      if(d.kind==="def") {this.need("reduction"); return this.whnf(d.value);}
     }
     if(e[0]==="let") {this.need("reduction");return this.whnf(this.substitute(e[3],e[2]));}
     if(e[0]==="app") {
@@ -201,30 +120,9 @@ class Kernel {
     if(this.same(a,b)) return;
     const x=this.normal(a),y=this.normal(b);
     if(this.same(x,y)) return;
-    if(x[0]==="sort" && y[0]==="sort") {
-      if(typeof x[1]==="number"&&typeof y[1]==="number") this.reject("sort-mismatch");
-      this.need("universes");
-      if(levelsEqual(x[1],y[1],()=>this.tick())) return;
-      this.reject("universe-mismatch");
-    }
+    if(x[0]==="sort" && y[0]==="sort") this.reject("sort-mismatch");
     // Eta and proof irrelevance are not implemented. A failed comparison is not evidence of inequality.
     this.unknown("conversion-frontier");
-  }
-  instantiateDeclaration(ref,term) {
-    this.tick();
-    const d=this.env.get(ref[1]),ps=d.levelParams??[],args=ref[2]??[];
-    if(ps.length!==args.length) this.reject("universe-arity");
-    if(!ps.length) return term;
-    this.need("universes");
-    const sub=new Map(ps.map((p,i)=>[p,args[i]]));
-    const walk=e=>{
-      this.tick();
-      if(e[0]==="sort") return this.make("sort",levelSub(e[1],sub,()=>this.tick()));
-      if(e[0]==="const") return e.length===2?e:this.make("const",e[1],e[2].map(u=>levelSub(u,sub,()=>this.tick())));
-      if(e[0]==="var") return e;
-      return this.make(e[0],...e.slice(1).map(walk));
-    };
-    return walk(term);
   }
   sortOf(e,ctx) {
     const t=this.whnf(this.infer(e,ctx));
@@ -234,7 +132,7 @@ class Kernel {
   infer(e,ctx) {
     this.tick();
     switch(e[0]) {
-      case "sort": this.need("sort"); return this.make("sort",levelSucc(e[1]));
+      case "sort": this.need("sort"); return this.make("sort",e[1]+1);
       case "var":
         this.need("binders");
         if(e[1]>=ctx.length) this.reject("unbound-variable");
@@ -242,11 +140,11 @@ class Kernel {
       case "const":
         this.need("declarations");
         if(!this.env.has(e[1])) this.reject("undeclared-constant");
-        return this.instantiateDeclaration(e,this.env.get(e[1]).type);
+        return this.env.get(e[1]).type;
       case "pi": {
         this.need("binders");
         const a=this.sortOf(e[1],ctx), b=this.sortOf(e[2],[...ctx,e[1]]);
-        return this.make("sort",levelIMax(a,b));
+        return this.make("sort",b===0 ? 0 : Math.max(a,b));
       }
       case "lam":
         this.need("binders"); this.sortOf(e[1],ctx);
@@ -298,19 +196,16 @@ function checkExport(input,capabilities,budget=200000) {
         else if(tag==="num" && v && Number.isSafeInteger(v.i)&&v.i>=0) put(names,row.in,JSON.stringify([get(names,v.pre),"num",v.i]));
         else fail("name-frontier");
       } else if(refs[0]==="il") {
-        if(tag==="succ") put(levels,row.il,levelSucc(get(levels,v)));
+        if(tag==="succ") put(levels,row.il,get(levels,v)+1);
         else if((tag==="max"||tag==="imax")&&Array.isArray(v)&&v.length===2) {
           const a=get(levels,v[0]),b=get(levels,v[1]);
-          put(levels,row.il,typeof a==="number"&&typeof b==="number"?(tag==="imax"&&b===0?0:Math.max(a,b)):[tag,a,b]);
-        } else if(tag==="param") {
-          if(!capabilities.includes("universes")) fail("universe-frontier");
-          put(levels,row.il,["param",get(names,v)]);
+          put(levels,row.il,tag==="imax"&&b===0?0:Math.max(a,b));
         } else fail("universe-frontier");
       } else if(refs[0]==="ie") {
         let e;
         if(tag==="sort") e=S(get(levels,v));
         else if(tag==="bvar" && Number.isSafeInteger(v)&&v>=0) e=V(v);
-        else if(tag==="const" && v && Array.isArray(v.us)) e=v.us.length?["const",get(names,v.name),v.us.map(u=>get(levels,u))]:["const",get(names,v.name)];
+        else if(tag==="const" && v && Array.isArray(v.us)&&v.us.length===0) e=["const",get(names,v.name)];
         else if((tag==="lam"||tag==="forallE")&&v) e=[tag==="lam"?"lam":"pi",get(exprs,v.type),get(exprs,v.body)];
         else if(tag==="app"&&v) e=App(get(exprs,v.fn),get(exprs,v.arg));
         else if(tag==="letE"&&v&&typeof v.nondep==="boolean") e=Let(get(exprs,v.type),get(exprs,v.value),get(exprs,v.body));
@@ -318,11 +213,10 @@ function checkExport(input,capabilities,budget=200000) {
         else fail("expression-frontier:"+tag);
         put(exprs,row.ie,e);
       } else if(tag==="axiom"||tag==="def") {
-        if(!v || !Array.isArray(v.levelParams)) fail("declaration-universes");
-        if(v.levelParams.length&&!capabilities.includes("universes")) fail("declaration-universes");
+        if(!v || !Array.isArray(v.levelParams)||v.levelParams.length) fail("declaration-universes");
         if(tag==="axiom" && v.isUnsafe!==false) fail("unsafe-axiom");
         if(tag==="def" && v.safety!=="safe") fail("unsafe-definition");
-        const d={kind:tag,name:get(names,v.name),type:get(exprs,v.type),levelParams:v.levelParams.map(n=>get(names,n))};
+        const d={kind:tag,name:get(names,v.name),type:get(exprs,v.type)};
         if(tag==="def") d.value=get(exprs,v.value);
         decls.push(d);
       } else fail("declaration-frontier:"+tag);
@@ -337,4 +231,4 @@ function checkExport(input,capabilities,budget=200000) {
   }
 }
 
-export {levelsEqual,levelSucc,levelIMax,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,checkExport};
+export {Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,checkExport};

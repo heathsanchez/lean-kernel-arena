@@ -18,8 +18,8 @@ node genesis/check.mjs --state genesis/evidence/retained.json < tests/sparse-nam
 Without --state, check.mjs runs the empty present. Exit codes are 0 ACCEPT,
 1 REJECT, 2 UNKNOWN, 3 usage failure. Unexpected programming errors are failures,
 not proof rejections. The core accepts a deliberately bounded monomorphic fragment:
-numeric universes, dependent binders, application, beta/let reduction, and validated
-axioms/definitions. Proof irrelevance, eta, polymorphic universe parameters,
+numeric and symbolic universes (at most eight parameters per equality), dependent binders, application, beta/let reduction, and validated
+axioms/definitions. Proof irrelevance, eta,
 inductives, recursors, quotient rules, theorem declarations and primitive literal
 extensions remain explicit frontiers. Failed structural conversion returns UNKNOWN
 unless distinct numeric sorts supply a decisive mismatch.
@@ -57,8 +57,9 @@ procedures is a further compiler step, not claimed here.
 The 16-case corpus participates in selection; the 96-case set is a held-out
 parameter expansion, not an independently authored theorem corpus. The downloaded
 Arena tests are independent integration evidence. Their exact SHA-256 and all
-declines are recorded. The download is not pinned across future runs; freeze its
-hash/corpus before claiming cross-commit benchmark comparisons.
+declines are recorded. The corpus is pinned to SHA-256
+85942e6f19274699a476d4e5b772abf4bf16f6a719985938bfcb5349ad90d118;
+a changed download fails instead of silently changing the comparison.
 
 ## Cost and trust
 
@@ -76,7 +77,7 @@ invalidity. Inputs and traversals are bounded to keep this first feedback loop s
 ## Evidence
 
 The workflow prints every transition immediately and saves events.jsonl,
-retained.json, summary.json and arena.json. Local V8 execution during development
+retained.json, summary.json, arena.json and frontier.json. Local V8 execution during development
 showed coverage 0 -> 2 -> 5 -> 8 -> 12 -> 16 and one redundant capability removed.
 GitHub Actions is the reproducible check of the committed files and CLI.
 
@@ -87,3 +88,15 @@ after the checker command returned zero under `set -e`. It failed because the
 output was empty, not because the checker returned rejection. The short harness
 contains a silent-success process control to prevent that gate error. The earlier
 expensive workflow is not rerun by this branch.
+
+## Second increment: symbolic universes
+
+The first run's 151 universe-frontier declines motivated this extension. Level
+comparison splits each parameter into zero or positive, represents a positive
+parameter as q+1, and compares max-of-affine forms on every branch. This is exact
+within the resource bound; numeric sampling is only an independent test, never
+the reason to accept equality. The module includes universe parameter scope and
+constant instantiation/arity validation. Ten laws and 196 independent expression
+pairs precede the protected replay and pinned Arena corpus. Removing the universe
+capability restores UNKNOWN on the polymorphic probe. This is still a supplied
+candidate implementation admitted by tests, not generated mathematical rules.
