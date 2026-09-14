@@ -203,3 +203,8 @@ type and body are checked exactly once at admission, unsafe opaque declarations 
 rejected, and the body is thereafter unavailable to conversion. This differs from
 ordinary `def`, which remains unfoldable by weak-head reduction. A control verifies
 that downstream typing cannot succeed merely by exposing an opaque body.
+
+
+### String literals
+
+String literals are retained as primitive literal expressions with exact literal identity and type `String`. No constructor expansion or additional string reduction is assumed; unsupported consequences remain UNKNOWN.

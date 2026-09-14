@@ -72,6 +72,7 @@ const S = n => ["sort", n], V = n => ["var", n];
 const Pi = (a,b) => ["pi",a,b], Lam = (a,b) => ["lam",a,b];
 const App = (f,a) => ["app",f,a], Let = (a,v,b) => ["let",a,v,b];
 const NatLit = n => ["nat",n];
+const StrLit = s => ["strlit",s];
 const Proj = (n,i,e) => ["proj",n,i,e];
 const leanName = (...parts) => parts.reduce((pre,s)=>JSON.stringify([pre,"str",s]),"[]");
 class Stop extends Error { constructor(status, reason) { super(reason); this.status=status; } }
@@ -414,7 +415,7 @@ class Kernel {
   validate(e) {
     this.tick();
     if(!Array.isArray(e) || typeof e[0]!=="string") this.reject("malformed-term");
-    const arities={sort:2,var:2,const:2,nat:2,proj:4,pi:3,lam:3,app:3,let:4};
+    const arities={sort:2,var:2,const:2,nat:2,strlit:2,proj:4,pi:3,lam:3,app:3,let:4};
     if(!(e[0] in arities)) this.unknown("syntax:"+e[0]);
     if(e.length!==arities[e[0]] && !(e[0]==="const"&&e.length===3)) this.reject("malformed-arity");
     if(e[0]==="sort"&&typeof e[1]!=="number") {
@@ -422,6 +423,9 @@ class Kernel {
     } else if(e[0]==="nat") {
       this.need("nat-literals");
       if(!Number.isSafeInteger(e[1])||e[1]<0) this.reject("malformed-nat-literal");
+    } else if(e[0]==="strlit") {
+      this.need("string-literals");
+      if(typeof e[1]!=="string") this.reject("malformed-string-literal");
     } else if(e[0]==="proj") {
       this.need("projections");
       if(typeof e[1]!=="string"||!Number.isSafeInteger(e[2])||e[2]<0) this.reject("malformed-projection");
@@ -440,7 +444,7 @@ class Kernel {
   shift(e,amount,cut=0) {
     this.tick();
     switch(e[0]) {
-      case "sort": case "const": case "nat": return e;
+      case "sort": case "const": case "nat": case "strlit": return e;
       case "var": return e[1]<cut ? e : this.make("var",e[1]+amount);
       case "pi": case "lam": return this.make(e[0],this.shift(e[1],amount,cut),this.shift(e[2],amount,cut+1));
       case "app": return this.make("app",this.shift(e[1],amount,cut),this.shift(e[2],amount,cut));
@@ -452,7 +456,7 @@ class Kernel {
   substitute(e,arg,depth=0) {
     this.tick();
     switch(e[0]) {
-      case "sort": case "const": case "nat": return e;
+      case "sort": case "const": case "nat": case "strlit": return e;
       case "var": return e[1]===depth ? this.shift(arg,depth) : e[1]>depth ? this.make("var",e[1]-1) : e;
       case "pi": case "lam": return this.make(e[0],this.substitute(e[1],arg,depth),this.substitute(e[2],arg,depth+1));
       case "app": return this.make("app",this.substitute(e[1],arg,depth),this.substitute(e[2],arg,depth));
@@ -509,7 +513,7 @@ class Kernel {
   }
   normal(e) {
     this.tick(); e=this.whnf(e);
-    if(["sort","var","const","nat"].includes(e[0])) return e;
+    if(["sort","var","const","nat","strlit"].includes(e[0])) return e;
     if(e[0]==="proj") return this.make("proj",e[1],e[2],this.normal(e[3]));
     return this.make(e[0],...e.slice(1).map(x=>this.normal(x)));
   }
@@ -564,7 +568,7 @@ class Kernel {
       this.tick();
       if(e[0]==="sort") return this.make("sort",levelSub(e[1],sub,()=>this.tick()));
       if(e[0]==="const") return e.length===2?e:this.make("const",e[1],e[2].map(u=>levelSub(u,sub,()=>this.tick())));
-      if(e[0]==="var"||e[0]==="nat") return e;
+      if(e[0]==="var"||e[0]==="nat"||e[0]==="strlit") return e;
       if(e[0]==="proj") return this.make("proj",e[1],e[2],walk(e[3]));
       return this.make(e[0],...e.slice(1).map(walk));
     };
@@ -593,6 +597,12 @@ class Kernel {
         if(!this.env.has(n)) this.reject("undeclared-nat");
         return ["const",n];
       }
+      case "strlit": {
+        this.need("string-literals"); this.need("declarations");
+        const n=leanName("String");
+        if(!this.env.has(n)) this.reject("undeclared-string");
+        return ["const",n];
+      }
       case "proj": return this.inferProjection(e[1],e[2],e[3],ctx);
       case "pi": {
         this.need("binders");
@@ -617,7 +627,7 @@ class Kernel {
     }
   }
 }
-const API={Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,Proj};
+const API={Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,StrLit,Proj};
 
 function checkExport(input,capabilities,budget=200000) {
   const start=Date.now();let parsed=0,frontierInductive=null;
@@ -673,6 +683,10 @@ function checkExport(input,capabilities,budget=200000) {
           const n=Number(v);
           if(!Number.isSafeInteger(n)) fail("nat-literal-budget");
           e=NatLit(n);
+        } else if(tag==="strVal") {
+          if(!capabilities.includes("string-literals")) fail("expression-frontier:strVal");
+          if(typeof v!=="string") reject("malformed-string-literal");
+          e=StrLit(v);
         } else if(tag==="proj"&&v) {
           if(!capabilities.includes("projections")) fail("expression-frontier:proj");
           if(!Number.isSafeInteger(v.idx)||v.idx<0) reject("malformed-projection");
@@ -849,4 +863,4 @@ function checkExport(input,capabilities,budget=200000) {
   }
 }
 
-export {levelsEqual,levelSucc,levelIMax,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,Proj,checkExport};
+export {levelsEqual,levelSucc,levelIMax,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,StrLit,Proj,checkExport};

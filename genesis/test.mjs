@@ -1,7 +1,7 @@
 import {writeFileSync,appendFileSync,mkdirSync,readFileSync} from "node:fs";
 import {spawnSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
-import {levelsEqual,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,Proj,checkExport} from "./kernel.mjs";
+import {levelsEqual,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,StrLit,Proj,checkExport} from "./kernel.mjs";
 
 function growthSuite() {
   const C=(name,term,type,expected=ACCEPT,declarations=[])=>({name,term,type,expected,declarations});
@@ -443,6 +443,36 @@ function runNatLiteralTests(base,emit=()=>{}) {
 }
 
 
+function runStringLiteralTests(base,emit=()=>{}) {
+  const caps=[...base,"string-literals"],N="String";
+  const decls=[{kind:"axiom",name:N,levelParams:[],type:S(1)}];
+  const before=new Kernel(base).run(StrLit("hello"),["const",N],decls);
+  assert(before.status===UNKNOWN&&before.reason==="missing:string-literals",
+    "string literal ablation did not restore missing capability");
+  const accepted=new Kernel(caps).run(StrLit("hello"),["const",N],decls);
+  assert(accepted.status===ACCEPT,"string literal did not typecheck: "+JSON.stringify(accepted));
+
+  const meta={meta:{format:{version:"3.1.0"}}};
+  const raw=[
+    meta,
+    {"in":1,str:{pre:0,str:"String"}},
+    {"in":2,str:{pre:0,str:"s"}},
+    {"il":1,succ:0},
+    {"ie":0,sort:1},
+    {"ie":1,const:{name:1,us:[]}},
+    {"ie":2,strVal:"hello"},
+    {axiom:{name:1,levelParams:[],type:0,isUnsafe:false}},
+    {def:{name:2,levelParams:[],type:1,value:2,hints:"opaque",safety:"safe",all:[2]}}
+  ].map(JSON.stringify).join("\n");
+  const ablated=checkExport(raw,base);
+  assert(ablated.status===UNKNOWN&&ablated.reason==="expression-frontier:strVal",
+    "string export ablation did not restore literal frontier");
+  assert(checkExport(raw,caps).status===ACCEPT,"exported string literal was rejected");
+  emit({event:"string-literal-growth",ablation_unknown:true,typecheck:true,primitive_identity:true});
+  return {capabilities:caps,cases:2};
+}
+
+
 function runProjectionTests(base,emit=()=>{}) {
   const caps=[...base,"projections"],A="ProjA",a="projA",B="Box",mk="Box.mk",rn=JSON.stringify([B,"str","rec"]),u="u";
   const AT=["const",A],av=["const",a],I=["const",B],Mk=["const",mk],Rec=["const",rn,[["param",u]]];
@@ -576,7 +606,11 @@ const natLiteral=runNatLiteralTests(singleInductive.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const projection=runProjectionTests(natLiteral.capabilities,row=>{
+const stringLiteral=runStringLiteralTests(natLiteral.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const projection=runProjectionTests(stringLiteral.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
@@ -599,6 +633,7 @@ report.empty_inductive_tests={cases:emptyInductive.cases};
 report.enum_inductive_tests={cases:enumInductive.cases};
 report.single_inductive_tests={cases:singleInductive.cases};
 report.nat_literal_tests={cases:natLiteral.cases};
+report.string_literal_tests={cases:stringLiteral.cases};
 report.projection_tests={cases:projection.cases};
 report.opaque_declaration_tests={cases:opaqueDeclaration.cases};
 report.declaration_safety_controls={cases:declarationSafety.cases,retained_capability:false};
