@@ -405,7 +405,10 @@ class Kernel {
         const domain=ct[1],u=this.sortOf(domain,cctx);
         const fieldFits=levelsLe(u,indLevel,()=>this.tick());
         if(mayBeProp) {
-          if(!fieldFits) dataFields.push(fields);
+          // Lean's elimination test asks whether the field TYPE itself
+          // normalizes to Prop. Merely fitting below a result universe that
+          // may later instantiate to Prop is not enough.
+          if(!levelsEqual(u,0,()=>this.tick())) dataFields.push(fields);
         } else if(!fieldFits) this.reject("constructor-field-universe");
         const w=this.whnf(domain);
         if(this.hasConst(w,d.name)) {
