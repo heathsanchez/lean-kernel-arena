@@ -383,6 +383,43 @@ function runEnumInductiveTests(base,emit=()=>{}) {
 }
 
 
+function runSingleInductiveTests(base,emit=()=>{}) {
+  const caps=[...base,"single-inductives"],n="Ntest",z="Ntest.zero",s="Ntest.succ",rn=JSON.stringify([n,"str","rec"]),u="u";
+  const I=["const",n],Z=["const",z],Succ=["const",s],Rec=["const",rn,[["param",u]]];
+  const motive=Pi(I,S(["param",u]));
+  const zeroMinor=App(V(0),Z);
+  const succMinor=Pi(I,Pi(App(V(2),V(0)),App(V(3),App(Succ,V(1)))));
+  const recType=Pi(motive,Pi(zeroMinor,Pi(succMinor,Pi(I,App(V(3),V(0))))));
+  const rz=Lam(motive,Lam(zeroMinor,Lam(succMinor,V(1))));
+  const recCall=App(App(App(App(Rec,V(3)),V(2)),V(1)),V(0));
+  const rs=Lam(motive,Lam(zeroMinor,Lam(succMinor,Lam(I,App(App(V(1),V(0)),recCall)))));
+  const good={kind:"inductive",name:n,levelParams:[],type:S(1),numParams:0,numIndices:0,numNested:0,
+    isRec:true,isUnsafe:false,isReflexive:false,all:[n],ctorNames:[z,s],
+    ctors:[
+      {name:z,levelParams:[],type:I,induct:n,cidx:0,numParams:0,numFields:0,isUnsafe:false},
+      {name:s,levelParams:[],type:Pi(I,I),induct:n,cidx:1,numParams:0,numFields:1,isUnsafe:false}
+    ],
+    rec:{name:rn,levelParams:[u],type:recType,all:[n],numParams:0,numIndices:0,numMotives:1,
+      numMinors:2,k:false,isUnsafe:false,rules:[
+        {ctor:z,nfields:0,rhs:rz},{ctor:s,nfields:1,rhs:rs}
+      ]}
+  };
+  const before=new Kernel(base).run(S(0),S(1),[good]);
+  assert(before.status===UNKNOWN&&before.reason==="missing:single-inductives",
+    "single-inductive ablation did not restore missing capability");
+  const accepted=new Kernel(caps).run(S(0),S(1),[good]);
+  assert(accepted.status===ACCEPT,"recursive single inductive was not accepted: "+JSON.stringify(accepted));
+  const bad=JSON.parse(JSON.stringify(good));
+  bad.ctors[1].type=Pi(Pi(I,I),I);
+  const rejected=new Kernel(caps).run(S(0),S(1),[bad]);
+  assert(rejected.status===REJECT&&rejected.reason==="negative-recursive-occurrence",
+    "negative recursive occurrence was not rejected: "+JSON.stringify(rejected));
+  emit({event:"single-inductive-growth",ablation_unknown:true,recursive_type:true,
+    derived_recursor:true,strict_positivity:true});
+  return {capabilities:caps,cases:2};
+}
+
+
 function runDeclarationSafetyControls(base,emit=()=>{}) {
   const meta={meta:{format:{version:"3.1.0"}}};
   const mkDef=safety=>[
@@ -439,7 +476,11 @@ const enumInductive=runEnumInductiveTests(emptyInductive.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const declarationSafety=runDeclarationSafetyControls(enumInductive.capabilities,row=>{
+const singleInductive=runSingleInductiveTests(enumInductive.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const declarationSafety=runDeclarationSafetyControls(singleInductive.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
@@ -452,6 +493,7 @@ report.proof_irrelevance_tests={cases:proofIrrelevance.cases};
 report.inductive_envelope_tests={cases:inductiveEnvelope.cases};
 report.empty_inductive_tests={cases:emptyInductive.cases};
 report.enum_inductive_tests={cases:enumInductive.cases};
+report.single_inductive_tests={cases:singleInductive.cases};
 report.declaration_safety_controls={cases:declarationSafety.cases,retained_capability:false};
 for(const name of ["level-index-out-of-order","sparse-name-index"]) {
   const raw=readFileSync(new URL("../tests/"+name+".ndjson",import.meta.url),"utf8");

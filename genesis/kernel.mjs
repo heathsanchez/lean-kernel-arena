@@ -25,6 +25,8 @@ function validateLevel(u,allowed,tick) {
 }
 function levelSucc(u) { return typeof u==="number"?u+1:["succ",u]; }
 function levelIMax(a,b) { return typeof a==="number"&&typeof b==="number"?(b===0?0:Math.max(a,b)):["imax",a,b]; }
+function levelMax(a,b) { return typeof a==="number"&&typeof b==="number"?Math.max(a,b):["max",a,b]; }
+function levelsLe(a,b,tick=()=>{}) { return levelsEqual(levelMax(a,b),b,tick); }
 function levelSub(u,sub,tick) {
   tick();
   if(typeof u==="number") return u;
@@ -83,7 +85,12 @@ class Kernel {
       if (declarations.length) this.need("declarations");
       for (const d of declarations) {
         this.tick();
-        if (!d || typeof d.name!=="string" || !["axiom","def","thm"].includes(d.kind)) this.unknown("declaration-kind");
+        if (!d || typeof d.name!=="string" || !["axiom","def","thm","inductive"].includes(d.kind)) this.unknown("declaration-kind");
+        if(d.kind==="inductive") {
+          this.need("single-inductives");
+          this.addSingleInductive(d);
+          continue;
+        }
         if(d.kind==="thm") this.need("theorems");
         if (this.env.has(d.name)) this.reject("duplicate-declaration");
         const ps=d.levelParams??[];
@@ -119,6 +126,252 @@ class Kernel {
       if(e instanceof RangeError) return this.result(UNKNOWN,"host-stack-limit",start);
       throw e; // A programming exception is never converted into proof rejection.
     }
+  }
+
+  hasConst(e,name) {
+    this.tick();
+    if(e[0]==="const") return e[1]===name;
+    if(e[0]==="sort"||e[0]==="var") return false;
+    for(let i=1;i<e.length;i++) if(Array.isArray(e[i])&&this.hasConst(e[i],name)) return true;
+    return false;
+  }
+  getApp(e) {
+    this.tick(); const args=[];
+    while(e[0]==="app") { args.push(e[2]); e=e[1]; this.tick(); }
+    return [e,args.reverse()];
+  }
+  appN(f,args) { for(const a of args) f=this.make("app",f,a); return f; }
+  bvars(n,offset=0) {
+    const out=[]; for(let i=0;i<n;i++) out.push(V(offset+n-1-i)); return out;
+  }
+  constRef(name,lparams=[]) {
+    return lparams.length?["const",name,lparams.map(p=>["param",p])]:["const",name];
+  }
+  instantiateForalls(type,args) {
+    let cur=type;
+    for(const a of args) {
+      cur=this.whnf(cur);
+      if(cur[0]!=="pi") this.reject("insufficient-constructor-parameters");
+      cur=this.substitute(cur[2],a);
+    }
+    return cur;
+  }
+  splitAllForalls(type) {
+    const domains=[]; let cur=type;
+    while(true) {
+      cur=this.whnf(cur);
+      if(cur[0]!=="pi") return {domains,rest:cur};
+      domains.push(cur[1]); cur=cur[2];
+    }
+  }
+  mkBinders(tag,types,body) {
+    for(let i=types.length-1;i>=0;i--) body=this.make(tag,types[i],body);
+    return body;
+  }
+  isExactIndApp(type,d,shift) {
+    const [head,args]=this.getApp(type);
+    if(head[0]!=="const"||head[1]!==d.name) this.reject("inductive-result-head");
+    const us=head[2]??[],expectedUs=d.levelParams.map(p=>["param",p]);
+    if(JSON.stringify(us)!==JSON.stringify(expectedUs)) this.reject("inductive-result-universes");
+    if(args.length!==d.numParams+d.numIndices) this.reject("inductive-result-arity");
+    for(let i=0;i<d.numParams;i++) {
+      const expected=V(shift+d.numParams-(i+1));
+      if(!this.same(args[i],expected)) this.reject("inductive-result-parameter");
+    }
+    for(let i=d.numParams;i<args.length;i++)
+      if(this.hasConst(args[i],d.name)) this.reject("inductive-in-index");
+  }
+  deriveTypeRecursor(d,ctorInfos,rec) {
+    const nC=ctorInfos.length,nP=d.numParams,nI=d.numIndices;
+    const u=rec.levelParams[0],motiveLevel=["param",u],I=this.constRef(d.name,d.levelParams);
+    let cur=d.type; const paramTypes=[];
+    for(let i=0;i<nP;i++) {
+      cur=this.whnf(cur); if(cur[0]!=="pi") this.reject("inductive-parameter-telescope");
+      paramTypes.push(cur[1]); cur=cur[2];
+    }
+    const idxTypes=[]; let ix=cur;
+    for(let i=0;i<nI;i++) {
+      ix=this.whnf(ix); if(ix[0]!=="pi") this.reject("inductive-index-telescope");
+      idxTypes.push(ix[1]); ix=ix[2];
+    }
+    const paramsInIdx=this.bvars(nP,nI),idxVars=this.bvars(nI);
+    const majorForMotive=this.appN(I,paramsInIdx.concat(idxVars));
+    const motiveType=this.mkBinders("pi",idxTypes.concat([majorForMotive]),S(motiveLevel));
+
+    const minorTypes=[];
+    for(const ci of ctorInfos) {
+      const ps=this.bvars(nP,1);
+      let ct=this.instantiateForalls(ci.type,ps);
+      const fieldDomains=[];
+      while(true) {
+        const w=this.whnf(ct); if(w[0]!=="pi") { ct=w; break; }
+        fieldDomains.push(w[1]); ct=w[2];
+      }
+      const nf=fieldDomains.length,hypTypes=[];
+      for(let j=0;j<nf;j++) {
+        let ft=this.whnf(this.shift(fieldDomains[j],nf-j));
+        if(!this.hasConst(ft,d.name)) continue;
+        const sp=this.splitAllForalls(ft),m=sp.domains.length;
+        const [h,args]=this.getApp(sp.rest);
+        if(h[0]!=="const"||h[1]!==d.name) this.reject("recursive-field-shape");
+        const idxs=args.slice(nP,nP+nI);
+        const motive=V(nf+m),field=V(nf-1-j);
+        const fieldApp=this.appN(this.shift(field,m),this.bvars(m));
+        const hypBody=this.appN(motive,idxs.concat([fieldApp]));
+        hypTypes.push(this.mkBinders("pi",sp.domains,hypBody));
+      }
+      const nh=hypTypes.length,res=this.shift(ct,nh);
+      const [,resArgs]=this.getApp(res),idxs=resArgs.slice(nP,nP+nI);
+      const ps2=ps.map(p=>this.shift(p,nf+nh));
+      const fields=this.bvars(nf,nh);
+      const ctorApp=this.appN(this.constRef(ci.name,d.levelParams),ps2.concat(fields));
+      const body=this.appN(V(nf+nh),idxs.concat([ctorApp]));
+      const types=fieldDomains.concat(hypTypes.map((ht,i)=>this.shift(ht,i)));
+      minorTypes.push(this.mkBinders("pi",types,body));
+    }
+
+    const types=paramTypes.concat([motiveType],minorTypes.map((mt,i)=>this.shift(mt,i)));
+    let indexed=this.shift(cur,1+nC);
+    for(let i=0;i<nI;i++) {
+      indexed=this.whnf(indexed); if(indexed[0]!=="pi") this.reject("inductive-index-telescope");
+      types.push(indexed[1]); indexed=indexed[2];
+    }
+    const params=this.bvars(nP,1+nC+nI),idxs=this.bvars(nI);
+    const major=this.appN(I,params.concat(idxs)); types.push(major);
+    const result=this.appN(V(nC+nI+1),this.bvars(nI,1).concat([V(0)]));
+    const recType=this.mkBinders("pi",types,result);
+
+    const ruleBodies=[];
+    for(let ciIndex=0;ciIndex<nC;ciIndex++) {
+      const ci=ctorInfos[ciIndex],prefix=[]; let rt=recType;
+      for(let j=0;j<nP+1+nC;j++) {
+        rt=this.whnf(rt); if(rt[0]!=="pi") this.reject("derived-recursor-prefix");
+        prefix.push(rt[1]); rt=rt[2];
+      }
+      const ps=this.bvars(nP,1+nC);
+      let ct=this.instantiateForalls(ci.type,ps);
+      const fieldDomains=[];
+      while(true) {
+        const w=this.whnf(ct); if(w[0]!=="pi") { ct=w; break; }
+        fieldDomains.push(w[1]); ct=w[2];
+      }
+      const nf=fieldDomains.length,minor=V(nC-(ciIndex+1)+nf),fields=this.bvars(nf),ihs=[];
+      for(let j=0;j<nf;j++) {
+        let ft=this.whnf(this.shift(fieldDomains[j],nf-j));
+        if(!this.hasConst(ft,d.name)) continue;
+        const sp=this.splitAllForalls(ft),m=sp.domains.length;
+        const [,args]=this.getApp(sp.rest),ridx=args.slice(nP,nP+nI);
+        const recApp=this.constRef(rec.name,rec.levelParams);
+        const prefixVars=this.bvars(nP+1+nC,nf+m);
+        const field=V(nf-1-j),fieldApp=this.appN(this.shift(field,m),this.bvars(m));
+        const body=this.appN(recApp,prefixVars.concat(ridx,[fieldApp]));
+        ihs.push(this.mkBinders("lam",sp.domains,body));
+      }
+      const rhs=this.appN(minor,fields.concat(ihs));
+      ruleBodies.push(this.mkBinders("lam",prefix.concat(fieldDomains),rhs));
+    }
+    return {recType,ruleBodies};
+  }
+  addSingleInductive(d) {
+    this.tick();
+    if(d.numNested!==0 || d.isUnsafe!==false) this.reject("unsupported-inductive-envelope");
+    if(d.isReflexive) this.unknown("inductive-semantics-frontier");
+    if(!Array.isArray(d.levelParams)||new Set(d.levelParams).size!==d.levelParams.length)
+      this.reject("invalid-universe-parameters");
+    this.params=new Set(d.levelParams);
+    if(d.levelParams.length) this.need("universes");
+    if(this.env.has(d.name)) this.reject("duplicate-declaration");
+    this.validate(d.type); this.sortOf(d.type,[]);
+
+    let cur=d.type,ctx=[];
+    for(let i=0;i<d.numParams;i++) {
+      cur=this.whnf(cur); if(cur[0]!=="pi") this.reject("inductive-parameter-telescope");
+      this.sortOf(cur[1],ctx); ctx.push(cur[1]); cur=cur[2];
+    }
+    let actualIndices=0;
+    while(true) {
+      const w=this.whnf(cur);
+      if(w[0]!=="pi") { cur=w; break; }
+      this.sortOf(w[1],ctx); ctx.push(w[1]); cur=w[2]; actualIndices++;
+    }
+    if(actualIndices!==d.numIndices) this.reject("inductive-index-count");
+    if(cur[0]!=="sort") this.reject("inductive-not-sort");
+    const indLevel=cur[1];
+    // Propositional elimination and reflexive inductives are separate grains.
+    if(levelsEqual(indLevel,0,()=>this.tick())) this.unknown("inductive-semantics-frontier");
+
+    if(!Array.isArray(d.all)||d.all.length!==1||d.all[0]!==d.name) this.reject("inductive-all");
+    if(!Array.isArray(d.ctorNames)||d.ctorNames.length!==d.ctors.length ||
+       d.ctorNames.some((n,i)=>n!==d.ctors[i]?.name)) this.reject("inductive-constructor-list");
+
+    const groupNames=[d.name,...d.ctors.map(c=>c.name),d.rec?.name];
+    if(groupNames.some(n=>typeof n!=="string")||new Set(groupNames).size!==groupNames.length)
+      this.reject("duplicate-declaration");
+    for(const n of groupNames) if(this.env.has(n)) this.reject("duplicate-declaration");
+
+    this.env.set(d.name,{kind:"inductive",name:d.name,type:d.type,levelParams:d.levelParams,
+      numParams:d.numParams,numIndices:d.numIndices,ctors:d.ctors.map(c=>c.name)});
+
+    const ctorInfos=[]; let actualRec=false;
+    for(let ciIndex=0;ciIndex<d.ctors.length;ciIndex++) {
+      const c=d.ctors[ciIndex];
+      if(c.induct!==d.name||c.cidx!==ciIndex||c.numParams!==d.numParams||c.isUnsafe!==false ||
+         JSON.stringify(c.levelParams)!==JSON.stringify(d.levelParams))
+        this.reject("constructor-metadata");
+      this.validate(c.type); this.sortOf(c.type,[]);
+      let indT=d.type,ct=c.type,cctx=[];
+      for(let i=0;i<d.numParams;i++) {
+        indT=this.whnf(indT);
+        if(indT[0]!=="pi"||ct[0]!=="pi") this.reject("constructor-parameter-telescope");
+        this.equal(indT[1],ct[1],cctx);
+        cctx.push(indT[1]); indT=indT[2]; ct=ct[2];
+      }
+      let fields=0;
+      while(ct[0]==="pi") {
+        const domain=ct[1],u=this.sortOf(domain,cctx);
+        if(!levelsLe(u,indLevel,()=>this.tick())) this.reject("constructor-field-universe");
+        const w=this.whnf(domain);
+        if(this.hasConst(w,d.name)) {
+          actualRec=true;
+          const sp=this.splitAllForalls(w);
+          for(const rd of sp.domains) if(this.hasConst(rd,d.name)) this.reject("negative-recursive-occurrence");
+          this.isExactIndApp(sp.rest,d,fields+sp.domains.length);
+        }
+        cctx.push(domain); fields++; ct=ct[2];
+      }
+      this.isExactIndApp(ct,d,fields);
+      if(fields!==c.numFields) this.reject("constructor-field-count");
+      ctorInfos.push({...c,numFields:fields});
+    }
+    if(actualRec!==d.isRec) this.reject("inductive-recursion-metadata");
+
+    const rec=d.rec;
+    if(!rec||rec.numParams!==d.numParams||rec.numIndices!==d.numIndices||
+       rec.numMotives!==1||rec.numMinors!==d.ctors.length||rec.k!==false||rec.isUnsafe!==false||
+       !Array.isArray(rec.all)||rec.all.length!==1||rec.all[0]!==d.name||
+       !Array.isArray(rec.rules)||rec.rules.length!==d.ctors.length)
+      this.reject("recursor-metadata");
+    const expectedRecName=JSON.stringify([d.name,"str","rec"]);
+    if(rec.name!==expectedRecName) this.reject("recursor-name");
+    if(!Array.isArray(rec.levelParams)||rec.levelParams.length!==d.levelParams.length+1||
+       rec.levelParams.slice(1).some((p,i)=>p!==d.levelParams[i])||
+       d.levelParams.includes(rec.levelParams[0]))
+      this.reject("recursor-universe-parameters");
+
+    for(const c of ctorInfos)
+      this.env.set(c.name,{kind:"ctor",name:c.name,type:c.type,levelParams:d.levelParams,induct:d.name,numFields:c.numFields});
+    this.params=new Set(rec.levelParams);
+    const derived=this.deriveTypeRecursor(d,ctorInfos,rec);
+    if(!this.same(rec.type,derived.recType)) this.reject("recursor-type");
+    for(let i=0;i<rec.rules.length;i++) {
+      const rr=rec.rules[i];
+      if(rr.ctor!==ctorInfos[i].name||rr.nfields!==ctorInfos[i].numFields)
+        this.reject("recursor-rule-metadata");
+      if(!this.same(rr.rhs,derived.ruleBodies[i])) this.reject("recursor-rule");
+    }
+    this.validate(derived.recType); this.sortOf(derived.recType,[]);
+    this.env.set(rec.name,{kind:"rec",name:rec.name,type:derived.recType,levelParams:rec.levelParams,
+      numParams:d.numParams,numIndices:d.numIndices,numMinors:d.ctors.length,rules:rec.rules,induct:d.name});
   }
   result(status,reason,start) { return {status,reason,steps:this.steps,constructed:this.allocations,elapsed_ms:Date.now()-start}; }
   tick() { if(++this.steps>this.budget) this.unknown("budget-exhausted"); }
@@ -459,6 +712,32 @@ function checkExport(input,capabilities,budget=200000) {
               continue;
             }
           }
+        }
+        if(capabilities.includes("single-inductives") && v.types.length===1 && v.recs.length===1) {
+          const it=v.types[0],rec=v.recs[0];
+          if(!it||!rec||!Array.isArray(it.levelParams)||!Array.isArray(it.all)||!Array.isArray(it.ctors))
+            fail("inductive-envelope-schema");
+          const d={
+            kind:"inductive",name:get(names,it.name),levelParams:it.levelParams.map(n=>get(names,n)),
+            type:get(exprs,it.type),numParams:it.numParams,numIndices:it.numIndices,numNested:it.numNested,
+            isRec:it.isRec,isUnsafe:it.isUnsafe,isReflexive:it.isReflexive,
+            all:it.all.map(n=>get(names,n)),ctorNames:it.ctors.map(n=>get(names,n)),
+            ctors:v.ctors.map(c=>({
+              name:get(names,c.name),levelParams:(c.levelParams??[]).map(n=>get(names,n)),
+              type:get(exprs,c.type),induct:get(names,c.induct),cidx:c.cidx,
+              numParams:c.numParams,numFields:c.numFields,isUnsafe:c.isUnsafe
+            })),
+            rec:{
+              name:get(names,rec.name),levelParams:(rec.levelParams??[]).map(n=>get(names,n)),
+              type:get(exprs,rec.type),all:(rec.all??[]).map(n=>get(names,n)),
+              numParams:rec.numParams,numIndices:rec.numIndices,numMotives:rec.numMotives,
+              numMinors:rec.numMinors,k:rec.k,isUnsafe:rec.isUnsafe,
+              rules:(rec.rules??[]).map(rr=>({
+                ctor:get(names,rr.ctor),nfields:rr.nfields,rhs:get(exprs,rr.rhs)
+              }))
+            }
+          };
+          decls.push(d); continue;
         }
         frontierInductive={
           name:v.types.length===1&&Number.isSafeInteger(v.types[0]?.name)?(names.get(v.types[0].name)??null):null,

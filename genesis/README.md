@@ -173,3 +173,8 @@ fragment without broadening the inductive language.
 ### Finite-enumeration inductives
 
 The next retained semantic grain derives and verifies recursors for single, non-dependent, non-Propositional finite enumerations with nullary constructors. Exported recursor metadata, type and rule bodies are treated as redundant evidence and must match the derivation exactly. Recursive, indexed, parameterized, propositional and level-polymorphic inductives remain at the semantic frontier until separately earned.
+
+
+### Single Type-valued inductives
+
+The checker now has a separately charged single-inductive semantic grain for non-Propositional, non-reflexive groups: it checks the parameter/index telescope, constructor parameter agreement, field universe bounds, strict positivity, exact constructor results, recursion metadata, and independently derives the recursor type and computation-rule bodies before installing them. Prop elimination, reflexive and mutual inductives remain explicit UNKNOWN frontiers.
