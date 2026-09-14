@@ -270,6 +270,36 @@ function runFunctionEtaTests(base,emit=()=>{}) {
 }
 
 
+function runRigidConversionTests(base,emit=()=>{}) {
+  const caps=[...base,"rigid-conversion"],A="RigidA",B="RigidB";
+  const decls=[
+    {kind:"axiom",name:A,levelParams:[],type:S(1)},
+    {kind:"axiom",name:B,levelParams:[],type:S(1)}
+  ];
+  const setup=cset=>{
+    const q=new Kernel(cset); q.steps=0; q.params=new Set();
+    q.env=new Map(decls.map(d=>[d.name,d])); return q;
+  };
+  let constUnknown=false;
+  try { setup(base).equal(["const",A],["const",B],[]); }
+  catch(e) { constUnknown=e instanceof Stop&&e.status===UNKNOWN&&e.message==="conversion-frontier"; }
+  assert(constUnknown,"rigid conversion ablation did not restore constant frontier");
+  let constRejected=false;
+  try { setup(caps).equal(["const",A],["const",B],[]); }
+  catch(e) { constRejected=e instanceof Stop&&e.status===REJECT&&e.message==="rigid-constant-mismatch"; }
+  assert(constRejected,"distinct rigid constants were not rejected");
+
+  const ctx=[S(1),S(1)];
+  let varRejected=false;
+  try { setup(caps).equal(V(1),V(0),ctx); }
+  catch(e) { varRejected=e instanceof Stop&&e.status===REJECT&&e.message==="rigid-variable-mismatch"; }
+  assert(varRejected,"distinct rigid variables were not rejected");
+  emit({event:"rigid-conversion-growth",ablation_unknown:true,
+    distinct_constants_rejected:true,distinct_variables_rejected:true});
+  return {capabilities:caps,cases:2};
+}
+
+
 function runUnitEtaTests(base,emit=()=>{}) {
   const caps=[...base,"unit-eta"],U="UnitLike",Mk="UnitLike.mk",R=JSON.stringify(["UnitLike","str","rec"]),u="uu";
   const I=["const",U],C=["const",Mk],motive=Pi(I,S(["param",u])),minor=App(V(0),C);
@@ -869,7 +899,11 @@ const functionEta=runFunctionEtaTests(proofIrrelevance.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const inductiveEnvelope=runInductiveEnvelopeTests(functionEta.capabilities,row=>{
+const rigidConversion=runRigidConversionTests(functionEta.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const inductiveEnvelope=runInductiveEnvelopeTests(rigidConversion.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
@@ -940,6 +974,7 @@ report.universe_tests={laws:universe.laws,independent_pairs:universe.independent
 report.theorem_tests={cases:theorem.cases};
 report.proof_irrelevance_tests={cases:proofIrrelevance.cases};
 report.function_eta_tests={cases:functionEta.cases};
+report.rigid_conversion_tests={cases:rigidConversion.cases};
 report.unit_eta_tests={cases:unitEta.cases};
 report.inductive_envelope_tests={cases:inductiveEnvelope.cases};
 report.empty_inductive_tests={cases:emptyInductive.cases};

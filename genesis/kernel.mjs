@@ -800,6 +800,22 @@ class Kernel {
         return;
       }
     }
+    if(this.caps.has("rigid-conversion")) {
+      // These normal forms have no remaining computation rule that can change
+      // their head. Proof irrelevance and eta have already had first refusal.
+      if(x[0]==="var" && y[0]==="var") this.reject("rigid-variable-mismatch");
+      if(x[0]==="const" && y[0]==="const") {
+        if(x[1]!==y[1]) this.reject("rigid-constant-mismatch");
+        const ux=x[2]??[],uy=y[2]??[];
+        if(ux.length!==uy.length) this.reject("universe-arity");
+        this.need("universes");
+        if(ux.every((u,i)=>levelsEqual(u,uy[i],()=>this.tick()))) return;
+        this.reject("universe-mismatch");
+      }
+      if((x[0]==="sort")!==(y[0]==="sort")) this.reject("rigid-sort-mismatch");
+      if(x[0]===y[0] && (x[0]==="nat"||x[0]==="strlit"))
+        this.reject("rigid-literal-mismatch");
+    }
     // Eta and the remaining conversion rules are not implemented.
     // A failed comparison is not evidence of inequality.
     const lx=JSON.stringify(x),ly=JSON.stringify(y);
