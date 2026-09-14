@@ -378,7 +378,7 @@ class Kernel {
     this.env.set(d.name,{kind:"inductive",name:d.name,type:d.type,levelParams:d.levelParams,
       numParams:d.numParams,numIndices:d.numIndices,ctors:d.ctors.map(c=>c.name)});
 
-    const ctorInfos=[]; let actualRec=false,nonImpredicative=true;
+    const ctorInfos=[]; let actualRec=false,recoverableData=true;
     for(let ciIndex=0;ciIndex<d.ctors.length;ciIndex++) {
       const c=d.ctors[ciIndex];
       if(c.induct!==d.name||c.cidx!==ciIndex||c.numParams!==d.numParams||c.isUnsafe!==false ||
@@ -392,12 +392,12 @@ class Kernel {
         this.equal(indT[1],ct[1],cctx);
         cctx.push(indT[1]); indT=indT[2]; ct=ct[2];
       }
-      let fields=0;
+      let fields=0; const dataFields=[];
       while(ct[0]==="pi") {
         const domain=ct[1],u=this.sortOf(domain,cctx);
         const fieldFits=levelsLe(u,indLevel,()=>this.tick());
         if(mayBeProp) {
-          if(!fieldFits) nonImpredicative=false;
+          if(!fieldFits) dataFields.push(fields);
         } else if(!fieldFits) this.reject("constructor-field-universe");
         const w=this.whnf(domain);
         if(this.hasConst(w,d.name)) {
@@ -410,6 +410,13 @@ class Kernel {
       }
       this.isExactIndApp(ct,d,fields);
       if(fields!==c.numFields) this.reject("constructor-field-count");
+      if(mayBeProp && dataFields.length) {
+        const [,resultArgs]=this.getApp(ct);
+        for(const ordinal of dataFields) {
+          const fieldVar=V(fields-1-ordinal);
+          if(!resultArgs.some(arg=>this.same(arg,fieldVar))) recoverableData=false;
+        }
+      }
       ctorInfos.push({...c,numFields:fields});
     }
     if(actualRec!==d.isRec) this.reject("inductive-recursion-metadata");
@@ -429,7 +436,7 @@ class Kernel {
     // Large elimination is safe if the inductive can never be Prop, or for the
     // standard empty / eta-structure / K exceptions. A merely polymorphic Sort u
     // does not count as "never Prop".
-    const structureLarge=d.ctors.length===1 && d.numIndices===0 && !actualRec && nonImpredicative;
+    const structureLarge=d.ctors.length===1 && !actualRec && recoverableData;
     const largeElim=!mayBeProp || d.ctors.length===0 || structureLarge || expectedK;
     let motiveLevel;
     if(!largeElim) {
