@@ -770,11 +770,7 @@ const functionEta=runFunctionEtaTests(proofIrrelevance.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const unitEta=runUnitEtaTests(functionEta.capabilities,row=>{
-  console.log(JSON.stringify(row));
-  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
-});
-const inductiveEnvelope=runInductiveEnvelopeTests(unitEta.capabilities,row=>{
+const inductiveEnvelope=runInductiveEnvelopeTests(functionEta.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
@@ -794,7 +790,11 @@ const inductiveReduction=runInductiveReductionTests(singleInductive.capabilities
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const propInductive=runPropInductiveTests(inductiveReduction.capabilities,row=>{
+const unitEta=runUnitEtaTests(inductiveReduction.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const propInductive=runPropInductiveTests(unitEta.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
