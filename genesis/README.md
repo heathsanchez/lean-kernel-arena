@@ -19,9 +19,9 @@ Without --state, check.mjs runs the empty present. Exit codes are 0 ACCEPT,
 1 REJECT, 2 UNKNOWN, 3 usage failure. Unexpected programming errors are failures,
 not proof rejections. The core accepts a deliberately bounded monomorphic fragment:
 numeric and symbolic universes (at most eight parameters per equality), dependent binders, application, beta/let reduction, and validated
-axioms/definitions. Proof irrelevance, eta,
-inductives, recursors, quotient rules, theorem declarations and primitive literal
-extensions remain explicit frontiers. Failed structural conversion returns UNKNOWN
+axioms, definitions and opaque theorem declarations. Proof irrelevance, eta,
+inductives, recursors, quotient rules and primitive literal extensions remain explicit
+frontiers. Failed structural conversion returns UNKNOWN
 unless distinct numeric sorts supply a decisive mismatch.
 
 This is not a complete or formally verified Lean kernel and has no Mathlib speed claim.
@@ -100,3 +100,15 @@ constant instantiation/arity validation. Ten laws and 196 independent expression
 pairs precede the protected replay and pinned Arena corpus. Removing the universe
 capability restores UNKNOWN on the polymorphic probe. This is still a supplied
 candidate implementation admitted by tests, not generated mathematical rules.
+
+
+## Third increment: theorem declarations
+
+The post-universe Arena residual separated seven theorem-declaration cases from the
+149 inductive-frontier cases. This increment therefore does not jump to inductives.
+It adds the smaller independently ablatable theorem capability: the declared type
+must itself inhabit Prop, the proof term must check against that type, earlier
+theorems may be referenced, self/forward references are rejected because installation
+still happens only after validation, and theorem bodies remain opaque to conversion.
+Hand-written format-3.1 exports exercise both acceptance and rejection before the
+protected replay and pinned Arena corpus. Removing the capability restores UNKNOWN.

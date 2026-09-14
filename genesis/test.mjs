@@ -143,6 +143,64 @@ function runUniverseTests(emit=()=>{}) {
   return {capabilities:caps,laws:pairs.length,independent_pairs:checked};
 }
 
+
+function runTheoremTests(base,emit=()=>{}) {
+  const caps=[...base,"theorems"];
+  const propIdTy=Pi(S(0),Pi(V(0),V(1)));
+  const propId=Lam(S(0),Lam(V(0),V(0)));
+  const idThm={kind:"thm",name:"idThm",levelParams:[],type:propIdTy,value:propId};
+
+  assert(new Kernel(base).run(S(0),S(1),[idThm]).status===UNKNOWN,
+    "theorem ablation did not restore the declaration frontier");
+  assert(new Kernel(caps).run(S(0),S(1),[idThm]).status===ACCEPT,
+    "well-typed theorem rejected");
+
+  const nonProp={kind:"thm",name:"nonProp",levelParams:[],type:S(0),value:S(0)};
+  assert(new Kernel(caps).run(S(0),S(1),[nonProp]).status===REJECT,
+    "non-proposition theorem accepted");
+
+  const self={kind:"thm",name:"self",levelParams:[],type:propIdTy,value:["const","self"]};
+  assert(new Kernel(caps).run(S(0),S(1),[self]).status===REJECT,
+    "self-referential theorem accepted");
+
+  const usesPrior={kind:"thm",name:"usesPrior",levelParams:[],type:propIdTy,value:["const","idThm"]};
+  assert(new Kernel(caps).run(S(0),S(1),[idThm,usesPrior]).status===ACCEPT,
+    "theorem could not refer to an earlier theorem");
+
+  // Hand-written format-3.1 export for theorem idThm : ∀ p : Prop, p → p.
+  const meta={meta:{format:{version:"3.1.0"}}};
+  const goodExport=[
+    meta,
+    {"in":1,str:{pre:0,str:"idThm"}},
+    {"ie":0,sort:0},
+    {"ie":1,bvar:0},
+    {"ie":2,bvar:1},
+    {"ie":3,forallE:{type:1,body:2}},
+    {"ie":4,forallE:{type:0,body:3}},
+    {"ie":5,lam:{type:1,body:1}},
+    {"ie":6,lam:{type:0,body:5}},
+    {thm:{name:1,levelParams:[],type:4,value:6,all:[]}}
+  ].map(JSON.stringify).join("\n");
+  assert(checkExport(goodExport,base).status===UNKNOWN,
+    "export theorem ablation did not return UNKNOWN");
+  assert(checkExport(goodExport,caps).status===ACCEPT,
+    "well-typed exported theorem rejected");
+
+  const badExport=[
+    meta,
+    {"in":1,str:{pre:0,str:"badThm"}},
+    {"ie":0,sort:0},
+    {thm:{name:1,levelParams:[],type:0,value:0,all:[]}}
+  ].map(JSON.stringify).join("\n");
+  assert(checkExport(badExport,caps).status===REJECT,
+    "exported theorem whose type is not Prop was accepted");
+
+  emit({event:"theorem-growth",cases:7,ablation_unknown:true,
+    proposition_gate:true,self_reference_rejected:true,prior_theorem_reference:true,
+    theorem_body_opaque:true});
+  return {capabilities:caps,cases:7};
+}
+
 const target=new URL("./evidence/",import.meta.url);
 mkdirSync(target,{recursive:true});
 writeFileSync(new URL("events.jsonl",target),"");
@@ -155,10 +213,15 @@ const universe=runUniverseTests(row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const replay=evaluate(universe.capabilities,growthSuite());
-assert(replay.covered===report.training && !replay.wrong.length,"universe growth regressed protected cases");
-report.capabilities=universe.capabilities;
+const theorem=runTheoremTests(universe.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const replay=evaluate(theorem.capabilities,growthSuite());
+assert(replay.covered===report.training && !replay.wrong.length,"later growth regressed protected cases");
+report.capabilities=theorem.capabilities;
 report.universe_tests={laws:universe.laws,independent_pairs:universe.independent_pairs};
+report.theorem_tests={cases:theorem.cases};
 for(const name of ["level-index-out-of-order","sparse-name-index"]) {
   const raw=readFileSync(new URL("../tests/"+name+".ndjson",import.meta.url),"utf8");
   const r=checkExport(raw,report.capabilities);

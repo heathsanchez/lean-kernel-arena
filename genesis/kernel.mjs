@@ -83,19 +83,22 @@ class Kernel {
       if (declarations.length) this.need("declarations");
       for (const d of declarations) {
         this.tick();
-        if (!d || typeof d.name!=="string" || !["axiom","def"].includes(d.kind)) this.unknown("declaration-kind");
+        if (!d || typeof d.name!=="string" || !["axiom","def","thm"].includes(d.kind)) this.unknown("declaration-kind");
+        if(d.kind==="thm") this.need("theorems");
         if (this.env.has(d.name)) this.reject("duplicate-declaration");
         const ps=d.levelParams??[];
         if(!Array.isArray(ps)||ps.some(p=>typeof p!=="string")||new Set(ps).size!==ps.length) this.reject("invalid-universe-parameters");
         this.params=new Set(ps);
         if(ps.length) this.need("universes");
         this.validate(d.type);
-        this.sortOf(d.type,[]);
-        if (d.kind==="def") {
+        const declSort=this.sortOf(d.type,[]);
+        if(d.kind==="thm" && !levelsEqual(declSort,0,()=>this.tick())) this.reject("theorem-not-proposition");
+        if (d.kind==="def" || d.kind==="thm") {
           this.validate(d.value);
           this.equal(this.infer(d.value,[]),d.type);
         }
         // Install only after validation; self and forward references cannot be used.
+        // Theorem bodies stay opaque because whnf unfolds only kind "def".
         this.env.set(d.name,d);
       }
       this.params=new Set(parameters);
@@ -317,13 +320,14 @@ function checkExport(input,capabilities,budget=200000) {
         else if(tag==="mdata"&&v) e=get(exprs,v.expr);
         else fail("expression-frontier:"+tag);
         put(exprs,row.ie,e);
-      } else if(tag==="axiom"||tag==="def") {
+      } else if(tag==="axiom"||tag==="def"||tag==="thm") {
+        if(tag==="thm"&&!capabilities.includes("theorems")) fail("declaration-frontier:thm");
         if(!v || !Array.isArray(v.levelParams)) fail("declaration-universes");
         if(v.levelParams.length&&!capabilities.includes("universes")) fail("declaration-universes");
         if(tag==="axiom" && v.isUnsafe!==false) fail("unsafe-axiom");
         if(tag==="def" && v.safety!=="safe") fail("unsafe-definition");
         const d={kind:tag,name:get(names,v.name),type:get(exprs,v.type),levelParams:v.levelParams.map(n=>get(names,n))};
-        if(tag==="def") d.value=get(exprs,v.value);
+        if(tag==="def"||tag==="thm") d.value=get(exprs,v.value);
         decls.push(d);
       } else fail("declaration-frontier:"+tag);
     }
