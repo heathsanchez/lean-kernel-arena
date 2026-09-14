@@ -361,6 +361,37 @@ function checkExport(input,capabilities,budget=200000) {
           if(!rec || !Number.isSafeInteger(rec.numMinors)) fail("inductive-envelope-schema");
           if(rec.numMinors!==v.ctors.length) reject("inductive-minor-count");
         }
+
+        // First complete semantic grain: a single empty inductive with no
+        // parameters/indices/constructors. Its recursor has no computation
+        // rules, so its full type is determined by the type constant alone.
+        if(capabilities.includes("empty-inductives") && v.types.length===1 &&
+           v.ctors.length===0 && v.recs.length===1) {
+          const t=v.types[0],rec=v.recs[0];
+          const exactMeta=
+            t.numParams===0 && t.numIndices===0 && t.numNested===0 &&
+            t.isRec===false && t.isReflexive===false && t.isUnsafe===false &&
+            Array.isArray(t.levelParams) && t.levelParams.length===0 &&
+            Array.isArray(t.all) && t.all.length===1 && t.all[0]===t.name &&
+            Array.isArray(t.ctors) && t.ctors.length===0 &&
+            rec.numParams===0 && rec.numIndices===0 && rec.numMotives===1 &&
+            rec.numMinors===0 && rec.k===false && rec.isUnsafe===false &&
+            Array.isArray(rec.rules) && rec.rules.length===0 &&
+            Array.isArray(rec.all) && rec.all.length===1 && rec.all[0]===t.name &&
+            Array.isArray(rec.levelParams) && rec.levelParams.length===1;
+          if(exactMeta) {
+            const tn=get(names,t.name),rn=get(names,rec.name),u=get(names,rec.levelParams[0]);
+            const typeExpr=get(exprs,t.type),recExpr=get(exprs,rec.type);
+            if(typeExpr?.[0]!=="sort") fail("empty-inductive-type-frontier");
+            const I=["const",tn];
+            const expectedRec=Pi(Pi(I,S(["param",u])),Pi(I,App(V(1),V(0))));
+            if(JSON.stringify(recExpr)!==JSON.stringify(expectedRec))
+              reject("empty-inductive-recursor-type");
+            decls.push({kind:"axiom",name:tn,type:typeExpr,levelParams:[]});
+            decls.push({kind:"axiom",name:rn,type:recExpr,levelParams:[u]});
+            continue;
+          }
+        }
         fail("inductive-semantics-frontier");
       } else if(tag==="axiom"||tag==="def"||tag==="thm") {
         if(tag==="thm"&&!capabilities.includes("theorems")) fail("declaration-frontier:thm");

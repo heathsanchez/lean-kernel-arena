@@ -279,6 +279,53 @@ function runInductiveEnvelopeTests(base,emit=()=>{}) {
   return {capabilities:caps,cases:4};
 }
 
+
+function runEmptyInductiveTests(base,emit=()=>{}) {
+  const caps=[...base,"empty-inductives"];
+  const meta={meta:{format:{version:"3.1.0"}}};
+  const rows=[
+    meta,
+    {"in":1,str:{pre:0,str:"Empty"}},
+    {"il":1,succ:0},
+    {"ie":0,sort:1},
+    {"in":2,str:{pre:1,str:"rec"}},
+    {"in":3,str:{pre:0,str:"u"}},
+    {"il":2,param:3},
+    {"in":4,str:{pre:0,str:"motive"}},
+    {"in":5,str:{pre:0,str:"t"}},
+    {"ie":1,const:{name:1,us:[]}},
+    {"ie":2,sort:2},
+    {"ie":3,forallE:{type:1,body:2}},
+    {"ie":4,bvar:1},
+    {"ie":5,bvar:0},
+    {"ie":6,app:{fn:4,arg:5}},
+    {"ie":7,forallE:{type:1,body:6}},
+    {"ie":8,forallE:{type:3,body:7}},
+    {inductive:{
+      types:[{name:1,levelParams:[],type:0,numParams:0,numIndices:0,all:[1],
+        ctors:[],numNested:0,isRec:false,isUnsafe:false,isReflexive:false}],
+      ctors:[],
+      recs:[{name:2,levelParams:[3],type:8,all:[1],numParams:0,numIndices:0,
+        numMotives:1,numMinors:0,rules:[],k:false,isUnsafe:false}]
+    }}
+  ];
+  const good=rows.map(JSON.stringify).join("\n");
+  const before=checkExport(good,base);
+  assert(before.status===UNKNOWN && before.reason==="inductive-semantics-frontier",
+    "empty-inductive ablation did not restore semantic frontier");
+  assert(checkExport(good,caps).status===ACCEPT,
+    "certified empty inductive was not accepted");
+
+  const bad=rows.map(x=>JSON.parse(JSON.stringify(x)));
+  bad[bad.length-1].inductive.recs[0].type=1;
+  assert(checkExport(bad.map(JSON.stringify).join("\n"),caps).status===REJECT,
+    "forged empty recursor type was accepted");
+
+  emit({event:"empty-inductive-growth",ablation_unknown:true,
+    exact_recursor:true,forged_recursor_rejected:true});
+  return {capabilities:caps,cases:2};
+}
+
 const target=new URL("./evidence/",import.meta.url);
 mkdirSync(target,{recursive:true});
 writeFileSync(new URL("events.jsonl",target),"");
@@ -303,13 +350,18 @@ const inductiveEnvelope=runInductiveEnvelopeTests(proofIrrelevance.capabilities,
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const replay=evaluate(inductiveEnvelope.capabilities,growthSuite());
+const emptyInductive=runEmptyInductiveTests(inductiveEnvelope.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const replay=evaluate(emptyInductive.capabilities,growthSuite());
 assert(replay.covered===report.training && !replay.wrong.length,"later growth regressed protected cases");
-report.capabilities=inductiveEnvelope.capabilities;
+report.capabilities=emptyInductive.capabilities;
 report.universe_tests={laws:universe.laws,independent_pairs:universe.independent_pairs};
 report.theorem_tests={cases:theorem.cases};
 report.proof_irrelevance_tests={cases:proofIrrelevance.cases};
 report.inductive_envelope_tests={cases:inductiveEnvelope.cases};
+report.empty_inductive_tests={cases:emptyInductive.cases};
 for(const name of ["level-index-out-of-order","sparse-name-index"]) {
   const raw=readFileSync(new URL("../tests/"+name+".ndjson",import.meta.url),"utf8");
   const r=checkExport(raw,report.capabilities);

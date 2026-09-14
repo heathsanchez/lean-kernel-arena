@@ -138,3 +138,17 @@ a structurally valid inductive is still UNKNOWN with
 `inductive-semantics-frontier`. It does not yet claim constructor typing,
 positivity, elimination, recursor typing, projection rules, eta, or recursor
 reduction. Ablation restores `declaration-frontier:inductive`.
+
+
+## Sixth increment: certified empty inductives
+
+The full residual exposed a first complete positive inductive fragment: one safe
+type, no parameters or indices, no constructors, and one recursor with no
+reduction rules. In that fragment the recursor is not supplied as trusted
+metadata; its type is reconstructed from the inductive type and its single
+elimination universe and compared exactly to the export.
+
+Only after that comparison are the type constant and recursor installed. A forged
+recursor is REJECT, and removing the capability restores
+`inductive-semantics-frontier`. Any inductive carrying a constructor, parameter,
+index, recursion, nesting, or reflexivity remains outside this fragment.
