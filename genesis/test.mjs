@@ -444,7 +444,7 @@ function runNatLiteralTests(base,emit=()=>{}) {
 
 
 function runStringLiteralTests(base,emit=()=>{}) {
-  const caps=[...base,"string-literals"],N="String";
+  const caps=[...base,"string-literals"],N=JSON.stringify(["[]","str","String"]);
   const decls=[{kind:"axiom",name:N,levelParams:[],type:S(1)}];
   const before=new Kernel(base).run(StrLit("hello"),["const",N],decls);
   assert(before.status===UNKNOWN&&before.reason==="missing:string-literals",
