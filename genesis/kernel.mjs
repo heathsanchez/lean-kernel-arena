@@ -690,6 +690,24 @@ class Kernel {
     const [h]=this.getApp(this.whnf(t));
     return h[0]==="const"&&this.isUnitLikeName(h[1]);
   }
+  structureEtaMatches(other,candidate,ctx) {
+    this.tick();
+    const [ch,cargs]=this.getApp(candidate);
+    if(ch[0]!=="const") return false;
+    const ctor=this.env.get(ch[1]);
+    if(ctor?.kind!=="ctor") return false;
+    const ind=this.env.get(ctor.induct);
+    if(ind?.kind!=="inductive"||ind.numIndices!==0||ind.isRec!==false||
+       ind.ctors?.length!==1||ind.ctors[0]!==ctor.name) return false;
+    if(cargs.length!==ctor.numParams+ctor.numFields) return false;
+    const [th,targs]=this.getApp(this.whnf(this.infer(other,ctx)));
+    if(th[0]!=="const"||th[1]!==ind.name||targs.length!==ind.numParams) return false;
+    if(!this.same(ch[2]??[],th[2]??[])) return false;
+    for(let i=0;i<ind.numParams;i++) this.equal(cargs[i],targs[i],ctx);
+    for(let i=0;i<ctor.numFields;i++)
+      this.equal(cargs[ctor.numParams+i],this.make("proj",ind.name,i,other),ctx);
+    return true;
+  }
   normal(e) {
     this.tick(); e=this.whnf(e);
     if(["sort","var","const","nat","strlit"].includes(e[0])) return e;
@@ -729,6 +747,9 @@ class Kernel {
     if(this.caps.has("unit-eta")) {
       const tx=this.normal(this.infer(x,ctx)),ty=this.normal(this.infer(y,ctx));
       if(this.same(tx,ty)&&this.isUnitLikeType(tx)) return;
+    }
+    if(this.caps.has("structure-eta")) {
+      if(this.structureEtaMatches(x,y,ctx)||this.structureEtaMatches(y,x,ctx)) return;
     }
     if(x[0]===y[0]) {
       if(x[0]==="app") {

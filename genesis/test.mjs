@@ -692,6 +692,43 @@ function runProjectionTests(base,emit=()=>{}) {
 
 
 
+function runStructureEtaTests(base,emit=()=>{}) {
+  const caps=[...base,"structure-eta"],A="StructA",B="StructBox",Mk="StructBox.mk",x="structX";
+  const AT=["const",A],I=["const",B],X=["const",x],M=["const",Mk];
+  const decls=[
+    {kind:"axiom",name:A,levelParams:[],type:S(1)},
+    {kind:"inductive",name:B,levelParams:[],type:S(1),numParams:0,numIndices:0,numNested:0,
+      isRec:false,isUnsafe:false,isReflexive:false,all:[B],ctorNames:[Mk],
+      ctors:[{name:Mk,levelParams:[],type:Pi(AT,I),induct:B,cidx:0,numParams:0,numFields:1,isUnsafe:false}],
+      rec:{name:JSON.stringify([B,"str","rec"]),levelParams:["su"],type:Pi(Pi(I,S(["param","su"])),
+        Pi(Pi(AT,App(V(1),App(M,V(0)))),Pi(I,App(V(2),V(0))))),all:[B],
+        numParams:0,numIndices:0,numMotives:1,numMinors:1,k:false,isUnsafe:false,
+        rules:[{ctor:Mk,nfields:1,rhs:Lam(Pi(I,S(["param","su"])),
+          Lam(Pi(AT,App(V(1),App(M,V(0)))),Lam(AT,App(V(1),V(0)))))}]}}
+  ];
+  const setup=cset=>{
+    const q=new Kernel(cset); const ok=q.run(S(0),S(1),decls); assert(ok.status===ACCEPT,"structure eta fixture rejected");
+    q.steps=0; q.env.set(x,{kind:"axiom",name:x,levelParams:[],type:I}); return q;
+  };
+  const rebuilt=App(M,Proj(B,0,X));
+  let ablated=false;
+  try { setup(base).equal(X,rebuilt,[]); }
+  catch(e) { ablated=e instanceof Stop&&e.status===UNKNOWN&&e.message==="conversion-frontier"; }
+  assert(ablated,"structure eta ablation did not restore conversion frontier");
+  setup(caps).equal(X,rebuilt,[]);
+
+  const guard=new Kernel(caps); guard.steps=0; guard.params=new Set();
+  guard.env=new Map([
+    ["Idx",{kind:"inductive",name:"Idx",numParams:0,numIndices:1,isRec:false,ctors:["Idx.mk"]}],
+    ["Idx.mk",{kind:"ctor",name:"Idx.mk",induct:"Idx",numParams:0,numFields:1}]
+  ]);
+  assert(!guard.structureEtaMatches(V(0),App(["const","Idx.mk"],V(1)),[["const","Idx"]]),
+    "indexed structure incorrectly gained structure eta");
+  emit({event:"structure-eta-growth",ablation_unknown:true,rebuild_equal:true,indexed_guarded:true});
+  return {capabilities:caps,cases:2};
+}
+
+
 function runOpaqueDeclarationTests(base,emit=()=>{}) {
   const caps=[...base,"opaque-declarations"];
   const O="OpaqueType",p="opaqueWitness";
@@ -814,7 +851,11 @@ const projection=runProjectionTests(quotient.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const opaqueDeclaration=runOpaqueDeclarationTests(projection.capabilities,row=>{
+const structureEta=runStructureEtaTests(projection.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const opaqueDeclaration=runOpaqueDeclarationTests(structureEta.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
@@ -840,6 +881,7 @@ report.nat_literal_tests={cases:natLiteral.cases};
 report.string_literal_tests={cases:stringLiteral.cases};
 report.quotient_tests={cases:quotient.cases};
 report.projection_tests={cases:projection.cases};
+report.structure_eta_tests={cases:structureEta.cases};
 report.opaque_declaration_tests={cases:opaqueDeclaration.cases};
 report.declaration_safety_controls={cases:declarationSafety.cases,retained_capability:false};
 for(const name of ["level-index-out-of-order","sparse-name-index"]) {
