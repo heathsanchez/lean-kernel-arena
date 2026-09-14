@@ -837,7 +837,9 @@ function checkExport(input,capabilities,budget=200000) {
     return {...result,parse_records:parsed,elapsed_ms:Date.now()-start};
   } catch(e) {
     if(e instanceof Stop) return out(e.status,e.message);
-    if(e instanceof SyntaxError || e instanceof TypeError || e instanceof RangeError) return out(UNKNOWN,"malformed-or-resource-limited-export");
+    if(e instanceof SyntaxError || e instanceof TypeError || e instanceof RangeError)
+      return {...out(UNKNOWN,"malformed-or-resource-limited-export"),
+        diagnostic_error:String(e?.stack??e).split("\n").slice(0,4).join(" | ")};
     throw e;
   }
 }
