@@ -480,6 +480,20 @@ function runSingleInductiveTests(base,emit=()=>{}) {
 }
 
 
+function runReflexiveInductiveTests(base,fixture,emit=()=>{}) {
+  const caps=[...base,"reflexive-inductives"];
+  // The exporter bit is redundant evidence: derive reflexivity from constructor
+  // shape rather than trusting the flag. A false positive must be rejected.
+  const lied=JSON.parse(JSON.stringify(fixture)); lied.isReflexive=true;
+  const mismatch=new Kernel(caps).run(S(0),S(1),[lied]);
+  assert(mismatch.status===REJECT&&mismatch.reason==="inductive-reflexivity-metadata",
+    "reflexivity metadata was trusted instead of derived: "+JSON.stringify(mismatch));
+  emit({event:"reflexive-inductive-growth",arena_authorized:true,
+    reflexivity_derived:true,metadata_mismatch_rejected:true});
+  return {capabilities:caps,cases:1};
+}
+
+
 function runInductiveReductionTests(base,fixture,emit=()=>{}) {
   const caps=[...base,"inductive-reduction"],n=fixture.name,z=fixture.ctors[0].name,s=fixture.ctors[1].name,rn=fixture.rec.name;
   const I=["const",n],Z=["const",z],Succ=["const",s],Rec=["const",rn,[0]];
@@ -858,7 +872,11 @@ const singleInductive=runSingleInductiveTests(enumInductive.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const inductiveReduction=runInductiveReductionTests(singleInductive.capabilities,singleInductive.fixture,row=>{
+const reflexiveInductive=runReflexiveInductiveTests(singleInductive.capabilities,singleInductive.fixture,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const inductiveReduction=runInductiveReductionTests(reflexiveInductive.capabilities,singleInductive.fixture,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
@@ -914,6 +932,7 @@ report.inductive_envelope_tests={cases:inductiveEnvelope.cases};
 report.empty_inductive_tests={cases:emptyInductive.cases};
 report.enum_inductive_tests={cases:enumInductive.cases};
 report.single_inductive_tests={cases:singleInductive.cases};
+report.reflexive_inductive_tests={cases:reflexiveInductive.cases};
 report.inductive_reduction_tests={cases:inductiveReduction.cases};
 report.rule_k_tests={cases:ruleK.cases};
 report.prop_inductive_tests={cases:propInductive.cases};

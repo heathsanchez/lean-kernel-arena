@@ -346,7 +346,6 @@ class Kernel {
   addSingleInductive(d) {
     this.tick();
     if(d.numNested!==0 || d.isUnsafe!==false) this.reject("unsupported-inductive-envelope");
-    if(d.isReflexive) this.unknown("inductive-semantics-frontier");
     if(!Array.isArray(d.levelParams)||new Set(d.levelParams).size!==d.levelParams.length)
       this.reject("invalid-universe-parameters");
     this.params=new Set(d.levelParams);
@@ -384,9 +383,10 @@ class Kernel {
     for(const n of groupNames) if(this.env.has(n)) this.reject("duplicate-declaration");
 
     this.env.set(d.name,{kind:"inductive",name:d.name,type:d.type,levelParams:d.levelParams,
-      numParams:d.numParams,numIndices:d.numIndices,ctors:d.ctors.map(c=>c.name),isProp,isRec:d.isRec});
+      numParams:d.numParams,numIndices:d.numIndices,ctors:d.ctors.map(c=>c.name),isProp,isRec:d.isRec,
+      isReflexive:d.isReflexive});
 
-    const ctorInfos=[]; let actualRec=false,recoverableData=true;
+    const ctorInfos=[]; let actualRec=false,actualReflexive=false,recoverableData=true;
     for(let ciIndex=0;ciIndex<d.ctors.length;ciIndex++) {
       const c=d.ctors[ciIndex];
       if(c.induct!==d.name||c.cidx!==ciIndex||c.numParams!==d.numParams||c.isUnsafe!==false ||
@@ -412,6 +412,7 @@ class Kernel {
           actualRec=true;
           const sp=this.splitAllForalls(w);
           for(const rd of sp.domains) if(this.hasConst(rd,d.name)) this.reject("negative-recursive-occurrence");
+          if(sp.domains.length>0) actualReflexive=true;
           this.isExactIndApp(sp.rest,d,fields+sp.domains.length);
         }
         cctx.push(domain); fields++; ct=ct[2];
@@ -428,6 +429,8 @@ class Kernel {
       ctorInfos.push({...c,numFields:fields});
     }
     if(actualRec!==d.isRec) this.reject("inductive-recursion-metadata");
+    if(actualReflexive!==d.isReflexive) this.reject("inductive-reflexivity-metadata");
+    if(actualReflexive) this.need("reflexive-inductives");
 
     const rec=d.rec;
     if(!rec||rec.numParams!==d.numParams||rec.numIndices!==d.numIndices||
