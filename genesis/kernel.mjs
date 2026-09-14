@@ -367,7 +367,7 @@ class Kernel {
       const rr=rec.rules[i];
       if(rr.ctor!==ctorInfos[i].name||rr.nfields!==ctorInfos[i].numFields)
         this.reject("recursor-rule-metadata");
-      if(!this.same(rr.rhs,derived.ruleBodies[i])) this.reject("recursor-rule");
+      if(!this.same(rr.rhs,derived.ruleBodies[i])) this.reject("recursor-rule-"+i);
     }
     this.validate(derived.recType); this.sortOf(derived.recType,[]);
     this.env.set(rec.name,{kind:"rec",name:rec.name,type:derived.recType,levelParams:rec.levelParams,
