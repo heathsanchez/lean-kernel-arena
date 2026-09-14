@@ -100,7 +100,7 @@ class Kernel {
     this.caps=new Set(capabilities); this.budget=budget;
   }
   run(term, expected, declarations=[], parameters=[]) {
-    this.steps=0; this.env=new Map(); this.allocations=0; this.params=new Set(parameters); this.currentDeclaration=null; this.conversionFrontier=null; this.inferCache=new WeakMap();
+    this.steps=0; this.env=new Map(); this.allocations=0; this.params=new Set(parameters); this.currentDeclaration=null; this.conversionFrontier=null;
     const start=Date.now();
     try {
       if (!this.caps.size) this.unknown("empty-present");
@@ -660,16 +660,6 @@ class Kernel {
   }
   infer(e,ctx) {
     this.tick();
-    let byCtx=this.inferCache?.get(e);
-    if(byCtx?.has(ctx)) return byCtx.get(ctx);
-    const result=this.inferUncached(e,ctx);
-    if(this.inferCache) {
-      if(!byCtx) { byCtx=new WeakMap(); this.inferCache.set(e,byCtx); }
-      byCtx.set(ctx,result);
-    }
-    return result;
-  }
-  inferUncached(e,ctx) {
     switch(e[0]) {
       case "sort": this.need("sort"); return this.make("sort",levelSucc(e[1]));
       case "var":
