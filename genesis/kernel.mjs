@@ -24,6 +24,14 @@ function validateLevel(u,allowed,tick) {
   for(let i=1;i<u.length;i++) validateLevel(u[i],allowed,tick);
 }
 function levelSucc(u) { return typeof u==="number"?u+1:["succ",u]; }
+function levelDefinitelyPositive(u) {
+  if(typeof u==="number") return u>0;
+  if(u[0]==="param") return false;
+  if(u[0]==="succ") return true;
+  if(u[0]==="max") return levelDefinitelyPositive(u[1])||levelDefinitelyPositive(u[2]);
+  if(u[0]==="imax") return levelDefinitelyPositive(u[2]);
+  return false;
+}
 function levelIMax(a,b) { return typeof a==="number"&&typeof b==="number"?(b===0?0:Math.max(a,b)):["imax",a,b]; }
 function levelMax(a,b) { return typeof a==="number"&&typeof b==="number"?Math.max(a,b):["max",a,b]; }
 function levelsLe(a,b,tick=()=>{}) { return levelsEqual(levelMax(a,b),b,tick); }
@@ -351,10 +359,12 @@ class Kernel {
     }
     if(actualIndices!==d.numIndices) this.reject("inductive-index-count");
     if(cur[0]!=="sort") this.reject("inductive-not-sort");
-    const indLevel=cur[1],isProp=levelsEqual(indLevel,0,()=>this.tick());
-    // Prop declarations use the same constructor and positivity checks, but
-    // their eliminator universe is constrained below.
-    if(isProp) this.need("prop-inductives");
+    const indLevel=cur[1],isProp=levelsEqual(indLevel,0,()=>this.tick()),
+      mayBeProp=!levelDefinitelyPositive(indLevel);
+    // A universe parameter is not safely Type-valued merely because it is not
+    // identically zero: it may instantiate to Prop. Such declarations use the
+    // same elimination restrictions as Prop unless a structural exception applies.
+    if(mayBeProp) this.need("prop-inductives");
 
     if(!Array.isArray(d.all)||d.all.length!==1||d.all[0]!==d.name) this.reject("inductive-all");
     if(!Array.isArray(d.ctorNames)||d.ctorNames.length!==d.ctors.length ||
@@ -368,7 +378,7 @@ class Kernel {
     this.env.set(d.name,{kind:"inductive",name:d.name,type:d.type,levelParams:d.levelParams,
       numParams:d.numParams,numIndices:d.numIndices,ctors:d.ctors.map(c=>c.name)});
 
-    const ctorInfos=[]; let actualRec=false,propFieldsOnly=true;
+    const ctorInfos=[]; let actualRec=false,nonImpredicative=true;
     for(let ciIndex=0;ciIndex<d.ctors.length;ciIndex++) {
       const c=d.ctors[ciIndex];
       if(c.induct!==d.name||c.cidx!==ciIndex||c.numParams!==d.numParams||c.isUnsafe!==false ||
@@ -385,9 +395,10 @@ class Kernel {
       let fields=0;
       while(ct[0]==="pi") {
         const domain=ct[1],u=this.sortOf(domain,cctx);
-        if(isProp) {
-          if(!levelsEqual(u,0,()=>this.tick())) propFieldsOnly=false;
-        } else if(!levelsLe(u,indLevel,()=>this.tick())) this.reject("constructor-field-universe");
+        const fieldFits=levelsLe(u,indLevel,()=>this.tick());
+        if(mayBeProp) {
+          if(!fieldFits) nonImpredicative=false;
+        } else if(!fieldFits) this.reject("constructor-field-universe");
         const w=this.whnf(domain);
         if(this.hasConst(w,d.name)) {
           actualRec=true;
@@ -412,11 +423,16 @@ class Kernel {
     const expectedRecName=JSON.stringify([d.name,"str","rec"]);
     if(rec.name!==expectedRecName) this.reject("recursor-name");
 
-    // Large elimination from Prop is valid only for empty or singleton
-    // proof-only inductives. General Prop recursors must eliminate into Prop.
-    const singletonPropElim=isProp && (d.ctors.length===0 || (d.ctors.length===1 && propFieldsOnly));
+    const expectedK=isProp && d.ctors.length===1 && ctorInfos[0]?.numFields===0;
+    if(rec.k!==expectedK) this.reject("recursor-k");
+
+    // Large elimination is safe if the inductive can never be Prop, or for the
+    // standard empty / eta-structure / K exceptions. A merely polymorphic Sort u
+    // does not count as "never Prop".
+    const structureLarge=d.ctors.length===1 && d.numIndices===0 && !actualRec && nonImpredicative;
+    const largeElim=!mayBeProp || d.ctors.length===0 || structureLarge || expectedK;
     let motiveLevel;
-    if(isProp && !singletonPropElim) {
+    if(!largeElim) {
       if(!Array.isArray(rec.levelParams)||rec.levelParams.length!==d.levelParams.length||
          rec.levelParams.some((p,i)=>p!==d.levelParams[i]))
         this.reject("recursor-universe-parameters");

@@ -469,9 +469,26 @@ function runPropInductiveTests(base,emit=()=>{}) {
   ]);
   assert(guarded.status===REJECT&&guarded.reason==="recursor-universe-parameters",
     "data-carrying Prop incorrectly gained large elimination: "+JSON.stringify(guarded));
+
+  const U="polyU",Vv="polyV",MB="PolyBool",Tt="PolyBool.tt",Ff="PolyBool.ff",MR=JSON.stringify([MB,"str","rec"]);
+  const MI=["const",MB,[["param",U]]],poly={
+    kind:"inductive",name:MB,levelParams:[U],type:S(["param",U]),numParams:0,numIndices:0,numNested:0,
+    isRec:false,isUnsafe:false,isReflexive:false,all:[MB],ctorNames:[Tt,Ff],
+    ctors:[
+      {name:Tt,levelParams:[U],type:MI,induct:MB,cidx:0,numParams:0,numFields:0,isUnsafe:false},
+      {name:Ff,levelParams:[U],type:MI,induct:MB,cidx:1,numParams:0,numFields:0,isUnsafe:false}
+    ],
+    rec:{name:MR,levelParams:[Vv,U],type:S(0),all:[MB],numParams:0,numIndices:0,numMotives:1,
+      numMinors:2,k:false,isUnsafe:false,rules:[
+        {ctor:Tt,nfields:0,rhs:V(0)},{ctor:Ff,nfields:0,rhs:V(0)}
+      ]}
+  };
+  const polyBad=new Kernel(caps).run(S(0),S(1),[poly]);
+  assert(polyBad.status===REJECT&&polyBad.reason==="recursor-universe-parameters",
+    "Sort u with multiple constructors incorrectly gained unconditional large elimination: "+JSON.stringify(polyBad));
   emit({event:"prop-inductive-growth",ablation_unknown:true,singleton_large_elimination:true,
-    general_prop_elimination_restricted:true});
-  return {capabilities:caps,cases:2};
+    general_prop_elimination_restricted:true,polymorphic_zero_case_guarded:true,k_exact:true});
+  return {capabilities:caps,cases:3};
 }
 
 
