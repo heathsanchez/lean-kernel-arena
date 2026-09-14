@@ -49,7 +49,7 @@ jobs:
           cat > checkers/mathgraph-base.yaml <<'EOF'
           description: "Frozen MathGraph d6a baseline for deterministic private instruction comparison."
           url: https://github.com/metalogiclabs/mathgraph-lean-kernel
-          ref: open-development-core-v1
+          ref: candidate/warm-projection-base
           rev: d6a73279e6765e637f9741180cefbd7ef957d8e5
           build: |
             cat > config.json <<__END__
