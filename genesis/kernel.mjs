@@ -100,14 +100,14 @@ class Kernel {
     this.caps=new Set(capabilities); this.budget=budget;
   }
   run(term, expected, declarations=[], parameters=[]) {
-    this.steps=0; this.env=new Map(); this.allocations=0; this.params=new Set(parameters);
+    this.steps=0; this.env=new Map(); this.allocations=0; this.params=new Set(parameters); this.currentDeclaration=null; this.conversionFrontier=null;
     const start=Date.now();
     try {
       if (!this.caps.size) this.unknown("empty-present");
       this.validate(term); this.validate(expected);
       if (declarations.length) this.need("declarations");
       for (const d of declarations) {
-        this.tick();
+        this.tick(); this.currentDeclaration=d?.name??null;
         if (!d || typeof d.name!=="string" || !["axiom","def","opaque","thm","quot","inductive"].includes(d.kind)) this.unknown("declaration-kind");
         if(d.kind==="inductive") {
           this.need("single-inductives");
@@ -427,7 +427,11 @@ class Kernel {
     this.env.set(rec.name,{kind:"rec",name:rec.name,type:derived.recType,levelParams:rec.levelParams,
       numParams:d.numParams,numIndices:d.numIndices,numMinors:d.ctors.length,rules:rec.rules,induct:d.name});
   }
-  result(status,reason,start) { return {status,reason,steps:this.steps,constructed:this.allocations,elapsed_ms:Date.now()-start}; }
+  result(status,reason,start) {
+    return {status,reason,steps:this.steps,constructed:this.allocations,elapsed_ms:Date.now()-start,
+      ...(this.currentDeclaration?{frontier_declaration:this.currentDeclaration}:{}),
+      ...(this.conversionFrontier?{conversion_frontier:this.conversionFrontier}:{})};
+  }
   tick() { if(++this.steps>this.budget) this.unknown("budget-exhausted"); }
   need(c) { if(!this.caps.has(c)) this.unknown("missing:"+c); }
   unknown(r) { throw new Stop(UNKNOWN,r); }
@@ -600,6 +604,9 @@ class Kernel {
     }
     // Eta and the remaining conversion rules are not implemented.
     // A failed comparison is not evidence of inequality.
+    const lx=JSON.stringify(x),ly=JSON.stringify(y);
+    this.conversionFrontier={ctx_depth:ctx.length,left_bytes:lx.length,right_bytes:ly.length,
+      left:lx.slice(0,4000),right:ly.slice(0,4000)};
     this.unknown("conversion-frontier");
   }
   instantiateDeclaration(ref,term) {
