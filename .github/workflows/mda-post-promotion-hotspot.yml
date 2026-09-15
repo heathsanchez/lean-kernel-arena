@@ -1,0 +1,29 @@
+name: MDA post-promotion hotspot atlas
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - '.github/workflows/mda-post-promotion-hotspot.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Profile current live residual frontier
+        run: timeout 180s node --stack-size=32768 experiments/current-hotspot-atlas.mjs
+      - name: Preserve hotspot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-post-promotion-hotspot-${{ github.sha }}
+          path: genesis/evidence/current-hotspot-atlas.json
+          if-no-files-found: warn
