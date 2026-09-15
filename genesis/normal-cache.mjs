@@ -2,19 +2,10 @@ import { Kernel } from "./kernel-base.mjs";
 
 // Retained consequence from the semantic-reuse separator: normalization is a
 // deterministic successful consequence of an exact expression under one
-// monotonic kernel run. Cache successes only; failures/frontiers are never
-// retained. Weak identity keys preserve the exact term, not an approximation.
-//
-// A cache hit deliberately does not tick: the separator established that the
-// expensive normalization consequence has already been paid for and compiled.
-// Re-charging semantic work on reuse erased the verified capability gain.
-//
-// The retained checker has no local definitions, so expression identity is a
-// complete key there. The optional local-definition fallback can normalize the
-// same de-Bruijn expression differently under different exact local contexts;
-// only that mode adds the complete context identity sequence to the key.
+// monotonic kernel run. Evaluate it with an explicit work stack while retaining
+// successful results for every visited subtree, not just the top-level request.
+// Weak identity keys preserve the exact term. Failures/frontiers are never cached.
 const oldRun = Kernel.prototype.run;
-const oldNormal = Kernel.prototype.normal;
 
 Kernel.prototype.run = function(...args) {
   this._normalCache = new WeakMap();
@@ -40,25 +31,91 @@ function contextKey(kernel,ctx) {
   return parts.join(",");
 }
 
-Kernel.prototype.normal = function(e) {
-  this._normalCache ??= new WeakMap();
-  if(!Array.isArray(e)) return oldNormal.call(this,e);
-
-  if(!this.localDefs) {
-    if(this._normalCache.has(e)) return this._normalCache.get(e);
-    const out=oldNormal.call(this,e);
-    this._normalCache.set(e,out);
-    return out;
+function cacheSlot(kernel,e,ctxKey) {
+  if(!Array.isArray(e)) return null;
+  if(!kernel.localDefs) {
+    return {
+      has:()=>kernel._normalCache.has(e),
+      get:()=>kernel._normalCache.get(e),
+      set:v=>kernel._normalCache.set(e,v)
+    };
   }
-
-  let byCtx=this._normalCache.get(e);
+  let byCtx=kernel._normalCache.get(e);
   if(!(byCtx instanceof Map)) {
     byCtx=new Map();
-    this._normalCache.set(e,byCtx);
+    kernel._normalCache.set(e,byCtx);
   }
-  const key=contextKey(this,this._activeCtx??[]);
-  if(byCtx.has(key)) return byCtx.get(key);
-  const out=oldNormal.call(this,e);
-  byCtx.set(key,out);
-  return out;
+  return {
+    has:()=>byCtx.has(ctxKey),
+    get:()=>byCtx.get(ctxKey),
+    set:v=>byCtx.set(ctxKey,v)
+  };
+}
+
+Kernel.prototype.normal = function(root) {
+  this._normalCache ??= new WeakMap();
+  this._normalCtxIds ??= new WeakMap();
+  this._nextNormalCtxId ??= 1;
+
+  if(!Array.isArray(root)) return root;
+  const ckey=this.localDefs ? contextKey(this,this._activeCtx??[]) : "";
+  const work=[{kind:"visit",e:root}], vals=[];
+
+  while(work.length) {
+    const f=work.pop();
+    if(f.kind==="build") {
+      let out;
+      if(f.tag==="proj") {
+        out=this.make("proj",f.name,f.index,vals.pop());
+      } else {
+        const xs=new Array(f.n);
+        for(let i=f.n-1;i>=0;i--) xs[i]=vals.pop();
+        out=this.make(f.tag,...xs);
+      }
+      f.slot.set(out);
+      vals.push(out);
+      continue;
+    }
+
+    const requested=f.e,slot=cacheSlot(this,requested,ckey);
+    if(slot?.has()) {
+      // Cache hits deliberately do not tick: the verified normalization
+      // consequence has already been paid for and compiled.
+      vals.push(slot.get());
+      continue;
+    }
+
+    this.tick();
+    const e=this.whnf(requested);
+
+    // If weak-head reduction landed on an already normalized exact node, reuse
+    // that consequence and cache it for the original request as well.
+    if(e!==requested) {
+      const reducedSlot=cacheSlot(this,e,ckey);
+      if(reducedSlot?.has()) {
+        const out=reducedSlot.get();
+        slot?.set(out);
+        vals.push(out);
+        continue;
+      }
+    }
+
+    if(["sort","var","const","nat","strlit"].includes(e[0])) {
+      slot?.set(e);
+      if(e!==requested) cacheSlot(this,e,ckey)?.set(e);
+      vals.push(e);
+      continue;
+    }
+
+    if(e[0]==="proj") {
+      work.push({kind:"build",tag:"proj",name:e[1],index:e[2],slot});
+      work.push({kind:"visit",e:e[3]});
+      continue;
+    }
+
+    work.push({kind:"build",tag:e[0],n:e.length-1,slot});
+    for(let i=e.length-1;i>=1;i--) work.push({kind:"visit",e:e[i]});
+  }
+
+  return vals.pop();
 };
