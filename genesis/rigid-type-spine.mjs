@@ -9,6 +9,7 @@ import { Kernel, Stop } from "./kernel-base.mjs";
 // failure restores both semantic budget and conversion frontier before falling
 // back to the retained converter.
 //
+// Imported after the retained execution layers from kernel.mjs; local-definition fallback remains excluded by the localDefs guard.
 // This adds no definitional equality rule: successful congruence is only a
 // sufficient proof of an equality the kernel already recognizes. Local
 // definition fallback is deliberately excluded and keeps its verified path.
