@@ -1,0 +1,32 @@
+name: MDA creative recursor-gated stress
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/creative-recursor-gated-stress.mjs'
+      - '.github/workflows/mda-creative-recursor-gated-stress.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stress:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Reconstruct retained present
+        run: timeout 30s node --stack-size=32768 genesis/test.mjs
+      - name: Build complete CI Arena set
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-test --skip-ci
+      - name: Stress recursor-gated creative schedule
+        run: timeout 180s node --stack-size=32768 genesis/creative-recursor-gated-stress.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: creative-recursor-gated-${{ github.sha }}
+          path: genesis/evidence/creative-recursor-gated-stress.json
+          if-no-files-found: error
