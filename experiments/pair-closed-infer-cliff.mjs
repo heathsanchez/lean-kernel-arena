@@ -203,7 +203,7 @@ function evaluate(budget,enabled,rows){
   return {budget,enabled,wrong,totalSteps,totalConstructed,elapsed_ms:Date.now()-t0,stats:d,results};
 }
 const thresholds=[];
-for(const budget of [1000000]){
+for(const budget of [1000000,2000000,4000000,8000000]){
   thresholds.push(evaluate(budget,true,focusRows));
 }
 install(false);
