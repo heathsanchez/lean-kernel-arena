@@ -1,0 +1,30 @@
+name: MDA nested mutual recursor derivation
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/nested-mutual-recursor-derivation.mjs'
+      - '.github/workflows/mda-nested-mutual-recursor-derivation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  derive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build nested witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test init-prelude
+          ./lka.py build-test perf/grind-ring-5
+      - name: Independently derive mutual recursors
+        run: node experiments/nested-mutual-recursor-derivation.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nested-mutual-recursor-derivation-${{ github.sha }}
+          path: genesis/evidence/nested-mutual-recursor-derivation.json
+          if-no-files-found: error
