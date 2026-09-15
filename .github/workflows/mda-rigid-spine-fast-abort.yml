@@ -1,0 +1,29 @@
+name: MDA rigid spine fast abort
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/rigid-spine-fast-abort.mjs'
+      - '.github/workflows/mda-rigid-spine-fast-abort.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Run fueled rigid-spine fast abort
+        run: timeout 420s node experiments/rigid-spine-fast-abort.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rigid-spine-fast-abort-${{ github.sha }}
+          path: genesis/evidence/rigid-spine-fast-abort.json
+          if-no-files-found: error
+          retention-days: 7
