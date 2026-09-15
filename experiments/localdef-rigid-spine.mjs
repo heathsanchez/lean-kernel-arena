@@ -4,6 +4,7 @@ import {createHash} from "node:crypto";
 import * as K from "../genesis/kernel.mjs";
 import {Stop} from "../genesis/kernel-base.mjs";
 
+const FOCUS_BUDGET=Number(process.env.FOCUS_BUDGET??1000000);
 const caps=JSON.parse(readFileSync(new URL("../genesis/evidence/retained.json",import.meta.url),"utf8"));
 const expectedHash="85942e6f19274699a476d4e5b772abf4bf16f6a719985938bfcb5349ad90d118";
 const response=await fetch("https://arena.lean-lang.org/lean-arena-tests.tar.gz",{signal:AbortSignal.timeout(15000)});
@@ -194,12 +195,12 @@ function install(enabled){
   };
 }
 
-function evalRows(mode,enabled,subset){
+function evalRows(mode,enabled,subset,budget=1000000){
   install(enabled);
   const before={...stats},results=[],counts={ACCEPT:0,REJECT:0,UNKNOWN:0};
   let wrong=0,totalSteps=0,totalConstructed=0;const t0=Date.now();
   for(const row of subset){
-    const r=K.checkExport(row.input,caps,1_000_000);
+    const r=K.checkExport(row.input,caps,budget);
     counts[r.status]=(counts[r.status]??0)+1;
     totalSteps+=r.steps??0;totalConstructed+=r.constructed??0;
     if(r.status!=="UNKNOWN"&&r.status!==row.expected)wrong++;
@@ -211,10 +212,11 @@ function evalRows(mode,enabled,subset){
   return {mode,counts,wrong,totalSteps,totalConstructed,elapsed_ms:Date.now()-t0,stats:d,results};
 }
 
-const focus=evalRows("focus-candidate",true,focusRows);
+const focus=evalRows("focus-candidate",true,focusRows,FOCUS_BUDGET);
 console.log("LOCALDEF_RIGID_SPINE_FOCUS "+JSON.stringify({...focus,fallbackDetails}));
 if(focus.wrong)throw new Error("focus wrong");
 if(focus.results[0]?.status!=="ACCEPT"){install(false);process.exit(0);}
+if(FOCUS_BUDGET!==1000000){install(false);process.exit(0);}
 
 const candidate=evalRows("candidate",true,rows);
 const baseline=evalRows("baseline",false,rows);
