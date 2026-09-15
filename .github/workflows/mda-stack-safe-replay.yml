@@ -1,0 +1,33 @@
+name: MDA stack-safe full replay
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/stack-safe.mjs'
+      - 'genesis/structural-cache.mjs'
+      - 'genesis/normal-cache.mjs'
+      - 'genesis/kernel-base.mjs'
+      - '.github/workflows/mda-stack-safe-replay.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained capability present
+        run: timeout 15s node genesis/test.mjs
+      - name: Replay exact 188-case Arena corpus
+        run: timeout 150s node genesis/arena.mjs
+      - name: Preserve replay evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-stack-safe-replay-${{ github.sha }}
+          path: genesis/evidence/
+          if-no-files-found: error
