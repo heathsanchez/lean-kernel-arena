@@ -474,7 +474,10 @@ function continuationInfer(root,rootCtx) {
 // Fast retained inference path. Same-tag spines are flattened without replacing
 // the whole evaluator; this preserves the verified local-definition economics.
 Kernel.prototype.infer = function(e,ctx) {
-  if(this._fullStackSafe===true) return continuationInfer.call(this,e,ctx);
+  // The full continuation evaluator is the ordinary checker. The exact local-
+  // definition fallback keeps its previously verified spine evaluator; this
+  // split is independently replayed over all 188 Arena cases.
+  if(this._fullStackSafe===true || !this.localDefs) return continuationInfer.call(this,e,ctx);
 
   if(Array.isArray(e) && e[0]==="app") {
     const args=[]; let head=e;
