@@ -1,0 +1,30 @@
+name: MDA constructor local cheapest
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/ctor-local-cheapest.mjs'
+      - '.github/workflows/mda-ctor-local-cheapest.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Test constructor-local cheapest-first conversion
+        run: timeout 240s node experiments/ctor-local-cheapest.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-ctor-local-cheapest-${{ github.sha }}
+          path: genesis/evidence/ctor-local-cheapest.json
+          if-no-files-found: warn
