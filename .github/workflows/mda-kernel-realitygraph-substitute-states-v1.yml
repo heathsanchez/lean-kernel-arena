@@ -1,0 +1,23 @@
+name: MDA Kernel RealityGraph substitution states
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/kernel-realitygraph-substitute-states-v1.mjs'
+      - '.github/workflows/mda-kernel-realitygraph-substitute-states-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  atlas:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Measure substitution state diversity
+        run: timeout 660s node experiments/kernel-realitygraph-substitute-states-v1.mjs
