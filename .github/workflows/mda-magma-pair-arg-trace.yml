@@ -1,0 +1,23 @@
+name: MDA magma pair argument trace
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/magma-pair-arg-trace.mjs'
+      - '.github/workflows/mda-magma-pair-arg-trace.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  trace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Trace pair projection spine arguments
+        run: timeout 180s node experiments/magma-pair-arg-trace.mjs
