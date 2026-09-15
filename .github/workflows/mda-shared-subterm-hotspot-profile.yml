@@ -1,0 +1,30 @@
+name: MDA shared-subterm hotspot profile
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/shared-subterm-hotspot-profile.mjs'
+      - '.github/workflows/mda-shared-subterm-hotspot-profile.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build shared-subterm
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-test perf/shared-subterm
+      - name: Profile fallback cost
+        run: timeout 90s node --stack-size=32768 genesis/shared-subterm-hotspot-profile.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shared-subterm-hotspot-profile-${{ github.sha }}
+          path: genesis/evidence/shared-subterm-hotspot-profile.json
+          if-no-files-found: error
