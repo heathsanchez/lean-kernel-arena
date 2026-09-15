@@ -7,6 +7,8 @@ on:
       - experiments/post-nested-projection-proof-irrelevance.mjs
       - experiments/make-arbitrary-nat-candidate.mjs
       - experiments/make-zero-param-nested-parser-candidate.mjs
+      - experiments/make-optparam-field-domain-candidate.mjs
+      - experiments/make-recursor-type-conversion-candidate.mjs
       - .github/workflows/mda-post-nested-projection-proof-irrelevance.yml
   workflow_dispatch:
 permissions:
@@ -33,8 +35,12 @@ jobs:
         run: node experiments/make-zero-param-nested-parser-candidate.mjs
       - name: Add arbitrary precision Nat candidate
         run: node experiments/make-arbitrary-nat-candidate.mjs
-      - name: Test projection bridge
-        run: timeout 240s node --stack-size=32768 experiments/post-nested-projection-proof-irrelevance.mjs
+      - name: Expose optParam constructor annotations
+        run: node experiments/make-optparam-field-domain-candidate.mjs
+      - name: Permit and instrument verified recursor type conversion
+        run: node experiments/make-recursor-type-conversion-candidate.mjs
+      - name: Test projection bridge beyond TSyntax
+        run: timeout 300s node --stack-size=32768 experiments/post-nested-projection-proof-irrelevance.mjs
       - if: always()
         uses: actions/upload-artifact@v4
         with:
