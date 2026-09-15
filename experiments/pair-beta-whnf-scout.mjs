@@ -24,7 +24,7 @@ print(json.dumps(rows))
 const focusRows=JSON.parse(execFileSync("python3",["-c",py],{input:data,maxBuffer:50000000,timeout:10000}));
 
 const proto=K.Kernel.prototype,retainedRun=proto.run,retainedEqual=proto.equal,retainedWhnf=proto.whnf;
-const stats={eqHits:0,eqStores:0,earlyPi:0,frontiers:0,projectionEligible:0,projectionSuccess:0,argChecks:0,whnfQueries:0,whnfHits:0,whnfStores:0,whnfCanonNodes:0,whnfLocalBypass:0,betaQueries:0,betaEligible:0,betaSuccesses:0,betaBinders:0,betaSubstNodes:0,betaSubstHits:0,betaFallbacks:0};
+const stats={eqHits:0,eqStores:0,earlyPi:0,frontiers:0,projectionEligible:0,projectionSuccess:0,argChecks:0,whnfQueries:0,whnfHits:0,whnfStores:0,whnfCanonNodes:0,whnfLocalBypass:0,localWhnfQueries:0,localWhnfHits:0,localWhnfStores:0,betaQueries:0,betaEligible:0,betaSuccesses:0,betaBinders:0,betaSubstNodes:0,betaSubstHits:0,betaFallbacks:0};
 
 function objectId(k,x){
   k.__pairIds??=new WeakMap();k.__pairNextId??=1;
@@ -48,7 +48,7 @@ function sameHead(k,a,b){return a===b||(Array.isArray(a)&&Array.isArray(b)&&k.sa
 
 const WHNF_END=Symbol("whnf-end");
 function whnfEnsure(k){
-  k.__pairWhnfWeak??=new WeakMap();k.__pairWhnfRoot??=new Map();k.__pairWhnfCache??=new WeakMap();
+  k.__pairWhnfWeak??=new WeakMap();k.__pairWhnfRoot??=new Map();k.__pairWhnfCache??=new WeakMap();k.__pairLocalWhnfCache??=new WeakMap();
 }
 function whnfRep(k,e){
   if(!Array.isArray(e))return e;
@@ -70,12 +70,19 @@ function whnfRep(k,e){
 
 
 function structuralWhnf(k,e){
-  if(k.localDefs===true || !Array.isArray(e)){
-    if(k.localDefs===true)stats.whnfLocalBypass++;
-    return retainedWhnf.call(k,e);
+  if(!Array.isArray(e))return retainedWhnf.call(k,e);
+  const r=whnfRep(k,e);
+  if(k.localDefs===true){
+    stats.localWhnfQueries++;
+    const key=ctxKey(k,k._activeCtx??[]);
+    let byCtx=k.__pairLocalWhnfCache?.get(r);
+    if(!byCtx){byCtx=new Map();k.__pairLocalWhnfCache.set(r,byCtx);}
+    if(byCtx.has(key)){stats.localWhnfHits++;return byCtx.get(key);}
+    const out=retainedWhnf.call(k,e);
+    byCtx.set(key,out);stats.localWhnfStores++;
+    return out;
   }
   stats.whnfQueries++;
-  const r=whnfRep(k,e);
   if(k.__pairWhnfCache?.has(r)){stats.whnfHits++;return k.__pairWhnfCache.get(r);}
   const out=retainedWhnf.call(k,e);
   k.__pairWhnfCache.set(r,out);stats.whnfStores++;
@@ -132,7 +139,7 @@ function install(enabled){
   if(!enabled)return;
   proto.run=function(...args){
     this.__pairEq=new WeakMap();this.__pairIds=new WeakMap();this.__pairNextId=1;
-    this.__pairWhnfWeak=new WeakMap();this.__pairWhnfRoot=new Map();this.__pairWhnfCache=new WeakMap();
+    this.__pairWhnfWeak=new WeakMap();this.__pairWhnfRoot=new Map();this.__pairWhnfCache=new WeakMap();this.__pairLocalWhnfCache=new WeakMap();
     return retainedRun.apply(this,args);
   };
   proto.whnf=function(e){
