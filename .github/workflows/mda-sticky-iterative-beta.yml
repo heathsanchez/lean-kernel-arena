@@ -1,0 +1,31 @@
+name: MDA sticky iterative beta
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/multi-beta-sticky-iterative.mjs'
+      - '.github/workflows/mda-sticky-iterative-beta.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Test sticky iterative beta continuation
+        run: timeout 420s node experiments/multi-beta-sticky-iterative.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sticky-iterative-beta-${{ github.sha }}
+          path: genesis/evidence/multi-beta-sticky-iterative.json
+          if-no-files-found: ignore
+          retention-days: 7
