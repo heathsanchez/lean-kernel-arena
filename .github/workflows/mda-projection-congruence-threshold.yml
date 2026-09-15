@@ -1,0 +1,23 @@
+name: MDA projection congruence threshold
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/projection-congruence-threshold.mjs'
+      - '.github/workflows/mda-projection-congruence-threshold.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  focus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Measure pair projection threshold
+        run: timeout 240s node experiments/projection-congruence-threshold.mjs
