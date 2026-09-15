@@ -1,0 +1,40 @@
+name: MDA recursor rule beta batch
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/recursor-rule-beta-batch.mjs'
+      - '.github/workflows/mda-recursor-rule-beta-batch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  experiment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build focused witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test perf/shared-subterm
+          ./lka.py build-test perf/church-numerals
+          ./lka.py build-test perf/args-before-unfold
+          ./lka.py build-test perf/folded-constant-first
+          ./lka.py build-test perf/repeated-subproblem
+          ./lka.py build-test perf/discarded-argument-match
+          ./lka.py build-test undecidability/alg-conv-trans-acc
+          ./lka.py build-test undecidability/subject-reduction-reduct
+      - name: Batch recursor rule beta
+        run: timeout 150s node --stack-size=32768 genesis/recursor-rule-beta-batch.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recursor-rule-beta-batch-${{ github.sha }}
+          path: genesis/evidence/recursor-rule-beta-batch.json
+          if-no-files-found: error
