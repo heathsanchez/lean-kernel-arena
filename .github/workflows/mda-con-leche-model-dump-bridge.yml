@@ -6,6 +6,7 @@ on:
       - 'experiments/con-leche-model-dump-bridge-v1.mjs'
       - 'experiments/con-leche-model-residual-v2.mjs'
       - 'experiments/con-leche-model-canonicalize-v3.mjs'
+      - 'experiments/con-leche-model-missing-const-v4.mjs'
       - '.github/workflows/mda-con-leche-model-dump-bridge.yml'
   workflow_dispatch:
 permissions:
@@ -35,6 +36,11 @@ jobs:
           cd _tmp/con-leche
           git checkout -q "$CON_LECHE_COMMIT"
           test "$(git rev-parse HEAD)" = "$CON_LECHE_COMMIT"
+      - name: Cache con-leche build
+        uses: actions/cache@v4
+        with:
+          path: _tmp/con-leche/.lake
+          key: con-leche-${{ runner.os }}-${{ env.CON_LECHE_COMMIT }}
       - name: Build con-leche compiler
         working-directory: _tmp/con-leche
         run: timeout 4200s lake build con-leche
@@ -54,6 +60,9 @@ jobs:
       - name: Canonicalize fieldless generated model metadata
         run: |
           timeout 300s node experiments/con-leche-model-canonicalize-v3.mjs _tmp/inmodel_nested.dump.ndjson | tee _tmp/model-canonicalize-v3.log
+      - name: Trace missing dependency after canonicalization
+        run: |
+          timeout 300s node experiments/con-leche-model-missing-const-v4.mjs _tmp/inmodel_nested.dump.ndjson | tee _tmp/model-missing-v4.log
       - name: Preserve compiler bridge evidence
         if: always()
         uses: actions/upload-artifact@v4
