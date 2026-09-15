@@ -124,7 +124,21 @@ function installLocalDefs(){
   };
 
   proto.equal=function(a,b,ctx=[]){
-    return withCtx(this,ctx,()=>baseEqual.call(this,a,b,ctx));
+    return withCtx(this,ctx,()=>{
+      try { return baseEqual.call(this,a,b,ctx); }
+      catch(e) {
+        if(e instanceof K.Stop && e.status===K.UNKNOWN && e.message==="conversion-frontier" && this.conversionFrontier) {
+          this.conversionFrontier.context = ctx.map((entry,i)=>({
+            slot:i,
+            from_top:ctx.length-1-i,
+            kind:entry?.__localDef===true?"local-def":"binder",
+            type:entry?.__localDef===true?JSON.stringify(entry.type).slice(0,500):JSON.stringify(entry).slice(0,500),
+            value:entry?.__localDef===true?JSON.stringify(entry.value).slice(0,500):null
+          }));
+        }
+        throw e;
+      }
+    });
   };
   proto.sortOf=function(e,ctx){
     return withCtx(this,ctx,()=>baseSortOf.call(this,e,ctx));
