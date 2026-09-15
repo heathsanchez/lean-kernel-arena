@@ -14,7 +14,7 @@ import io,tarfile,json,sys
 data=sys.stdin.buffer.read()
 with tarfile.open(fileobj=io.BytesIO(data),mode="r:gz") as a:
   for m in a:
-    if m.isfile() and m.name.endswith("/good/perf/args-before-unfold.ndjson"):
+    if m.isfile() and m.name.endswith("good/perf/args-before-unfold.ndjson"):
       print(json.dumps({"name":m.name,"input":a.extractfile(m).read().decode("utf-8")}));break
 `;
 const row=JSON.parse(execFileSync("python3",["-c",py],{input:data,maxBuffer:10000000,timeout:10000}));
