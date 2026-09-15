@@ -1,0 +1,19 @@
+version: "0.1.1"
+description: |
+  **MathGraph** — an experimental independent Lean 4 checker in JavaScript.
+
+  It uses a small explicit semantic core with exact decline boundaries, validated
+  single-inductive semantics, quotient rules, projections, proof irrelevance, eta,
+  symbolic universes, and stack-safe/local-definition fallbacks. The Arena runtime
+  is self-contained and excludes the developmental search and qualification system
+  used to construct it.
+
+  Unsupported or resource-bounded inputs are declined (exit 2), never guessed.
+dir: mathgraph
+build: |
+  for f in *.mjs; do node --check "$f"; done
+run: node main.mjs "$IN"
+threads: 1
+declines:
+  - undecidability/alg-conv-trans-acc-left
+  - undecidability/subject-reduction-redex
