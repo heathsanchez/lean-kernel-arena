@@ -1,0 +1,23 @@
+name: MDA beta substitution shape
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/beta-substitution-shape.mjs'
+      - '.github/workflows/mda-beta-substitution-shape.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  profile:
+    runs-on: macos-15
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: node genesis/test.mjs
+      - name: Profile beta-ladder substitution shape
+        run: node experiments/beta-substitution-shape.mjs
