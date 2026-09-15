@@ -49,6 +49,8 @@ Kernel.prototype.run = function(...args) {
 };
 
 Kernel.prototype.validate = function(root) {
+  // Direct semantic tests may bypass run(); lazy initialization preserves identical behavior.
+  this.__consequenceValidation ??= new WeakMap();
   const key=paramsKey(this);
   const work=[{kind:"visit",e:root}];
 
@@ -95,6 +97,11 @@ Kernel.prototype.validate = function(root) {
 
 Kernel.prototype.infer = function(e,ctx=[]) {
   if(!Array.isArray(e)) return retainedInfer.call(this,e,ctx);
+
+  // Direct semantic tests may bypass run(); cache identity state must still exist.
+  this.__consequenceInfer ??= new WeakMap();
+  this.__consequenceIds ??= new WeakMap();
+  this.__consequenceNextId ??= 1;
 
   let byCtx=this.__consequenceInfer.get(e);
   if(!(byCtx instanceof Map)) {
