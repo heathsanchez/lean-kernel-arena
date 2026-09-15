@@ -1,0 +1,30 @@
+name: MDA WHNF cache separator
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/whnf-cache.mjs'
+      - '.github/workflows/mda-whnf-cache.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Test exact successful ordinary WHNF reuse
+        run: timeout 150s node experiments/whnf-cache.mjs
+      - name: Preserve separator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-whnf-cache-${{ github.sha }}
+          path: genesis/evidence/whnf-cache-separator.json
+          if-no-files-found: warn
