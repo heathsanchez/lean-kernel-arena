@@ -52,7 +52,10 @@ function rawPiEligible(a,b){
 }
 function varTerm(e){ return Array.isArray(e)&&e[0]==="var"; }
 function localVarRelayEligible(a,b){
-  return (appHeadVar(a)&&varTerm(b))||(appHeadVar(b)&&varTerm(a));
+  // Inside an already-bounded LocalDef congruence transaction, a local
+  // variable is not a rigid head: it may carry an exact local definition.
+  // Expose that value before any global rigid-head decision.
+  return varTerm(a)||varTerm(b);
 }
 function spine(e){
   const args=[];while(Array.isArray(e)&&e[0]==="app"){args.push(e[2]);e=e[1];}
