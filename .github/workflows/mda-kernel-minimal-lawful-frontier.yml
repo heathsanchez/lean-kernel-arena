@@ -1,0 +1,32 @@
+name: MDA kernel minimal lawful frontier
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/kernel-minimal-lawful-frontier-v1.mjs'
+      - '.github/workflows/mda-kernel-minimal-lawful-frontier.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  minimize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs >/dev/null
+      - name: Search least lawful retained capability frontier
+        run: |
+          set -euo pipefail
+          timeout 1080s node experiments/kernel-minimal-lawful-frontier-v1.mjs | tee kernel-minimal-lawful-frontier.log
+      - name: Preserve frontier evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-minimal-lawful-frontier-${{ github.sha }}
+          path: kernel-minimal-lawful-frontier.log
+          if-no-files-found: warn
