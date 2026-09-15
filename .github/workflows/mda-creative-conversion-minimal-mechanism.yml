@@ -1,0 +1,40 @@
+name: MDA creative conversion minimal mechanism
+
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/creative-conversion-minimal-mechanism.mjs'
+      - '.github/workflows/mda-creative-conversion-minimal-mechanism.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Reconstruct retained present
+        run: timeout 30s node --stack-size=32768 genesis/test.mjs
+      - name: Build focused witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test undecidability/alg-conv-trans-acc-left
+          ./lka.py build-test undecidability/alg-conv-trans-acc-right
+          ./lka.py build-test undecidability/subject-reduction-redex
+      - name: Separate candidate mechanisms
+        run: timeout 180s node --stack-size=32768 genesis/creative-conversion-minimal-mechanism.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: creative-conversion-minimal-mechanism-${{ github.sha }}
+          path: genesis/evidence/creative-conversion-minimal-mechanism.json
+          if-no-files-found: error
