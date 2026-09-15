@@ -1,0 +1,58 @@
+name: MDA con-leche model dump bridge
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/con-leche-model-dump-bridge-v1.mjs'
+      - '.github/workflows/mda-con-leche-model-dump-bridge.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bridge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CON_LECHE_COMMIT: c431b1ca1b7a93486dd3e0440d3ee82abe90ccd0
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct reduced retained basis
+        run: timeout 20s node genesis/test.mjs >/dev/null
+      - name: Install elan
+        run: |
+          set -euo pipefail
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Pin con-leche reference compiler
+        run: |
+          set -euo pipefail
+          git clone -q https://github.com/leanprover/con-leche.git _tmp/con-leche
+          cd _tmp/con-leche
+          git checkout -q "$CON_LECHE_COMMIT"
+          test "$(git rev-parse HEAD)" = "$CON_LECHE_COMMIT"
+      - name: Build con-leche compiler
+        working-directory: _tmp/con-leche
+        run: timeout 4200s lake build con-leche
+      - name: Compile valid nested fixture to explicit model dump
+        working-directory: _tmp/con-leche
+        run: |
+          set -euo pipefail
+          export CON_LECHE_INMODEL_DUMP="$GITHUB_WORKSPACE/_tmp/inmodel_nested.dump.ndjson"
+          timeout 300 .lake/build/bin/con-leche tests/e2e/inmodel_nested.ndjson | tee "$GITHUB_WORKSPACE/_tmp/con-leche-nested.log"
+          test -s "$CON_LECHE_INMODEL_DUMP"
+      - name: Feed compiler artifact to minimal kernel diagnostics
+        run: |
+          timeout 300s node experiments/con-leche-model-dump-bridge-v1.mjs             _tmp/con-leche/tests/e2e/inmodel_nested.ndjson             _tmp/inmodel_nested.dump.ndjson | tee _tmp/model-bridge.log
+      - name: Preserve compiler bridge evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: con-leche-model-dump-bridge-${{ github.sha }}
+          path: |
+            _tmp/inmodel_nested.dump.ndjson
+            _tmp/con-leche-nested.log
+            _tmp/model-bridge.log
+          if-no-files-found: warn
