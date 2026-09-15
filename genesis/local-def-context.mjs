@@ -143,7 +143,8 @@ function evaluate(name,useLocalDefs){
     totalSteps+=r.steps??0; totalConstructed+=r.constructed??0;
     if(r.status!=="UNKNOWN"&&r.status!==row.expected) wrong++;
     results.push({name:row.name,expected:row.expected,status:r.status,reason:r.reason,
-      steps:r.steps??null,constructed:r.constructed??null,elapsed_ms:r.elapsed_ms??null});
+      steps:r.steps??null,constructed:r.constructed??null,elapsed_ms:r.elapsed_ms??null,
+      conversion_frontier:r.conversion_frontier??null,frontier_declaration:r.frontier_declaration??null});
   }
   return {name,counts,wrong,totalSteps,totalConstructed,elapsed_ms:Date.now()-t0,results};
 }
@@ -162,7 +163,8 @@ for(let i=0;i<rows.length;i++){
   const b=baseline.results[i],r=candidate.results[i];
   if(b.status!=="UNKNOWN"&&r.status!==b.status){
     protectedChanged++;
-    regressions.push({name:r.name,before:b.status,after:r.status,reason:r.reason});
+    regressions.push({name:r.name,before:b.status,after:r.status,reason:r.reason,
+      conversion_frontier:r.conversion_frontier??null,frontier_declaration:r.frontier_declaration??null});
   }
   if(residual.has(r.name)&&r.status!=="UNKNOWN"){
     if(r.status!==r.expected) throw new Error("WRONG_RESOLUTION "+JSON.stringify(r));
