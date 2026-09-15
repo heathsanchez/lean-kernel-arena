@@ -102,7 +102,7 @@ function reduceHeadOnce(k,t,allowMajor=true){
         if(rargs.length>=total){
           const major=rargs[total-1];
           const next=reduceHeadOnce(k,major,false);
-          if(next!==major){
+          if(next!==null&&next!==major){
             const xs=rargs.slice(); xs[total-1]=next;
             return rebuild(k,rh,xs);
           }
