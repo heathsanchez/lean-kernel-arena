@@ -1,0 +1,23 @@
+name: MDA beta recursor block profile
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/beta-recursor-block-profile.mjs'
+      - '.github/workflows/mda-beta-recursor-block-profile.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Localize blocked beta recursor frames
+        run: timeout 300s node experiments/beta-recursor-block-profile.mjs
