@@ -26,7 +26,7 @@ if(rows.length!==188)throw new Error("Arena row count changed");
 const focusRows=rows.filter(r=>r.name.endsWith("good/perf/fueled-chain.ndjson"));
 
 const proto=K.Kernel.prototype,retainedEqual=proto.equal;
-const stats={piProbe:0,piSuccess:0,localVarProbe:0,localVarRelay:0,outer:0,inner:0,success:0,fallback:0,argChecks:0,maxDepth:0};
+const stats={piProbe:0,piSuccess:0,localVarProbe:0,localVarRelay:0,etaRelay:0,outer:0,inner:0,success:0,fallback:0,argChecks:0,maxDepth:0};
 const fallbackDetails=[];
 function shape(e){
   if(!Array.isArray(e))return typeof e;
@@ -112,6 +112,12 @@ function install(enabled){
             kind:"relay",depth,ctx:ctx.length,beforeLeft:shape(a),beforeRight:shape(b),
             afterLeft:shape(x),afterRight:shape(y),spent:this.steps-snap.steps
           });
+          if(this.caps.has("function-eta")){
+            const ex=Array.isArray(x)&&x[0]==="lam"?this.functionEtaContract(x):null;
+            if(ex!==null){stats.etaRelay++;return this.equal(ex,y,ctx);}
+            const ey=Array.isArray(y)&&y[0]==="lam"?this.functionEtaContract(y):null;
+            if(ey!==null){stats.etaRelay++;return this.equal(x,ey,ctx);}
+          }
           return this.equal(x,y,ctx);
         }
       }catch(e){
