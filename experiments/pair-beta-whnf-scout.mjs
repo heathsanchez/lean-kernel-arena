@@ -24,7 +24,7 @@ print(json.dumps(rows))
 const focusRows=JSON.parse(execFileSync("python3",["-c",py],{input:data,maxBuffer:50000000,timeout:10000}));
 
 const proto=K.Kernel.prototype,retainedRun=proto.run,retainedEqual=proto.equal,retainedWhnf=proto.whnf;
-const stats={eqHits:0,eqStores:0,earlyPi:0,frontiers:0,projectionEligible:0,projectionSuccess:0,argChecks:0,whnfQueries:0,whnfHits:0,whnfStores:0,whnfCanonNodes:0,whnfLocalBypass:0,localWhnfQueries:0,localWhnfHits:0,localWhnfStores:0,natPrimitiveQueries:0,natAdd:0,natMul:0,natMod:0,headDecide:0,headForallFin:0,headBallLT:0,headDecidableOfIff:0,headEqFin:0,headMagmaOp:0,headCountermodelOp:0,betaQueries:0,betaEligible:0,betaSuccesses:0,betaBinders:0,betaSubstNodes:0,betaSubstHits:0,betaFallbacks:0};
+const stats={eqHits:0,eqStores:0,earlyPi:0,frontiers:0,projectionEligible:0,projectionSuccess:0,argChecks:0,whnfQueries:0,whnfHits:0,whnfStores:0,whnfCanonNodes:0,whnfLocalBypass:0,localWhnfQueries:0,localWhnfHits:0,localWhnfStores:0,natPrimitiveQueries:0,natOperandWhnf:0,natOperandClosedAfterWhnf:0,natAdd:0,natMul:0,natMod:0,headDecide:0,headForallFin:0,headBallLT:0,headDecidableOfIff:0,headEqFin:0,headMagmaOp:0,headCountermodelOp:0,betaQueries:0,betaEligible:0,betaSuccesses:0,betaBinders:0,betaSubstNodes:0,betaSubstHits:0,betaFallbacks:0};
 const decideSamples=[];
 
 function objectId(k,x){
@@ -104,6 +104,19 @@ function natWhnf(k,n){
   if(n===0)return ["const",NAT_ZERO];
   return k.make("app",["const",NAT_SUCC],k.make("nat",n-1));
 }
+function exposeClosedNat(k,e){
+  let v=closedNat(e);
+  if(v!==null)return v;
+  if(k.__nativeNatProbeDepth)return null;
+  k.__nativeNatProbeDepth=1;stats.natOperandWhnf++;
+  try{
+    const w=structuralWhnf(k,e);
+    v=closedNat(w);
+    if(v!==null)stats.natOperandClosedAfterWhnf++;
+    return v;
+  }catch{return null;}
+  finally{k.__nativeNatProbeDepth=0;}
+}
 function nativeNatPrimitive(k,e){
   if(!Array.isArray(e)||e[0]!=="app")return null;
   const sp=rawSpine(e);
@@ -111,7 +124,7 @@ function nativeNatPrimitive(k,e){
   const h=sp.head[1];
   if(h!==NAT_ADD&&h!==NAT_MUL&&h!==NAT_MOD)return null;
   stats.natPrimitiveQueries++;
-  const a=closedNat(sp.args[0]),b=closedNat(sp.args[1]);
+  const a=exposeClosedNat(k,sp.args[0]),b=exposeClosedNat(k,sp.args[1]);
   if(a===null||b===null)return null;
   let v;
   if(h===NAT_ADD){v=a+b;stats.natAdd++;}
@@ -220,7 +233,7 @@ function install(enabled){
   };
   proto.whnf=function(e){
     countHead(e);
-    if(Array.isArray(e)&&e[0]==="app"){
+    if(!this.__nativeNatProbeDepth&&Array.isArray(e)&&e[0]==="app"){
       const nat=nativeNatPrimitive(this,e);
       if(nat!==null)return nat;
     }
