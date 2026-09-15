@@ -1,0 +1,43 @@
+name: MDA giant optParam field normalization
+on:
+  push:
+    branches:
+      - mda-kernel-genesis-v1
+    paths:
+      - experiments/make-optparam-field-domain-candidate.mjs
+      - .github/workflows/mda-giant-optparam-field.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  experiment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test init-prelude
+          ./lka.py build-test perf/grind-ring-5
+          ./lka.py build-test nat-rec-rules
+          ./lka.py build-test proj-non-structure
+          ./lka.py build-test proj-of-imax-prop
+          ./lka.py build-test proj-of-prop
+          ./lka.py build-test nested-unused-param
+          ./lka.py build-test nested-nonuniform-param
+      - name: Prepare nested parser candidate
+        run: node experiments/make-zero-param-nested-parser-candidate.mjs
+      - name: Add arbitrary precision Nat candidate
+        run: node experiments/make-arbitrary-nat-candidate.mjs
+      - name: Expose optParam constructor annotations
+        run: node experiments/make-optparam-field-domain-candidate.mjs
+      - name: Replay projection bridge
+        run: timeout 240s node --stack-size=32768 experiments/post-nested-projection-proof-irrelevance.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: giant-optparam-field-evidence
+          path: genesis/evidence/post-nested-projection-proof-irrelevance.json
+          if-no-files-found: error
