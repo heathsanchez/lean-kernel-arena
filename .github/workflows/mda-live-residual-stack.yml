@@ -1,0 +1,25 @@
+name: MDA live residual stack comparison
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/live-residual-list.mjs'
+      - '.github/workflows/mda-live-residual-stack.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Default host stack
+        run: timeout 150s node experiments/live-residual-list.mjs
+      - name: Large host stack
+        run: timeout 150s node --stack-size=32768 experiments/live-residual-list.mjs
