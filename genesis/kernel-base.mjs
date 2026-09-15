@@ -948,12 +948,20 @@ class LocalDefKernel extends Kernel {
         return this.shift(ty,e[1]+1);
       }
       if(e[0]==="let") {
-        this.tick(); this.need("reduction");
-        this.sortOf(e[1],ctx);
-        this.equal(this.infer(e[2],ctx),e[1],ctx);
-        const entry={__localDef:true,type:e[1],value:e[2]};
-        const bodyType=this.infer(e[3],[...ctx,entry]);
-        return this.substitute(bodyType,e[2]);
+        let cur=e,cctx=ctx;
+        const values=[];
+        while(cur[0]==="let") {
+          this.tick(); this.need("reduction");
+          this.sortOf(cur[1],cctx);
+          this.equal(this.infer(cur[2],cctx),cur[1],cctx);
+          const entry={__localDef:true,type:cur[1],value:cur[2]};
+          values.push(cur[2]);
+          cctx=[...cctx,entry];
+          cur=cur[3];
+        }
+        let bodyType=this.infer(cur,cctx);
+        for(let i=values.length-1;i>=0;i--) bodyType=this.substitute(bodyType,values[i]);
+        return bodyType;
       }
       return super.infer(e,ctx);
     });
