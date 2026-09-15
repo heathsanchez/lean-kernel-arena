@@ -1,0 +1,28 @@
+name: MDA kernel resource frontier
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/resource-frontier.mjs'
+      - '.github/workflows/mda-kernel-resource-frontier.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Separate semantic inadequacy from resource inadequacy
+        run: timeout 120s node --stack-size=32768 genesis/resource-frontier.mjs
+      - name: Preserve diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-kernel-resource-frontier-${{ github.sha }}
+          path: genesis/evidence/resource-frontier.json
+          if-no-files-found: warn
