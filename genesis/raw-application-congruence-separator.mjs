@@ -98,7 +98,7 @@ proto.equal=function(a,b,ctx=[]) {
     (sa.head===sb.head || this.same(sa.head,sb.head));
   if(!sameHead) return retainedEqual.call(this,a,b,ctx);
 
-  const differing=sa.args.map((x,i)=>i).filter(i=>!this.same(x,sb.args[i]));
+  const differing=sa.args.map((_,i)=>i).filter(i=>!this.same(sa.args[i],sb.args[i]));
   if(!differing.length) return;
 
   const snap={steps:this.steps,budget:this.budget,frontier:this.conversionFrontier};
