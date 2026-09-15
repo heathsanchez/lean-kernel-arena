@@ -1,0 +1,52 @@
+name: MDA global late dissolution
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/global-late-dissolution-v1.mjs'
+      - '.github/workflows/mda-global-late-dissolution.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dissolve:
+    strategy:
+      fail-fast: false
+      matrix:
+        cap:
+          - sort
+          - binders
+          - application
+          - reduction
+          - declarations
+          - universes
+          - theorems
+          - proof-irrelevance
+          - function-eta
+          - inductive-envelope
+          - single-inductives
+          - reflexive-inductives
+          - inductive-reduction
+          - rule-k
+          - unit-eta
+          - prop-inductives
+          - nat-literals
+          - string-literals
+          - quotients
+          - projections
+          - structure-eta
+          - rigid-conversion
+          - opaque-declarations
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      KERNEL_DISSOLVE_CAP: ${{ matrix.cap }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct current retained basis
+        run: timeout 20s node genesis/test.mjs >/dev/null
+      - name: Test one late dissolution
+        run: timeout 420s node experiments/global-late-dissolution-v1.mjs
