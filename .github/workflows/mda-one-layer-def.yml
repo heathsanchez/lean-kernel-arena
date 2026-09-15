@@ -1,0 +1,30 @@
+name: MDA one-layer def separator
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/one-layer-def-spine.mjs'
+      - '.github/workflows/mda-one-layer-def.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Test one-layer transparent exposure
+        run: timeout 150s node experiments/one-layer-def-spine.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-one-layer-def-${{ github.sha }}
+          path: genesis/evidence/one-layer-def-spine.json
+          if-no-files-found: warn
