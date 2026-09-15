@@ -17,6 +17,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Reconstruct frozen retained present
+        run: timeout 15s node genesis/test.mjs
       - name: Separate semantic inadequacy from resource inadequacy
         run: timeout 120s node --stack-size=32768 genesis/resource-frontier.mjs
       - name: Preserve diagnostic
