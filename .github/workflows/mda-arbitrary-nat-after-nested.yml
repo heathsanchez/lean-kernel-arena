@@ -1,0 +1,39 @@
+name: MDA arbitrary nat after nested
+on:
+  push:
+    branches:
+      - mda-kernel-genesis-v1
+    paths:
+      - experiments/make-arbitrary-nat-candidate.mjs
+      - experiments/arbitrary-nat-after-nested.mjs
+      - .github/workflows/mda-arbitrary-nat-after-nested.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  experiment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test init-prelude
+          ./lka.py build-test perf/grind-ring-5
+          ./lka.py build-test tutorial/101_natLitEq
+          ./lka.py build-test nested-unused-param
+          ./lka.py build-test nested-nonuniform-param
+      - name: Prepare nested parser candidate
+        run: node experiments/make-zero-param-nested-parser-candidate.mjs
+      - name: Add arbitrary precision nat atoms
+        run: node experiments/make-arbitrary-nat-candidate.mjs
+      - name: Run arbitrary nat separator
+        run: timeout 180s node --stack-size=32768 experiments/arbitrary-nat-after-nested.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arbitrary-nat-after-nested-evidence
+          path: genesis/evidence/arbitrary-nat-after-nested.json
+          if-no-files-found: error
