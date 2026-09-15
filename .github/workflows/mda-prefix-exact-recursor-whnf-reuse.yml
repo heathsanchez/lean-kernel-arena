@@ -1,0 +1,38 @@
+name: MDA prefix exact recursor WHNF reuse
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/prefix-exact-recursor-whnf-reuse.mjs'
+      - '.github/workflows/mda-prefix-exact-recursor-whnf-reuse.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  experiment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build focused witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test perf/shared-subterm
+          ./lka.py build-test perf/church-numerals
+          ./lka.py build-test perf/args-before-unfold
+          ./lka.py build-test perf/folded-constant-first
+          ./lka.py build-test perf/repeated-subproblem
+          ./lka.py build-test perf/discarded-argument-match
+          ./lka.py build-test undecidability/alg-conv-trans-acc-left
+          ./lka.py build-test undecidability/subject-reduction-redex
+          ./lka.py build-test undecidability/alg-conv-trans-acc
+          ./lka.py build-test undecidability/subject-reduction-reduct
+      - name: Reuse exact completed recursor WHNF
+        run: timeout 150s node --stack-size=32768 genesis/prefix-exact-recursor-whnf-reuse.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prefix-exact-recursor-whnf-reuse-${{ github.sha }}
+          path: genesis/evidence/prefix-exact-recursor-whnf-reuse.json
+          if-no-files-found: error
