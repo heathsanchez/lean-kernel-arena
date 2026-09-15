@@ -130,3 +130,5 @@ const summary={arena_sha256:sha,budget,
 mkdirSync(new URL("../genesis/evidence/",import.meta.url),{recursive:true});
 writeFileSync(new URL("../genesis/evidence/iterative-instantiation-separator.json",import.meta.url),JSON.stringify({summary,baseline,candidate},null,2));
 console.log("ITERATIVE_INSTANTIATION "+JSON.stringify(summary));
+
+// replay-current-head:05b829cd5700244e030b1b759c41d09370e3954d
