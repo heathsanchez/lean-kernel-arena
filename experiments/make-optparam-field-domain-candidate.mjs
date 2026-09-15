@@ -2,7 +2,7 @@ import {readFileSync,writeFileSync} from "node:fs";
 const p="/tmp/mathgraph-zero-nested/kernel-base.mjs";
 let s=readFileSync(p,"utf8");
 const old="fieldDomains.push(w[1]); ct=w[2];";
-const neu='let fd=w[1],fh=fd;\\n        while(Array.isArray(fh)&&fh[0]==="app")fh=fh[1];\\n        if(Array.isArray(fh)&&fh[0]==="const"&&fh[1]===leanName("optParam"))fd=this.whnf(fd);\\n        fieldDomains.push(fd); ct=w[2];';
+const neu='let fd=w[1],fh=fd;\n        while(Array.isArray(fh)&&fh[0]==="app")fh=fh[1];\n        if(Array.isArray(fh)&&fh[0]==="const"&&fh[1]===leanName("optParam"))fd=this.whnf(fd);\n        fieldDomains.push(fd); ct=w[2];';
 const hits=s.split(old).length-1;
 if(hits!==2)throw new Error("expected two constructor field-domain sites, got "+hits);
 s=s.split(old).join(neu);
