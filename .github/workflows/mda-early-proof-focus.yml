@@ -1,0 +1,20 @@
+name: MDA early proof irrelevance focus
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/early-proof-irrelevance-focus.mjs'
+      - '.github/workflows/mda-early-proof-focus.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  focus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: timeout 100s node experiments/early-proof-irrelevance-focus.mjs
