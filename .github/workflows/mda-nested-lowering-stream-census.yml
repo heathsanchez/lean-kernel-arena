@@ -1,0 +1,30 @@
+name: MDA nested lowering stream census
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/nested-lowering-stream-census.mjs'
+      - '.github/workflows/mda-nested-lowering-stream-census.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  census:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build giant witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test init-prelude
+          ./lka.py build-test perf/grind-ring-5
+      - name: Census nested lowering stream
+        run: node experiments/nested-lowering-stream-census.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nested-lowering-stream-census-${{ github.sha }}
+          path: genesis/evidence/nested-lowering-stream-census.json
+          if-no-files-found: error
