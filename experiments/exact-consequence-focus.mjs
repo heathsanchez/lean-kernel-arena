@@ -12,9 +12,10 @@ import {createHash} from "node:crypto";
 import * as K from "../genesis/kernel.mjs";
 
 const MODE=process.env.MODE??"both";
-if(!["retry","proof","getapp","both"].includes(MODE)) throw new Error("bad MODE "+MODE);
-const useProof=MODE==="proof"||MODE==="both";
-const useGetApp=MODE==="getapp"||MODE==="both";
+if(!["retry","proof","getapp","both","same","getapp-same","proof-same","all"].includes(MODE)) throw new Error("bad MODE "+MODE);
+const useProof=["proof","both","proof-same","all"].includes(MODE);
+const useGetApp=["getapp","both","getapp-same","all"].includes(MODE);
+const useSame=["same","getapp-same","proof-same","all"].includes(MODE);
 
 const caps=JSON.parse(readFileSync(new URL("../genesis/evidence/retained.json",import.meta.url),"utf8"));
 const expectedHash="85942e6f19274699a476d4e5b772abf4bf16f6a719985938bfcb5349ad90d118";
@@ -41,12 +42,14 @@ const proto=K.Kernel.prototype;
 const retainedRun=proto.run;
 const retainedProofType=proto.proofType;
 const retainedGetApp=proto.getApp;
+const retainedSame=proto.same;
 const retainedEqual=proto.equal;
 const retainedNormal=proto.normal;
 
 const stats={
   proof:{queries:0,hits:0,storesProof:0,storesNonProof:0},
   getapp:{queries:0,hits:0,stores:0},
+  same:{queries:0,hits:0,storesTrue:0,storesFalse:0},
   retry:{attempts:0,successes:0,failures:0,varMismatches:0,proofDischarges:0}
 };
 
@@ -66,6 +69,7 @@ function paramsKey(k){return [...(k.params??[])].sort().join("\u0000");}
 proto.run=function(...args){
   this.__proofTypeCache=new WeakMap();
   this.__getAppCache=new WeakMap();
+  this.__sameCache=new WeakMap();
   this.__pcIds=new WeakMap();
   this.__pcNextId=1;
   this.__paidNormals=new WeakMap();
@@ -84,6 +88,23 @@ if(useProof){
     const out=retainedProofType.call(this,e,ctx);
     byKey.set(key,out);
     if(out===null) stats.proof.storesNonProof++; else stats.proof.storesProof++;
+    return out;
+  };
+}
+if(useSame){
+  proto.same=function(a,b){
+    stats.same.queries++;
+    if(!Array.isArray(a)||!Array.isArray(b)) return retainedSame.call(this,a,b);
+    this.__sameCache??=new WeakMap();
+    let byRight=this.__sameCache.get(a);
+    if(!byRight){byRight=new WeakMap();this.__sameCache.set(a,byRight);}
+    if(byRight.has(b)){stats.same.hits++;return byRight.get(b);}
+    const out=retainedSame.call(this,a,b);
+    byRight.set(b,out);
+    let reverse=this.__sameCache.get(b);
+    if(!reverse){reverse=new WeakMap();this.__sameCache.set(b,reverse);}
+    reverse.set(a,out);
+    if(out) stats.same.storesTrue++; else stats.same.storesFalse++;
     return out;
   };
 }
@@ -198,6 +219,6 @@ for(const row of rows){
     constructed:r.constructed??null,elapsed_ms:Date.now()-t0,
     frontier_declaration:r.frontier_declaration??null,stats:delta(before,after)});
 }
-proto.run=retainedRun;proto.proofType=retainedProofType;proto.getApp=retainedGetApp;
+proto.run=retainedRun;proto.proofType=retainedProofType;proto.getApp=retainedGetApp;proto.same=retainedSame;
 proto.equal=retainedEqual;proto.normal=retainedNormal;
 console.log("EXACT_CONSEQUENCE_FOCUS "+JSON.stringify({mode:MODE,arena_sha256:sha,budget:1000000,results}));
