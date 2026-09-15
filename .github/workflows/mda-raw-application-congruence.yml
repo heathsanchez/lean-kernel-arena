@@ -1,0 +1,42 @@
+name: MDA raw application congruence separator
+
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/raw-application-congruence-separator.mjs'
+      - '.github/workflows/mda-raw-application-congruence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  separate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Reconstruct frozen retained present
+        run: timeout 30s node --stack-size=32768 genesis/test.mjs
+
+      - name: Build the current Arena suite including the creative residual
+        run: ./lka.py build-test --skip-ci
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Test raw application congruence and replay protected consequences
+        run: timeout 600s node --stack-size=32768 genesis/raw-application-congruence-separator.mjs
+
+      - name: Preserve separator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-raw-application-congruence-${{ github.sha }}
+          path: genesis/evidence/raw-application-congruence-separator.json
+          if-no-files-found: warn
