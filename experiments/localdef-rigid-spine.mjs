@@ -26,7 +26,7 @@ if(rows.length!==188)throw new Error("Arena row count changed");
 const focusRows=rows.filter(r=>r.name.endsWith("good/perf/fueled-chain.ndjson"));
 
 const proto=K.Kernel.prototype,retainedEqual=proto.equal;
-const stats={piProbe:0,piSuccess:0,outer:0,inner:0,success:0,fallback:0,argChecks:0,maxDepth:0};
+const stats={piProbe:0,piSuccess:0,localVarProbe:0,localVarRelay:0,outer:0,inner:0,success:0,fallback:0,argChecks:0,maxDepth:0};
 
 function appHeadVar(e){
   if(!Array.isArray(e)||e[0]!=="app")return false;
@@ -36,6 +36,10 @@ function appHeadVar(e){
 function rawPiEligible(a,b){
   return (Array.isArray(a)&&a[0]==="pi"&&appHeadVar(b))||
          (Array.isArray(b)&&b[0]==="pi"&&appHeadVar(a));
+}
+function varTerm(e){ return Array.isArray(e)&&e[0]==="var"; }
+function localVarRelayEligible(a,b){
+  return (appHeadVar(a)&&varTerm(b))||(appHeadVar(b)&&varTerm(a));
 }
 function spine(e){
   const args=[];while(Array.isArray(e)&&e[0]==="app"){args.push(e[2]);e=e[1];}
@@ -82,6 +86,26 @@ function install(enabled){
 
     if(a===b)return;
     const depth=this._localDefRigidDepth??0;
+
+    if(depth>0 && localVarRelayEligible(a,b) && !this._localVarRelayDepth){
+      stats.localVarProbe++;
+      const snap={steps:this.steps,budget:this.budget,frontier:this.conversionFrontier};
+      this._localVarRelayDepth=1;
+      try{
+        const x=this.whnf(a),y=this.whnf(b);
+        if(x!==a||y!==b){
+          stats.localVarRelay++;
+          return this.equal(x,y,ctx);
+        }
+      }catch(e){
+        if(!(e instanceof Stop||e instanceof RangeError))throw e;
+      }finally{
+        this._localVarRelayDepth=0;
+      }
+      this.steps=snap.steps;this.budget=snap.budget;this.conversionFrontier=snap.frontier;
+    }
+    const depthNow=this._localDefRigidDepth??0;
+    const depth=depthNow;
     const sa=spine(a),sb=spine(b);
     const sameHead=sa.args.length>0&&sa.args.length===sb.args.length&&
       (sa.head===sb.head||(Array.isArray(sa.head)&&Array.isArray(sb.head)&&this.same(sa.head,sb.head)));
