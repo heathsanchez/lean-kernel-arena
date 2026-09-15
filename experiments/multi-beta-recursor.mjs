@@ -232,6 +232,8 @@ function install(enabled){
   proto.run=retainedRun;proto.whnf=retainedWhnf;
   if(!enabled)return;
   proto.whnf=function(e){
+    if(this._fullStackSafe===true)
+      return iterativeRecWhnf(this,e);
     if(this._multiBetaDepth)
       return iterativeRecWhnf(this,e);
     if(!Array.isArray(e)||e[0]!=="app")
