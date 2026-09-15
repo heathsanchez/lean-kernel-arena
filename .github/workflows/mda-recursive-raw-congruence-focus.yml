@@ -1,0 +1,39 @@
+name: MDA recursive raw congruence focus
+
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/recursive-raw-congruence-focus.mjs'
+      - '.github/workflows/mda-recursive-raw-congruence-focus.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Reconstruct retained present
+        run: timeout 30s node --stack-size=32768 genesis/test.mjs
+      - name: Build creative conversion witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test undecidability/alg-conv-trans-acc-left
+          ./lka.py build-test undecidability/subject-reduction-redex
+      - name: Test recursive raw congruence
+        run: timeout 180s node --stack-size=32768 genesis/recursive-raw-congruence-focus.mjs
+      - name: Preserve focus evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recursive-raw-congruence-focus-${{ github.sha }}
+          path: genesis/evidence/recursive-raw-congruence-focus.json
+          if-no-files-found: warn
