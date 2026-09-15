@@ -1,0 +1,29 @@
+name: MDA LocalDef consequence bank
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/localdef-consequence-bank.mjs'
+      - '.github/workflows/mda-localdef-consequence-bank.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bank:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Compare LocalDef-only exact consequence policies
+        run: timeout 480s node experiments/localdef-consequence-bank.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mda-localdef-consequence-bank-${{ github.sha }}
+          path: genesis/evidence/localdef-consequence-bank.json
+          if-no-files-found: error
+          retention-days: 7
