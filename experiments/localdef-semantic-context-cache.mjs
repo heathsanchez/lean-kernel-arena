@@ -36,7 +36,7 @@ const py=[
   "    e='ACCEPT' if 'good' in p else 'REJECT' if 'bad' in p else None",
   "    if e: rows.append({'name':m.name,'expected':e,'input':a.extractfile(m).read().decode('utf-8')})",
   "print(json.dumps(rows))"
-].join("\\n");
+].join("\n");
 const rows=JSON.parse(execFileSync("python3",["-c",py],{input:data,maxBuffer:50000000,timeout:10000}));
 if(rows.length!==188) throw new Error("Arena row count changed");
 const focusRows=rows.filter(r=>r.name.endsWith("good/perf/fueled-chain.ndjson"));
@@ -213,5 +213,5 @@ const report={
   claim_boundary:"Execution consequence reuse only. Cache keys preserve exact term identities, exact binder order and exact ordinary binder identities. For LocalDef context entries only, the transient wrapper object's identity is replaced by the exact identity pair (entry.type, entry.value). Only successful exact inference/equality consequences are reused; no failed comparison, WHNF result, reduction, typing or equality rule is added."
 };
 mkdirSync(new URL("../genesis/evidence/",import.meta.url),{recursive:true});
-writeFileSync(new URL("../genesis/evidence/localdef-semantic-context-cache.json",import.meta.url),JSON.stringify(report,null,2)+"\\n");
+writeFileSync(new URL("../genesis/evidence/localdef-semantic-context-cache.json",import.meta.url),JSON.stringify(report,null,2)+"\n");
 console.log("LOCALDEF_SEMANTIC_CONTEXT_CACHE "+JSON.stringify(report));
