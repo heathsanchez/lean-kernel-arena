@@ -29,6 +29,27 @@ const focusRows=rows.filter(r=>r.name.endsWith("good/perf/fueled-chain.ndjson"))
 const proto=K.Kernel.prototype,retainedEqual=proto.equal;
 const stats={piProbe:0,piSuccess:0,localVarProbe:0,localVarRelay:0,etaRelay:0,etaExpand:0,subtypeProofSkip:0,outer:0,inner:0,success:0,fallback:0,argChecks:0,maxDepth:0};
 const fallbackDetails=[];
+const eqCacheStats={queries:0,hits:0,stores:0};
+function eqObjectId(k,x){
+  k.__localEqIds??=new WeakMap();k.__localEqNextId??=1;
+  let id=k.__localEqIds.get(x);
+  if(id!==undefined)return id;
+  id=k.__localEqNextId++;k.__localEqIds.set(x,id);return id;
+}
+function eqCtxKey(k,ctx){
+  if(!ctx?.length)return "";
+  return ctx.map(x=>(x!==null&&(typeof x==="object"||typeof x==="function"))
+    ?"o"+eqObjectId(k,x):typeof x+":"+String(x)).join(",");
+}
+function eqCapsKey(k){return [...(k.caps??[])].sort().join("\u0000");}
+function eqPairSet(k,a,b){
+  k.__localEqCache??=new WeakMap();
+  let byA=k.__localEqCache.get(a);
+  if(!byA){byA=new WeakMap();k.__localEqCache.set(a,byA);}
+  let s=byA.get(b);
+  if(!s){s=new Set();byA.set(b,s);}
+  return s;
+}
 function shape(e){
   if(!Array.isArray(e))return typeof e;
   let h=e,n=0;while(Array.isArray(h)&&h[0]==="app"){n++;h=h[1];}
@@ -206,11 +227,24 @@ function install(enabled){
       return retainedEqual.call(this,a,b,ctx);
     }
   };
+
+  const alignedEqual=proto.equal;
+  proto.equal=function(a,b,ctx=[]){
+    if(!Array.isArray(a)||!Array.isArray(b))
+      return alignedEqual.call(this,a,b,ctx);
+    eqCacheStats.queries++;
+    const key=(this.localDefs?"L|":"N|")+eqCapsKey(this)+"|"+eqCtxKey(this,ctx);
+    const set=eqPairSet(this,a,b);
+    if(set.has(key)){eqCacheStats.hits++;return;}
+    const out=alignedEqual.call(this,a,b,ctx);
+    set.add(key);eqPairSet(this,b,a).add(key);eqCacheStats.stores++;
+    return out;
+  };
 }
 
 function evalRows(mode,enabled,subset,budget=1000000){
   install(enabled);
-  const before={...stats},results=[],counts={ACCEPT:0,REJECT:0,UNKNOWN:0};
+  const before={...stats},cacheBefore={...eqCacheStats},results=[],counts={ACCEPT:0,REJECT:0,UNKNOWN:0};
   let wrong=0,totalSteps=0,totalConstructed=0;const t0=Date.now();
   for(const row of subset){
     const r=K.checkExport(row.input,caps,budget);
@@ -222,7 +256,8 @@ function evalRows(mode,enabled,subset,budget=1000000){
       fallback_mode:r.fallback_mode??null,fallback_attempt_reason:r.fallback_attempt_reason??null});
   }
   const d={};for(const k of Object.keys(before))d[k]=stats[k]-before[k];
-  return {mode,counts,wrong,totalSteps,totalConstructed,elapsed_ms:Date.now()-t0,stats:d,results};
+  return {mode,counts,wrong,totalSteps,totalConstructed,elapsed_ms:Date.now()-t0,stats:d,
+    cache:{queries:eqCacheStats.queries-cacheBefore.queries,hits:eqCacheStats.hits-cacheBefore.hits,stores:eqCacheStats.stores-cacheBefore.stores},results};
 }
 
 const focus=evalRows("focus-candidate",true,focusRows,FOCUS_BUDGET);
