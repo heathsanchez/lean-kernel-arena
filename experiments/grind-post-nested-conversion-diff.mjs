@@ -25,16 +25,24 @@ function rewrite(input){
  return {text:out.join("\n")+"\n",rewritten};
 }
 function firstDiff(a,b){
- const stack=[{a,b,path:"$"}];let common=0;
+ const stack=[{a,b,path:"$",binderDepth:0,trail:[]}];let common=0;
  while(stack.length){
   const q=stack.pop(),x=q.a,y=q.b;
   if(x===y){common++;continue;}
   if(!Array.isArray(x)||!Array.isArray(y))
-    return {path:q.path,left:x,right:y,common};
+    return {path:q.path,left:x,right:y,common,binderDepth:q.binderDepth,trail:q.trail.slice(-16)};
   if(x.length!==y.length||x[0]!==y[0])
     return {path:q.path,leftTag:x[0],rightTag:y[0],leftLen:x.length,rightLen:y.length,common,
+      binderDepth:q.binderDepth,trail:q.trail.slice(-16),
       left:JSON.stringify(x).slice(0,800),right:JSON.stringify(y).slice(0,800)};
-  for(let i=x.length-1;i>=1;i--)stack.push({a:x[i],b:y[i],path:q.path+"["+i+"]"});
+  const here={path:q.path,leftTag:x[0],rightTag:y[0],
+    leftHead:JSON.stringify(x).slice(0,220),rightHead:JSON.stringify(y).slice(0,220),
+    binderDepth:q.binderDepth};
+  for(let i=x.length-1;i>=1;i--){
+    const inc=((x[0]==="pi"||x[0]==="lam")&&i===2)||(x[0]==="let"&&i===3)?1:0;
+    stack.push({a:x[i],b:y[i],path:q.path+"["+i+"]",binderDepth:q.binderDepth+inc,
+      trail:q.trail.concat([here])});
+  }
   common++;
  }
  return {equal:true,common};
@@ -49,7 +57,7 @@ p.equal=function(a,b,ctx=[]){
  try{return equal0.call(this,a,b,ctx);}
  catch(e){
   if(e?.message==="conversion-frontier"&&!this.__fullConvCapture)
-    this.__fullConvCapture={a,b,ctxDepth:ctx.length,atSteps:this.steps};
+    this.__fullConvCapture={a,b,ctxDepth:ctx.length,ctx:[...ctx],atSteps:this.steps};
   throw e;
  }
 };
@@ -63,15 +71,19 @@ for(const [index,k] of kernels.entries()){
  let x,y,diag;
  try{
   x=k.normal(c.a);y=k.normal(c.b);
+  const diff=firstDiff(x,y);
   diag={index,localDefs:k.localDefs===true,atSteps:c.atSteps,ctxDepth:c.ctxDepth,
     leftBytes:JSON.stringify(x).length,rightBytes:JSON.stringify(y).length,
-    leftNodes:nodeCount(x),rightNodes:nodeCount(y),diff:firstDiff(x,y)};
+    leftNodes:nodeCount(x),rightNodes:nodeCount(y),diff,
+    ctx:(c.ctx??[]).map((t,i)=>({slot:i,bytes:JSON.stringify(t).length,head:JSON.stringify(t).slice(0,500)}))};
  }catch(e){diag={index,localDefs:k.localDefs===true,error:String(e?.stack??e).slice(0,1200)};}
  captures.push(diag);
 }
 const out={experiment:"grind-post-nested-conversion-diff",status:r.status,reason:r.reason,steps:r.steps??null,
  constructed:r.constructed??null,frontier_declaration:r.frontier_declaration??null,rewritten:rw.rewritten,
- elapsed_ms:Date.now()-t0,captures};
+ elapsed_ms:Date.now()-t0,
+ fallback_attempt_reason:r.fallback_attempt_reason??null,fallback_attempt_steps:r.fallback_attempt_steps??null,
+ stack_attempt_reason:r.stack_attempt_reason??null,stack_attempt_steps:r.stack_attempt_steps??null,captures};
 mkdirSync("genesis/evidence",{recursive:true});
 writeFileSync("genesis/evidence/grind-post-nested-conversion-diff.json",JSON.stringify(out,null,2)+"\n");
 console.log("GRIND_POST_NESTED_CONVERSION_DIFF "+JSON.stringify(out));
