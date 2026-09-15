@@ -1,0 +1,32 @@
+name: MDA native binder conversion stress
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/native-binder-capped-app-conversion.mjs'
+      - '.github/workflows/mda-native-binder-conversion.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stress:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Reconstruct retained present
+        run: timeout 30s node --stack-size=32768 genesis/test.mjs
+      - name: Build complete CI Arena set
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-test --skip-ci
+      - name: Stress native binder schedule
+        run: timeout 180s node --stack-size=32768 genesis/native-binder-capped-app-conversion.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-binder-conversion-${{ github.sha }}
+          path: genesis/evidence/native-binder-capped-app-conversion.json
+          if-no-files-found: error
