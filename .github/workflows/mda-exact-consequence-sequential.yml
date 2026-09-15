@@ -1,0 +1,32 @@
+name: MDA exact consequence sequential
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - '.github/workflows/mda-exact-consequence-sequential.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  focus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: node genesis/test.mjs
+      - name: Proof consequence
+        env:
+          MODE: proof
+        run: node experiments/exact-consequence-focus.mjs
+      - name: Application-spine consequence
+        env:
+          MODE: getapp
+        run: node experiments/exact-consequence-focus.mjs
+      - name: Combined consequences
+        env:
+          MODE: both
+        run: node experiments/exact-consequence-focus.mjs
