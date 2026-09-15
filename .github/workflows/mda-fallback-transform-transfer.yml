@@ -1,0 +1,29 @@
+name: MDA fallback transform transfer
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/fallback-transform-transfer.mjs'
+      - '.github/workflows/mda-fallback-transform-transfer.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  transfer:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: node genesis/test.mjs
+      - name: Test exact transform memory across fallbacks
+        run: node --stack_size=65500 experiments/fallback-transform-transfer.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mda-fallback-transform-transfer-${{ github.sha }}
+          path: genesis/evidence/fallback-transform-transfer.json
+          if-no-files-found: error
+          retention-days: 7
