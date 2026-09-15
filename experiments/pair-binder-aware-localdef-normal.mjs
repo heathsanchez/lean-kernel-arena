@@ -9,7 +9,7 @@ const expectedHash="85942e6f19274699a476d4e5b772abf4bf16f6a719985938bfcb5349ad90
 const response=await fetch("https://arena.lean-lang.org/lean-arena-tests.tar.gz",{signal:AbortSignal.timeout(15000)});
 if(!response.ok)throw new Error("Arena corpus fetch: "+response.status);
 const data=Buffer.from(await response.arrayBuffer()),sha=createHash("sha256").update(data).digest("hex");
-if(sha!==expectedHash)throw new Error("Arena corpus changed");
+if(sha!==expectedHash)throw new Error("Arena corpus changed: got "+sha+" expected "+expectedHash);
 const py=String.raw`
 import io,tarfile,json,sys
 wanted={"good/perf/magma-list-pair-n7.ndjson","good/perf/magma-list-pair-n21.ndjson"}
