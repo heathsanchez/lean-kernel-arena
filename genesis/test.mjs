@@ -421,11 +421,9 @@ function runEmptyInductiveTests(base,emit=()=>{}) {
     }}
   ];
   const good=rows.map(JSON.stringify).join("\n");
-  const before=checkExport(good,base);
-  assert(before.status===UNKNOWN && before.reason==="inductive-semantics-frontier",
-    "empty-inductive ablation did not restore semantic frontier");
-  assert(checkExport(good,caps).status===ACCEPT,
-    "certified empty inductive was not accepted");
+  const accepted=checkExport(good,caps);
+  assert(accepted.status===ACCEPT,
+    "general single-inductive path did not absorb empty inductive: "+JSON.stringify(accepted));
 
   const bad=rows.map(x=>JSON.parse(JSON.stringify(x)));
   bad[bad.length-1].inductive.recs[0].type=1;
@@ -437,8 +435,8 @@ function runEmptyInductiveTests(base,emit=()=>{}) {
   assert(checkExport(badK.map(JSON.stringify).join("\n"),caps).status===REJECT,
     "empty recursor with bogus K flag was accepted");
 
-  emit({event:"empty-inductive-growth",ablation_unknown:true,
-    exact_recursor:true,forged_recursor_rejected:true,bogus_k_rejected:true});
+  emit({event:"empty-inductive-dissolution",dedicated_capability:false,
+    general_single_path:true,exact_recursor:true,forged_recursor_rejected:true,bogus_k_rejected:true});
   return {capabilities:caps,cases:2};
 }
 
@@ -479,17 +477,15 @@ function runEnumInductiveTests(base,emit=()=>{}) {
     }}
   ];
   const good=rows.map(JSON.stringify).join("\n");
-  const before=checkExport(good,base);
-  assert(before.status===UNKNOWN && before.reason==="inductive-semantics-frontier",
-    "enum-inductive ablation did not restore semantic frontier");
-  assert(checkExport(good,caps).status===ACCEPT,"derived enum recursor was not accepted");
+  const accepted=checkExport(good,caps);
+  assert(accepted.status===ACCEPT,
+    "general single-inductive path did not absorb finite enum: "+JSON.stringify(accepted));
   const bad=rows.map(x=>JSON.parse(JSON.stringify(x)));
   bad[bad.length-1].inductive.recs[0].k=true;
   const forged=checkExport(bad.map(JSON.stringify).join("\n"),caps);
-  assert(forged.status===REJECT && forged.reason==="enum-inductive-recursor-metadata",
-    "forged enum K metadata was not rejected");
-  emit({event:"enum-inductive-growth",ablation_unknown:true,
-    derived_recursor:true,forged_k_rejected:true});
+  assert(forged.status===REJECT,"forged enum K metadata was not rejected");
+  emit({event:"enum-inductive-dissolution",dedicated_capability:false,
+    general_single_path:true,derived_recursor:true,forged_k_rejected:true});
   return {capabilities:caps,cases:2};
 }
 
@@ -924,7 +920,11 @@ const inductiveEnvelope=runInductiveEnvelopeTests(functionEta.capabilities,row=>
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const emptyInductive=runEmptyInductiveTests(inductiveEnvelope.capabilities,row=>{
+const singleInductive=runSingleInductiveTests(inductiveEnvelope.capabilities,row=>{
+  console.log(JSON.stringify(row));
+  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
+});
+const emptyInductive=runEmptyInductiveTests(singleInductive.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
@@ -932,11 +932,7 @@ const enumInductive=runEnumInductiveTests(emptyInductive.capabilities,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
-const singleInductive=runSingleInductiveTests(enumInductive.capabilities,row=>{
-  console.log(JSON.stringify(row));
-  appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
-});
-const reflexiveInductive=runReflexiveInductiveTests(singleInductive.capabilities,singleInductive.fixture,row=>{
+const reflexiveInductive=runReflexiveInductiveTests(enumInductive.capabilities,singleInductive.fixture,row=>{
   console.log(JSON.stringify(row));
   appendFileSync(new URL("events.jsonl",target),JSON.stringify(row)+"\n");
 });
