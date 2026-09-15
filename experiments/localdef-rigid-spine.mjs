@@ -104,8 +104,6 @@ function install(enabled){
       }
       this.steps=snap.steps;this.budget=snap.budget;this.conversionFrontier=snap.frontier;
     }
-    const depthNow=this._localDefRigidDepth??0;
-    const depth=depthNow;
     const sa=spine(a),sb=spine(b);
     const sameHead=sa.args.length>0&&sa.args.length===sb.args.length&&
       (sa.head===sb.head||(Array.isArray(sa.head)&&Array.isArray(sb.head)&&this.same(sa.head,sb.head)));
