@@ -59,8 +59,16 @@ function installBase(){
   proto.normal=function(e){
     if(!Array.isArray(e)) return baseNormal.call(this,e);
     this.__normalMemo??=new WeakMap();
-    if(this.__normalMemo.has(e)) return this.__normalMemo.get(e);
-    const r=baseNormal.call(this,e); this.__normalMemo.set(e,r); return r;
+    let byCtx=this.__normalMemo.get(e);
+    if(!byCtx){byCtx=new Map();this.__normalMemo.set(e,byCtx);}
+    const ctx=this.__activeCtx??[];
+    const key=ctx.map(entry=>{
+      if(entry?.__localDef===true)
+        return "d:"+objectId(this,entry.type)+":"+objectId(this,entry.value);
+      return Array.isArray(entry)?"t:"+objectId(this,entry):"x:"+String(entry);
+    }).join(",");
+    if(byCtx.has(key)) return byCtx.get(key);
+    const r=baseNormal.call(this,e); byCtx.set(key,r); return r;
   };
 }
 
