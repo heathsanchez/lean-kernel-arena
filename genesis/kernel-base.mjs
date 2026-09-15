@@ -158,7 +158,11 @@ class Kernel {
       return this.result(ACCEPT,"obligations-discharged",start);
     } catch(e) {
       if(e instanceof Stop) return this.result(e.status,e.message,start);
-      if(e instanceof RangeError) return this.result(UNKNOWN,"host-stack-limit",start);
+      if(e instanceof RangeError) {
+        const r=this.result(UNKNOWN,"host-stack-limit",start);
+        r.diagnostic_error=String(e?.stack??e).split("\n").slice(0,40).join(" | ");
+        return r;
+      }
       throw e; // A programming exception is never converted into proof rejection.
     }
   }
