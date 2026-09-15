@@ -127,7 +127,8 @@ function installLocalDefs(){
     return withCtx(this,ctx,()=>{
       try { return baseEqual.call(this,a,b,ctx); }
       catch(e) {
-        if(e instanceof K.Stop && e.status===K.UNKNOWN && e.message==="conversion-frontier" && this.conversionFrontier) {
+        if(e instanceof K.Stop && e.status===K.UNKNOWN && e.message==="conversion-frontier" &&
+           this.conversionFrontier && this.conversionFrontier.context===undefined) {
           this.conversionFrontier.context = ctx.map((entry,i)=>({
             slot:i,
             from_top:ctx.length-1-i,
