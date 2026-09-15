@@ -1,0 +1,20 @@
+name: MDA eta ablation diagnostic
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/function-eta-ablation-diagnostic.mjs'
+      - '.github/workflows/mda-eta-ablation-diagnostic.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node experiments/function-eta-ablation-diagnostic.mjs
