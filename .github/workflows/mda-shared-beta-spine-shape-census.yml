@@ -1,0 +1,29 @@
+name: MDA shared beta spine shape census
+on:
+  push:
+    branches:
+      - mda-kernel-genesis-v1
+    paths:
+      - genesis/shared-beta-spine-shape-census.mjs
+      - .github/workflows/mda-shared-beta-spine-shape-census.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  census:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build shared witness
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-test perf/shared-subterm
+      - name: Measure beta spine shapes
+        run: timeout 150s node --stack-size=32768 genesis/shared-beta-spine-shape-census.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shared-beta-spine-shape-evidence
+          path: genesis/evidence/shared-beta-spine-shape-census.json
+          if-no-files-found: error
