@@ -1,0 +1,29 @@
+name: MDA nested minor order diagnostic
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/nested-minor-order-diagnostic.mjs'
+      - '.github/workflows/mda-nested-minor-order-diagnostic.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build nested witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test init-prelude
+          ./lka.py build-test perf/grind-ring-5
+      - name: Extract mutual minor order
+        run: node experiments/nested-minor-order-diagnostic.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nested-minor-order-${{ github.sha }}
+          path: genesis/evidence/nested-minor-order-diagnostic.json
+          if-no-files-found: error
