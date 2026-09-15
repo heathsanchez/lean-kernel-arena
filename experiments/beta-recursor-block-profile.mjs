@@ -314,7 +314,10 @@ function evalRows(mode,enabled,subset){
       stack_attempt_steps:r.stack_attempt_steps??null,fallback_mode:r.fallback_mode??null,
       fallback_attempt_reason:r.fallback_attempt_reason??null,fallback_attempt_steps:r.fallback_attempt_steps??null});
   }
-  const delta={};for(const k of Object.keys(before))delta[k]=stats[k]-before[k];
+  const delta={};
+  for(const k of Object.keys(before)){
+    if(typeof before[k]==="number") delta[k]=stats[k]-before[k];
+  }
   return {mode,counts,wrong,totalSteps,totalConstructed,elapsed_ms:Date.now()-t0,stats:delta,results};
 }
 
