@@ -1,0 +1,32 @@
+name: MDA Pi-only creative long-tail stress
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/pi-only-creative-long-tail-stress.mjs'
+      - '.github/workflows/mda-pi-only-creative-long-tail-stress.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stress:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Reconstruct retained present
+        run: timeout 30s node --stack-size=32768 genesis/test.mjs
+      - name: Build complete CI Arena set
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-test --skip-ci
+      - name: Stress Pi-only creative schedule
+        run: timeout 240s node --stack-size=32768 genesis/pi-only-creative-long-tail-stress.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pi-only-creative-long-tail-${{ github.sha }}
+          path: genesis/evidence/pi-only-creative-long-tail-stress.json
+          if-no-files-found: error
