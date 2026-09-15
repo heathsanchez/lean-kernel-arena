@@ -10,4 +10,5 @@ import "./declaration-instantiation-cache.mjs";
 import "./localdef-continuation.mjs";
 import "./localdef-getapp-cache.mjs";
 import "./rigid-constructor-reject.mjs";
+import "./scoped-beta-spine.mjs";
 export * from "./kernel-semantic.mjs";
