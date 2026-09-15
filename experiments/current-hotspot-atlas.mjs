@@ -1,4 +1,4 @@
-// Current retained-kernel hotspot atlas.
+// Current retained-kernel hotspot atlas. Re-profiled after the 111/71/6 retained state.
 // Instrumentation only: attributes charged semantic ticks to the innermost
 // retained operation on the live residual frontier. No verdict/budget behavior
 // is changed.
