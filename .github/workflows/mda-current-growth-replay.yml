@@ -1,0 +1,19 @@
+name: MDA current growth replay
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - '.github/workflows/mda-current-growth-replay.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: timeout 30s node genesis/test.mjs
