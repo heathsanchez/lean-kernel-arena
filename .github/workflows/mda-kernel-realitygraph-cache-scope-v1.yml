@@ -1,0 +1,29 @@
+name: MDA Kernel RealityGraph cache scope
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/kernel-realitygraph-cache-scope-v1.mjs'
+      - '.github/workflows/mda-kernel-realitygraph-cache-scope-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  scope:
+    strategy:
+      fail-fast: false
+      matrix:
+        scope: [closed, support]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      KERNEL_RG_SCOPE: ${{ matrix.scope }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Test RealityGraph cache scope
+        run: timeout 840s node experiments/kernel-realitygraph-cache-scope-v1.mjs
