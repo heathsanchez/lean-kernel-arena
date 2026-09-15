@@ -1,4 +1,5 @@
 name: MDA magma pair frontier
+# rerun against current retained kernel
 on:
   push:
     branches: [mda-kernel-genesis-v1]
