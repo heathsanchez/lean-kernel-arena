@@ -1,0 +1,30 @@
+name: MDA transactional conversion separator
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/transactional-conversion-separator.mjs'
+      - '.github/workflows/mda-transactional-conversion.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Test transactional conversion probes
+        run: timeout 180s node genesis/transactional-conversion-separator.mjs
+      - name: Preserve separator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-transactional-conversion-${{ github.sha }}
+          path: genesis/evidence/transactional-conversion-separator.json
+          if-no-files-found: warn
