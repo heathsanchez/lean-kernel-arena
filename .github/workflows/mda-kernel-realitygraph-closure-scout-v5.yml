@@ -1,0 +1,23 @@
+name: MDA Kernel RealityGraph closure scout v5
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/kernel-realitygraph-closure-scout-v5.mjs'
+      - '.github/workflows/mda-kernel-realitygraph-closure-scout-v5.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  scout:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Evaluate finite Boolean computation with structural closures
+        run: timeout 660s node experiments/kernel-realitygraph-closure-scout-v5.mjs
