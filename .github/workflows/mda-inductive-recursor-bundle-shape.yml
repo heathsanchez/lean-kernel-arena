@@ -1,0 +1,37 @@
+name: MDA inductive recursor bundle shape
+
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/inductive-recursor-bundle-shape.mjs'
+      - '.github/workflows/mda-inductive-recursor-bundle-shape.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: \${{ secrets.GITHUB_TOKEN }}
+      - name: Build oversized witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test init-prelude
+          ./lka.py build-test perf/grind-ring-5
+      - name: Inspect recursor-count mismatches
+        run: node experiments/inductive-recursor-bundle-shape.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: inductive-recursor-bundle-shape-\${{ github.sha }}
+          path: genesis/evidence/inductive-recursor-bundle-shape.json
+          if-no-files-found: error
