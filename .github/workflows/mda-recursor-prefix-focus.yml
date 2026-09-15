@@ -1,0 +1,22 @@
+name: MDA recursor prefix focus
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/recursor-prefix-cache-focus.mjs'
+      - '.github/workflows/mda-recursor-prefix-focus.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  focus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build Arena set
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-test --skip-ci
+      - name: Run focus
+        run: timeout 120s node --stack-size=32768 genesis/recursor-prefix-cache-focus.mjs
