@@ -6,7 +6,10 @@ on:
       - 'genesis/creative-pi-cap-sweep.mjs'
       - '.github/workflows/mda-creative-pi-cap-sweep.yml'
   workflow_dispatch:
-permissions: {contents: read}
+
+permissions:
+  contents: read
+
 jobs:
   sweep:
     runs-on: ubuntu-24.04
@@ -14,7 +17,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: cachix/install-nix-action@v31
-        with: {github_access_token: ${{ secrets.GITHUB_TOKEN }}}
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Build creative witnesses
         shell: 'nix develop -c bash -euxo pipefail {0}'
         run: |
@@ -23,7 +27,8 @@ jobs:
           ./lka.py build-test undecidability/subject-reduction-redex
           ./lka.py build-test undecidability/alg-conv-trans-acc
           ./lka.py build-test undecidability/subject-reduction-reduct
-      - run: timeout 120s node --stack-size=32768 genesis/creative-pi-cap-sweep.mjs
+      - name: Sweep Pi transaction caps
+        run: timeout 120s node --stack-size=32768 genesis/creative-pi-cap-sweep.mjs
       - if: always()
         uses: actions/upload-artifact@v4
         with:
