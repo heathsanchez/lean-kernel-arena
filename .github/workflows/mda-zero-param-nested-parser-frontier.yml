@@ -1,0 +1,60 @@
+name: MDA zero-param nested parser frontier
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/zero-param-nested-parser-frontier.mjs'
+      - '.github/workflows/mda-zero-param-nested-parser-frontier.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  frontier:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build nested witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test init-prelude
+          ./lka.py build-test perf/grind-ring-5
+          ./lka.py build-test nested-unused-param
+          ./lka.py build-test nested-nonuniform-param
+      - name: Create zero-parameter nested parser candidate
+        run: |
+          rm -rf /tmp/mathgraph-zero-nested
+          cp -R genesis /tmp/mathgraph-zero-nested
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("/tmp/mathgraph-zero-nested/kernel-base.mjs")
+          s=p.read_text()
+          s=s.replace("input.length>2000000","input.length>16000000")
+          s=s.replace("++parsed>100000","++parsed>300000")
+          old='if(v.recs.length!==v.types.length) reject("inductive-recursor-count");'
+          new='''const nestedRuleCtors=new Set(v.recs.flatMap(r=>(r?.rules??[]).map(rr=>rr?.ctor)));
+        const source=v.types.length===1?v.types[0]:null;
+        const zeroNestedEnvelope=!!source &&
+          source.numParams===0 && source.numIndices===0 && source.isUnsafe===false &&
+          Number.isSafeInteger(source.numNested) && source.numNested>0 &&
+          v.recs.length===1+source.numNested &&
+          v.recs.every(r=>r && r.numMotives===1+source.numNested &&
+            r.numMinors===nestedRuleCtors.size);
+        if(!zeroNestedEnvelope && v.recs.length!==v.types.length) reject("inductive-recursor-count");'''
+          if old not in s: raise SystemExit("recursor-count patch point missing")
+          s=s.replace(old,new,1)
+          old2='if(rec.numMinors!==v.ctors.length) reject("inductive-minor-count");'
+          new2='if(!zeroNestedEnvelope && rec.numMinors!==v.ctors.length) reject("inductive-minor-count");'
+          if old2 not in s: raise SystemExit("minor-count patch point missing")
+          s=s.replace(old2,new2,1)
+          p.write_text(s)
+          PY
+      - name: Expose next nested frontier
+        run: timeout 180s node --stack-size=32768 experiments/zero-param-nested-parser-frontier.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zero-param-nested-parser-frontier-${{ github.sha }}
+          path: genesis/evidence/zero-param-nested-parser-frontier.json
+          if-no-files-found: error
