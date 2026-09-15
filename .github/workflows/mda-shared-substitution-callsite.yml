@@ -1,0 +1,29 @@
+name: MDA shared substitution callsite
+on:
+  push:
+    branches:
+      - mda-kernel-genesis-v1
+    paths:
+      - genesis/shared-substitution-callsite.mjs
+      - .github/workflows/mda-shared-substitution-callsite.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  census:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build shared witness
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-test perf/shared-subterm
+      - name: Localize substitution callers
+        run: timeout 150s node --stack-size=32768 genesis/shared-substitution-callsite.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shared-substitution-callsite-evidence
+          path: genesis/evidence/shared-substitution-callsite.json
+          if-no-files-found: error
