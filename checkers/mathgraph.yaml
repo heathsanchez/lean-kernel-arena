@@ -9,10 +9,13 @@ description: |
   used to construct it.
 
   Unsupported or resource-bounded inputs are declined (exit 2), never guessed.
-dir: mathgraph
+url: https://github.com/heathsanchez/lean-kernel-arena
+ref: mathgraph-arena-submission-v1
+rev: debbf137a0470707226e16c87a36364309a4e97f
 build: |
+  cd checkers/mathgraph
   for f in *.mjs; do node --check "$f"; done
-run: node main.mjs "$IN"
+run: node checkers/mathgraph/main.mjs "$IN"
 threads: 1
 declines:
   - undecidability/alg-conv-trans-acc-left
