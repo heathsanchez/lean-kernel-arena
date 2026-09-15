@@ -17,4 +17,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: timeout 100s node experiments/early-proof-irrelevance-focus.mjs
+      - name: Reconstruct retained present
+        run: timeout 30s node genesis/test.mjs
+      - name: Probe early proof irrelevance
+        run: timeout 100s node experiments/early-proof-irrelevance-focus.mjs
