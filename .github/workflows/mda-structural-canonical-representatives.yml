@@ -1,0 +1,30 @@
+name: MDA structural canonical representatives
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/structural-canonical-representatives.mjs'
+      - '.github/workflows/mda-structural-canonical-representatives.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Test exact structural canonical representatives
+        run: timeout 360s node experiments/structural-canonical-representatives.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: structural-canonical-representatives-${{ github.sha }}
+          path: genesis/evidence/structural-canonical-representatives.json
+          if-no-files-found: warn
