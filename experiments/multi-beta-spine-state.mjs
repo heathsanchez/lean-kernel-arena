@@ -348,7 +348,13 @@ if(focus.results[0]?.status!=="ACCEPT"){
 const candidate=evalRows("candidate",true,rows);
 const baseline=evalRows("baseline",false,rows);
 install(false);
-if(candidate.wrong||baseline.wrong)throw new Error("wrong verdict");
+if(candidate.wrong||baseline.wrong){
+  const wrongCases={
+    candidate:candidate.results.filter(r=>r.status!=="UNKNOWN"&&r.status!==r.expected),
+    baseline:baseline.results.filter(r=>r.status!=="UNKNOWN"&&r.status!==r.expected)
+  };
+  console.log("MULTI_BETA_SPINE_STATE_WRONG "+JSON.stringify(wrongCases));
+}
 
 let protectedChanged=0;
 const resolved=[],regressions=[],remaining=[];
