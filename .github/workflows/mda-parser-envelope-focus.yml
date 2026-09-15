@@ -1,0 +1,45 @@
+name: MDA parser envelope focus
+
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/parser-envelope-focus.mjs'
+      - '.github/workflows/mda-parser-envelope-focus.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build oversized Arena witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test init-prelude
+          ./lka.py build-test perf/grind-ring-5
+      - name: Create resource-envelope-only kernel copy
+        run: |
+          rm -rf /tmp/mathgraph-parser-envelope
+          cp -R genesis /tmp/mathgraph-parser-envelope
+          sed -i 's/input.length>2000000/input.length>16000000/' /tmp/mathgraph-parser-envelope/kernel-base.mjs
+          sed -i 's/++parsed>100000/++parsed>300000/' /tmp/mathgraph-parser-envelope/kernel-base.mjs
+          grep -q 'input.length>16000000' /tmp/mathgraph-parser-envelope/kernel-base.mjs
+          grep -q '++parsed>300000' /tmp/mathgraph-parser-envelope/kernel-base.mjs
+      - name: Test enlarged parser envelope
+        run: timeout 300s node --stack-size=32768 experiments/parser-envelope-focus.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parser-envelope-focus-${{ github.sha }}
+          path: genesis/evidence/parser-envelope-focus.json
+          if-no-files-found: error
