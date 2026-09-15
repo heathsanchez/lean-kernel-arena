@@ -5,6 +5,10 @@ import { Kernel } from "./kernel-base.mjs";
 // explicit work stacks, so stack safety does not discard the previously earned
 // per-subtree reuse. Keys remain exact: expression/argument object identity
 // plus every numeric parameter. Only successful completed results are cached.
+//
+// An exact cache hit is a compiled successful consequence: the identical
+// transform has already been verified and paid for in this run, so reuse does
+// not repay semantic work. This mirrors the retained normalization cache.
 const oldRun = Kernel.prototype.run;
 
 Kernel.prototype.run = function(...args) {
@@ -55,7 +59,6 @@ Kernel.prototype.shift = function(root,amount,cut=0) {
 
     const e=f.e,c=f.cut,key=`${amount}:${c}`,cache=shiftMap(this,e);
     if(cache.has(key)) {
-      this.tick();
       vals.push(cache.get(key));
       continue;
     }
@@ -114,7 +117,6 @@ Kernel.prototype.substitute = function(root,arg,depth=0) {
 
     const e=f.e,d=f.depth,cache=substMap(this,e,arg);
     if(cache.has(d)) {
-      this.tick();
       vals.push(cache.get(d));
       continue;
     }
