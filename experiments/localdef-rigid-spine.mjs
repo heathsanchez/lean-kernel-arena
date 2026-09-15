@@ -29,25 +29,77 @@ const focusRows=rows.filter(r=>r.name.endsWith("good/perf/fueled-chain.ndjson"))
 const proto=K.Kernel.prototype,retainedEqual=proto.equal;
 const stats={piProbe:0,piSuccess:0,localVarProbe:0,localVarRelay:0,etaRelay:0,etaExpand:0,subtypeProofSkip:0,outer:0,inner:0,success:0,fallback:0,argChecks:0,maxDepth:0};
 const fallbackDetails=[];
-const eqCacheStats={queries:0,hits:0,stores:0};
-function eqObjectId(k,x){
-  k.__localEqIds??=new WeakMap();k.__localEqNextId??=1;
-  let id=k.__localEqIds.get(x);
-  if(id!==undefined)return id;
-  id=k.__localEqNextId++;k.__localEqIds.set(x,id);return id;
-}
-function eqCtxKey(k,ctx){
-  if(!ctx?.length)return "";
-  return ctx.map(x=>(x!==null&&(typeof x==="object"||typeof x==="function"))
-    ?"o"+eqObjectId(k,x):typeof x+":"+String(x)).join(",");
-}
-function eqCapsKey(k){return [...(k.caps??[])].sort().join("\u0000");}
-function eqPairSet(k,a,b){
+const eqCacheStats={queries:0,hits:0,stores:0,termCanonical:0,ctxCanonical:0};
+const EQ_END=Symbol("eq-end");
+function ensureEqCanon(k){
+  k.__eqTermWeak??=new WeakMap();
+  k.__eqTermRoot??=new Map();
+  k.__eqEntryWeak??=new WeakMap();
+  k.__eqEntryRoot??=new Map();
+  k.__eqCtxRoot??=new Map();
+  k.__eqEmptyCtx??={kind:"empty-context"};
   k.__localEqCache??=new WeakMap();
-  let byA=k.__localEqCache.get(a);
-  if(!byA){byA=new WeakMap();k.__localEqCache.set(a,byA);}
-  let s=byA.get(b);
-  if(!s){s=new Set();byA.set(b,s);}
+}
+function eqTermRep(k,e){
+  if(!Array.isArray(e))return e;
+  ensureEqCanon(k);
+  const prior=k.__eqTermWeak.get(e);
+  if(prior!==undefined)return prior;
+  const xs=new Array(e.length);
+  let changed=false;
+  for(let i=0;i<e.length;i++){
+    const y=Array.isArray(e[i])?eqTermRep(k,e[i]):e[i];
+    xs[i]=y;if(y!==e[i])changed=true;
+  }
+  let node=k.__eqTermRoot;
+  for(const x of xs){
+    let next=node.get(x);
+    if(!(next instanceof Map)){next=new Map();node.set(x,next);}
+    node=next;
+  }
+  let rep=node.get(EQ_END);
+  if(rep===undefined){rep=changed?xs:e;node.set(EQ_END,rep);eqCacheStats.termCanonical++;}
+  k.__eqTermWeak.set(e,rep);k.__eqTermWeak.set(rep,rep);
+  return rep;
+}
+function eqEntryRep(k,x){
+  if(Array.isArray(x))return eqTermRep(k,x);
+  if(x?.__localDef!==true || x===null || typeof x!=="object")return x;
+  ensureEqCanon(k);
+  const prior=k.__eqEntryWeak.get(x);
+  if(prior!==undefined)return prior;
+  const t=eqTermRep(k,x.type),v=eqTermRep(k,x.value);
+  let byType=k.__eqEntryRoot.get(t);
+  if(!(byType instanceof Map)){byType=new Map();k.__eqEntryRoot.set(t,byType);}
+  let rep=byType.get(v);
+  if(rep===undefined){rep={kind:"local-def-entry",type:t,value:v};byType.set(v,rep);}
+  k.__eqEntryWeak.set(x,rep);
+  return rep;
+}
+function eqCtxRep(k,ctx){
+  ensureEqCanon(k);
+  if(!ctx?.length)return k.__eqEmptyCtx;
+  let node=k.__eqCtxRoot;
+  for(const x of ctx){
+    const r=eqEntryRep(k,x);
+    let next=node.get(r);
+    if(!(next instanceof Map)){next=new Map();node.set(r,next);}
+    node=next;
+  }
+  let rep=node.get(EQ_END);
+  if(rep===undefined){rep={kind:"context",length:ctx.length};node.set(EQ_END,rep);eqCacheStats.ctxCanonical++;}
+  return rep;
+}
+function eqCapsKey(k){return (k.localDefs?"L|":"N|")+[...(k.caps??[])].sort().join("\u0000");}
+function eqPairSet(k,a,b,ctx){
+  ensureEqCanon(k);
+  const ra=eqTermRep(k,a),rb=eqTermRep(k,b),cr=eqCtxRep(k,ctx);
+  let byA=k.__localEqCache.get(ra);
+  if(!byA){byA=new WeakMap();k.__localEqCache.set(ra,byA);}
+  let byB=byA.get(rb);
+  if(!byB){byB=new WeakMap();byA.set(rb,byB);}
+  let s=byB.get(cr);
+  if(!s){s=new Set();byB.set(cr,s);}
   return s;
 }
 function shape(e){
@@ -233,11 +285,11 @@ function install(enabled){
     if(!Array.isArray(a)||!Array.isArray(b))
       return alignedEqual.call(this,a,b,ctx);
     eqCacheStats.queries++;
-    const key=(this.localDefs?"L|":"N|")+eqCapsKey(this)+"|"+eqCtxKey(this,ctx);
-    const set=eqPairSet(this,a,b);
+    const key=eqCapsKey(this);
+    const set=eqPairSet(this,a,b,ctx);
     if(set.has(key)){eqCacheStats.hits++;return;}
     const out=alignedEqual.call(this,a,b,ctx);
-    set.add(key);eqPairSet(this,b,a).add(key);eqCacheStats.stores++;
+    set.add(key);eqPairSet(this,b,a,ctx).add(key);eqCacheStats.stores++;
     return out;
   };
 }
