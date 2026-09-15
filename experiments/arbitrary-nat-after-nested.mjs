@@ -28,7 +28,7 @@ function rewrite(input){
 const CASES=[
  ["init-prelude","ACCEPT",true],
  ["perf/grind-ring-5","ACCEPT",true],
- ["tutorial/101_natLitEq","ACCEPT",false],
+ ["nat-rec-rules","REJECT",false],
  ["nested-unused-param","REJECT",false],
  ["nested-nonuniform-param","either",false]
 ];
