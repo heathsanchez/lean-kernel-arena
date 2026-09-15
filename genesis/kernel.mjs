@@ -6,5 +6,6 @@ import "./rigid-type-spine.mjs";
 import "./lazy-delta.mjs";
 import "./early-proof-irrelevance.mjs";
 import "./consequence-cache.mjs";
+import "./declaration-instantiation-cache.mjs";
 import "./localdef-continuation.mjs";
 export * from "./kernel-semantic.mjs";
