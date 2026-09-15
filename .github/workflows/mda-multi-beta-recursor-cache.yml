@@ -1,0 +1,29 @@
+name: MDA multi beta recursor cache
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/multi-beta-recursor-cache.mjs'
+      - '.github/workflows/mda-multi-beta-recursor-cache.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separator:
+    runs-on: macos-15
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: node genesis/test.mjs
+      - name: Run compiled beta WHNF consequence
+        run: node experiments/multi-beta-recursor-cache.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: multi-beta-recursor-cache-${{ github.sha }}
+          path: genesis/evidence/multi-beta-recursor-cache.json
+          if-no-files-found: ignore
+          retention-days: 7
