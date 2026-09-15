@@ -42,6 +42,20 @@ function adjusted(op,underBinder) {
   if(op.kind==="shift") return {kind:"shift",amount:op.amount,cut:op.cut+1};
   return {kind:"subst",arg:op.arg,depth:op.depth+1};
 }
+function objectId(kernel,x) {
+  kernel.__lazyObjectIds ??= new WeakMap();
+  kernel.__lazyNextObjectId ??= 1;
+  let id=kernel.__lazyObjectIds.get(x);
+  if(id!==undefined) return id;
+  id=kernel.__lazyNextObjectId++;
+  kernel.__lazyObjectIds.set(x,id);
+  return id;
+}
+function opsKey(kernel,ops) {
+  return ops.map(op=>op.kind==="shift"
+    ? "s:"+op.amount+":"+op.cut
+    : "u:"+objectId(kernel,op.arg)+":"+op.depth).join("|");
+}
 function closure(kernel,base,ops) {
   if(!Array.isArray(base) || ops.length===0) return base;
   if(isLazy(base)) {
@@ -49,6 +63,14 @@ function closure(kernel,base,ops) {
     base=m.base;
     ops=m.ops.concat(ops);
   }
+
+  kernel.__lazyClosureCache ??= new WeakMap();
+  let byOps=kernel.__lazyClosureCache.get(base);
+  if(!byOps) { byOps=new Map(); kernel.__lazyClosureCache.set(base,byOps); }
+  const key=opsKey(kernel,ops);
+  const prior=byOps.get(key);
+  if(prior!==undefined) return prior;
+
   const meta={kernel,base,ops,view:null,proxy:null};
   const target=[];
   const proxy=new Proxy(target,{
@@ -61,6 +83,7 @@ function closure(kernel,base,ops) {
     }
   });
   meta.proxy=proxy;
+  byOps.set(key,proxy);
   return proxy;
 }
 function force(meta) {
@@ -125,6 +148,9 @@ function install(enabled) {
   proto.run=function(...args) {
     this.__lazyShiftCache=new WeakMap();
     this.__lazySubstCache=new WeakMap();
+    this.__lazyClosureCache=new WeakMap();
+    this.__lazyObjectIds=new WeakMap();
+    this.__lazyNextObjectId=1;
     return originalRun.apply(this,args);
   };
 
