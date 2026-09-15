@@ -1,0 +1,30 @@
+name: MDA structural WHNF keys
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/structural-whnf-keys.mjs'
+      - '.github/workflows/mda-structural-whnf-keys.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Test ordinary structural WHNF consequence keys
+        run: timeout 660s node experiments/structural-whnf-keys.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: structural-whnf-keys-${{ github.sha }}
+          path: genesis/evidence/structural-whnf-keys.json
+          if-no-files-found: warn
