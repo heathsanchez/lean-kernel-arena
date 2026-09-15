@@ -1,0 +1,23 @@
+name: MDA Pi lazy congruence
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/pi-lazy-congruence.mjs'
+      - '.github/workflows/mda-pi-lazy-congruence.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Test lazy Pi congruence
+        run: timeout 540s node experiments/pi-lazy-congruence.mjs
