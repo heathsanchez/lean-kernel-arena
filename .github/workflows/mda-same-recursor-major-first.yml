@@ -1,0 +1,39 @@
+name: MDA same-recursor major first
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/same-recursor-major-first.mjs'
+      - '.github/workflows/mda-same-recursor-major-first.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  experiment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Reconstruct retained present
+        run: timeout 30s node --stack-size=32768 genesis/test.mjs
+      - name: Build focused witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test perf/shared-subterm
+          ./lka.py build-test perf/args-before-unfold
+          ./lka.py build-test perf/folded-constant-first
+          ./lka.py build-test perf/repeated-subproblem
+          ./lka.py build-test perf/discarded-argument-match
+          ./lka.py build-test undecidability/alg-conv-trans-acc
+          ./lka.py build-test undecidability/subject-reduction-reduct
+      - name: Drive recursor majors before minors
+        run: timeout 120s node --stack-size=32768 genesis/same-recursor-major-first.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: same-recursor-major-first-${{ github.sha }}
+          path: genesis/evidence/same-recursor-major-first.json
+          if-no-files-found: error
