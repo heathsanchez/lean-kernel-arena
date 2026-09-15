@@ -24,7 +24,8 @@ print(json.dumps(rows))
 const focusRows=JSON.parse(execFileSync("python3",["-c",py],{input:data,maxBuffer:50000000,timeout:10000}));
 
 const proto=K.Kernel.prototype,retainedRun=proto.run,retainedEqual=proto.equal,retainedWhnf=proto.whnf;
-const stats={eqHits:0,eqStores:0,earlyPi:0,frontiers:0,projectionEligible:0,projectionSuccess:0,argChecks:0,whnfQueries:0,whnfHits:0,whnfStores:0,whnfCanonNodes:0,whnfLocalBypass:0,localWhnfQueries:0,localWhnfHits:0,localWhnfStores:0,natPrimitiveQueries:0,natAdd:0,natMul:0,natMod:0,headDecide:0,headForallFin:0,headBallLT:0,headDecidableOfIff:0,headEqFin:0,headMagmaOp:0,headCountermodelOp:0,decideSamples:[],betaQueries:0,betaEligible:0,betaSuccesses:0,betaBinders:0,betaSubstNodes:0,betaSubstHits:0,betaFallbacks:0};
+const stats={eqHits:0,eqStores:0,earlyPi:0,frontiers:0,projectionEligible:0,projectionSuccess:0,argChecks:0,whnfQueries:0,whnfHits:0,whnfStores:0,whnfCanonNodes:0,whnfLocalBypass:0,localWhnfQueries:0,localWhnfHits:0,localWhnfStores:0,natPrimitiveQueries:0,natAdd:0,natMul:0,natMod:0,headDecide:0,headForallFin:0,headBallLT:0,headDecidableOfIff:0,headEqFin:0,headMagmaOp:0,headCountermodelOp:0,betaQueries:0,betaEligible:0,betaSuccesses:0,betaBinders:0,betaSubstNodes:0,betaSubstHits:0,betaFallbacks:0};
+const decideSamples=[];
 
 function objectId(k,x){
   k.__pairIds??=new WeakMap();k.__pairNextId??=1;
@@ -70,7 +71,7 @@ function countHead(e){
   switch(sp.head[1]){
     case DECIDE:
       stats.headDecide++;
-      if(stats.decideSamples.length<12)stats.decideSamples.push({
+      if(decideSamples.length<12)decideSamples.push({
         arity:sp.args.length,
         proposition:sp.args[0]?shortShape(sp.args[0]):null,
         instance:sp.args[1]?shortShape(sp.args[1]):null
@@ -324,7 +325,7 @@ function evaluate(budget,enabled,rows){
       frontier_declaration:r.frontier_declaration??null});
   }
   const d={};for(const k of Object.keys(before))d[k]=stats[k]-before[k];
-  return {budget,enabled,wrong,totalSteps,totalConstructed,elapsed_ms:Date.now()-t0,stats:d,results};
+  return {budget,enabled,wrong,totalSteps,totalConstructed,elapsed_ms:Date.now()-t0,stats:d,decideSamples:[...decideSamples],results};
 }
 const thresholds=[];
 for(const budget of [1000000]){
