@@ -1,0 +1,21 @@
+name: MDA WHNF cycle declarations
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/whnf-cycle-declarations.mjs'
+      - '.github/workflows/mda-whnf-cycle-declarations.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect WHNF cycle declarations
+        run: timeout 240s node experiments/whnf-cycle-declarations.mjs
