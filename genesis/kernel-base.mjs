@@ -1224,13 +1224,33 @@ function checkExport(input,capabilities,budget=200000) {
     if(quotStage!==0 && quotStage!==quotKinds.length) reject("quotient-package-incomplete");
     const retained=new Kernel(capabilities,budget).run(S(0),S(1),decls);
     let result=retained;
-    if(retained.status===UNKNOWN) {
+    let stackAttempt=null;
+
+    // Host recursion is an execution artifact, not a semantic frontier. Only
+    // after the retained checker demonstrates that exact obstruction do we
+    // replay with the slower continuation/work-stack evaluator.
+    if(retained.status===UNKNOWN && retained.reason==="host-stack-limit") {
+      const stackKernel=new Kernel(capabilities,budget);
+      stackKernel._fullStackSafe=true;
+      stackAttempt=stackKernel.run(S(0),S(1),decls);
+      if(stackAttempt.status!==UNKNOWN) {
+        result={...stackAttempt,fallback_mode:"stack-safe",
+          retained_reason:retained.reason,retained_steps:retained.steps??null};
+      }
+    }
+
+    if(result.status===UNKNOWN) {
       const local=new LocalDefKernel(capabilities,budget).run(S(0),S(1),decls);
       if(local.status!==UNKNOWN) {
         result={...local,fallback_mode:"local-def",retained_reason:retained.reason,
-          retained_steps:retained.steps??null};
+          retained_steps:retained.steps??null,
+          ...(stackAttempt?{stack_attempt_reason:stackAttempt.reason,
+            stack_attempt_steps:stackAttempt.steps??null}:{})};
       } else {
-        result={...retained,fallback_attempt_reason:local.reason,
+        result={...retained,
+          ...(stackAttempt?{stack_attempt_reason:stackAttempt.reason,
+            stack_attempt_steps:stackAttempt.steps??null}:{}),
+          fallback_attempt_reason:local.reason,
           fallback_attempt_steps:local.steps??null};
       }
     }
