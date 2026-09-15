@@ -120,13 +120,15 @@ function installLocalDefs(){
     const ctx=this.__activeCtx??[];
     if(Array.isArray(e)&&e[0]==="var"&&e[1]<ctx.length){
       const entry=ctx[ctx.length-1-e[1]];
-      if(e[1]===3&&ctx.length===7)
-        (this.__localTrace??=[]).push({where:"whnf",index:3,ctxlen:7,kind:entry?.__localDef===true?"local-def":"binder"});
+      if(e[1]===3)
+        (this.__localTrace??=[]).push({where:"whnf",index:3,ctxlen:ctx.length,
+          kind:entry?.__localDef===true?"local-def":"binder",
+          mapped_slot:ctx.length-1-e[1]});
       if(entry?.__localDef===true){
         this.tick(); this.need("reduction");
         const lifted=this.shift(entry.value,e[1]+1);
-        if(e[1]===3&&ctx.length===7)
-          (this.__localTrace??=[]).push({where:"whnf",event:"unfold",shift:e[1]+1,lifted:JSON.stringify(lifted).slice(0,500)});
+        if(e[1]===3)
+          (this.__localTrace??=[]).push({where:"whnf",event:"unfold",ctxlen:ctx.length,shift:e[1]+1,lifted:JSON.stringify(lifted).slice(0,500)});
         // Keep the local-definition slot in the dynamic context while unfolding.
         return this.whnf(lifted);
       }
