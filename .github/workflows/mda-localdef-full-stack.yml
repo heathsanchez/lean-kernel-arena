@@ -1,0 +1,30 @@
+name: MDA local-def stack-safe separator
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/localdef-full-stack.mjs'
+      - '.github/workflows/mda-localdef-full-stack.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Replay local-definition fallback with continuation machine
+        run: timeout 150s node experiments/localdef-full-stack.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-localdef-full-stack-${{ github.sha }}
+          path: genesis/evidence/localdef-full-stack.json
+          if-no-files-found: warn
