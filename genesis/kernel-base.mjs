@@ -923,14 +923,14 @@ class LocalDefKernel extends Kernel {
   }
   whnf(e) {
     const ctx=this._activeCtx??[];
-    if(Array.isArray(e) && e[0]==="var" && e[1]<ctx.length) {
-      const entry=ctx[ctx.length-1-e[1]];
-      if(entry?.__localDef===true) {
-        this.tick(); this.need("reduction");
-        return this.whnf(this.shift(entry.value,e[1]+1));
-      }
+    let cur=e;
+    while(Array.isArray(cur) && cur[0]==="var" && cur[1]<ctx.length) {
+      const entry=ctx[ctx.length-1-cur[1]];
+      if(entry?.__localDef!==true) break;
+      this.tick(); this.need("reduction");
+      cur=this.shift(entry.value,cur[1]+1);
     }
-    return super.whnf(e);
+    return super.whnf(cur);
   }
   equal(a,b,ctx=[]) {
     return this.withCtx(ctx,()=>super.equal(a,b,ctx));
