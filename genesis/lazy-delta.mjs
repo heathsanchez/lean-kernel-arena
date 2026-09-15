@@ -154,7 +154,10 @@ function reduceHeadOnce(kernel,t,allowMajor=true) {
 }
 
 Kernel.prototype.equal = function(a,b,ctx=[]) {
-  if(this.localDefs) return fallbackEqual.call(this,a,b,ctx);
+  // This execution optimization was acquired after function eta in the retained
+  // developmental sequence. Do not let it mask that capability's ablation.
+  if(this.localDefs || !this.caps.has("function-eta"))
+    return fallbackEqual.call(this,a,b,ctx);
 
   const depth=this._lazyDeltaDepth??0;
   if(this.same(a,b)) return;
