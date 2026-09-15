@@ -1,19 +1,54 @@
 import { Kernel } from "./kernel-base.mjs";
 
-// Retained execution consequence from the LocalDef continuation separator.
+// Retained execution consequences from the LocalDef continuation separators.
 //
 // The fast local-definition fallback keeps exactly the same variable lookup,
 // local-definition context, typing, conversion, substitution and capability
-// rules. Only nested app/lambda/let inference control flow changes: JavaScript
-// recursion is replaced by an explicit continuation stack.
+// rules. Nested app/lambda/let inference uses an explicit continuation stack.
+//
+// Successful inference is also memoized at each exact continuation-machine DAG
+// node under the complete exact local context. This is execution compilation
+// only: failures are never cached and semantic rules are unchanged.
 //
 // This module is imported after consequence-cache.mjs so it wraps the exact
-// retained inference stack that was replayed on all 188 Arena cases.
+// retained inference stack replayed on all 188 Arena cases.
 
+const retainedRun=Kernel.prototype.run;
 const retainedInfer=Kernel.prototype.infer;
+
+function objectId(k,x) {
+  k.__localMachineCtxIds ??= new WeakMap();
+  k.__localMachineNextId ??= 1;
+  let id=k.__localMachineCtxIds.get(x);
+  if(id!==undefined) return id;
+  id=k.__localMachineNextId++;
+  k.__localMachineCtxIds.set(x,id);
+  return id;
+}
+
+function ctxKey(k,ctx) {
+  if(!ctx?.length) return "";
+  return ctx.map(x=>(x!==null&&(typeof x==="object"||typeof x==="function"))
+    ?"o"+objectId(k,x)
+    :typeof x+":"+String(x)).join(",");
+}
 
 function scoped(k,ctx,fn) {
   return typeof k.withCtx==="function" ? k.withCtx(ctx,fn) : fn();
+}
+
+function cacheGet(k,e,ctx) {
+  if(!Array.isArray(e)) return {hit:false,key:null,map:null};
+  k.__localMachineInfer ??= new WeakMap();
+  let byCtx=k.__localMachineInfer.get(e);
+  if(!(byCtx instanceof Map)) {
+    byCtx=new Map();
+    k.__localMachineInfer.set(e,byCtx);
+  }
+  const key=ctxKey(k,ctx);
+  return byCtx.has(key)
+    ? {hit:true,value:byCtx.get(key),key,map:byCtx}
+    : {hit:false,key,map:byCtx};
 }
 
 function localContinuationInfer(root,rootCtx) {
@@ -22,6 +57,14 @@ function localContinuationInfer(root,rootCtx) {
 
   while(true) {
     if(!returning) {
+      const memo=cacheGet(this,e,ctx);
+      if(memo.hit) {
+        value=memo.value;
+        returning=true;
+        continue;
+      }
+      if(memo.map) kont.push({kind:"memo",map:memo.map,key:memo.key});
+
       if(Array.isArray(e) && e[0]==="app") {
         this.tick(); this.need("application");
         kont.push({kind:"app-fn",arg:e[2],ctx});
@@ -64,6 +107,11 @@ function localContinuationInfer(root,rootCtx) {
     if(!kont.length) return value;
     const k=kont.pop();
 
+    if(k.kind==="memo") {
+      k.map.set(k.key,value);
+      continue;
+    }
+
     if(k.kind==="lam") {
       value=this.make("pi",k.domain,value);
       ctx=k.ctx;
@@ -103,6 +151,13 @@ function localContinuationInfer(root,rootCtx) {
     throw new Error("unknown local continuation frame");
   }
 }
+
+Kernel.prototype.run=function(...args) {
+  this.__localMachineInfer=new WeakMap();
+  this.__localMachineCtxIds=new WeakMap();
+  this.__localMachineNextId=1;
+  return retainedRun.apply(this,args);
+};
 
 Kernel.prototype.infer=function(e,ctx=[]) {
   if(this.localDefs!==true) return retainedInfer.call(this,e,ctx);
