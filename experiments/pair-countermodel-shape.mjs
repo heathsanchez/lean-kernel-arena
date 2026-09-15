@@ -49,13 +49,13 @@ const py=[
 "            arity+=1;cur=exprs[cur][1].get('fn')",
 "          if cur in exprs and exprs[cur][0]=='const':",
 "            vv=exprs[cur][1]; ni=vv.get('name') if isinstance(vv,dict) else None",
-"            appheads[(names.get(ni,str(ni)),arity)]+=1"
+"            appheads[(names.get(ni,str(ni)),arity)]+=1",
 "    return {'root_tag':exprs[root][0],'unique_nodes':len(seen),'max_depth':max_depth,'tags':dict(tags),",
 "      'root_lambda_spine':lam,'root_app_spine':app,'root_let_spine':letn,'shared_nodes':len(shared),",
 "      'max_indegree':max([c for _,c,_ in shared],default=1),",
 "      'top_shared':[{'id':n,'indegree':c,'tag':t} for n,c,t in shared[:20]],",
 "      'top_consts':[{'name':n,'count':c} for n,c in consts.most_common(30)],",
-"      'top_app_heads':[{'name':n,'arity':a,'count':c} for (n,a),c in appheads.most_common(40)]}"
+"      'top_app_heads':[{'name':n,'arity':a,'count':c} for (n,a),c in appheads.most_common(40)]}",
 "",
 "with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as a:",
 "  for m in a:",
