@@ -4,6 +4,10 @@ import { Kernel } from "./kernel-base.mjs";
 // deterministic successful consequence of an exact expression under one
 // monotonic kernel run. Cache successes only; failures/frontiers are never
 // retained. Weak identity keys preserve the exact term, not an approximation.
+//
+// A cache hit deliberately does not tick: the separator established that the
+// expensive normalization consequence has already been paid for and compiled.
+// Re-charging semantic work on reuse erased the verified capability gain.
 const oldRun = Kernel.prototype.run;
 const oldNormal = Kernel.prototype.normal;
 
@@ -14,10 +18,8 @@ Kernel.prototype.run = function(...args) {
 
 Kernel.prototype.normal = function(e) {
   this._normalCache ??= new WeakMap();
-  if(Array.isArray(e) && this._normalCache.has(e)) {
-    this.tick();
+  if(Array.isArray(e) && this._normalCache.has(e))
     return this._normalCache.get(e);
-  }
   const out=oldNormal.call(this,e);
   if(Array.isArray(e)) this._normalCache.set(e,out);
   return out;
