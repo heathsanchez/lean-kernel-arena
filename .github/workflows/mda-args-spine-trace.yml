@@ -1,0 +1,23 @@
+name: MDA args spine trace
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/args-spine-trace.mjs'
+      - '.github/workflows/mda-args-spine-trace.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  trace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Trace successful congruence
+        run: timeout 60s node experiments/args-spine-trace.mjs
