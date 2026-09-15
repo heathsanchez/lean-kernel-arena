@@ -1,0 +1,32 @@
+name: MDA nested inductive full export census
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/nested-inductive-full-export-census.mjs'
+      - '.github/workflows/mda-nested-inductive-full-export-census.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  census:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build oversized witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test init-prelude
+          ./lka.py build-test perf/grind-ring-5
+      - name: Census every nested bundle
+        run: node experiments/nested-inductive-full-export-census.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nested-inductive-full-export-census-${{ github.sha }}
+          path: genesis/evidence/nested-inductive-full-export-census.json
+          if-no-files-found: error
