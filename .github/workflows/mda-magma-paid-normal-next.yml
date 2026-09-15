@@ -1,0 +1,23 @@
+name: MDA magma paid-normal continuation
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/magma-paid-normal-next.mjs'
+      - '.github/workflows/mda-magma-paid-normal-next.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Follow magma frontier at higher budgets
+        run: timeout 240s node experiments/magma-paid-normal-next.mjs
