@@ -1,0 +1,27 @@
+name: MDA shared-subterm top substitution census
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/shared-subterm-top-substitution-census.mjs'
+      - '.github/workflows/mda-shared-subterm-top-substitution-census.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build shared-subterm
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-test perf/shared-subterm
+      - name: Attribute top-level substitution cost
+        run: timeout 90s node --stack-size=32768 genesis/shared-subterm-top-substitution-census.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shared-top-substitution-census-${{ github.sha }}
+          path: genesis/evidence/shared-subterm-top-substitution-census.json
+          if-no-files-found: error
