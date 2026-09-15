@@ -1,0 +1,32 @@
+name: MDA shared-subterm lazy-delta pair path
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/shared-subterm-lazy-delta-pair-path.mjs'
+      - '.github/workflows/mda-shared-subterm-lazy-delta-pair-path.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  trace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Reconstruct retained present
+        run: timeout 30s node --stack-size=32768 genesis/test.mjs
+      - name: Build shared-subterm
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-test perf/shared-subterm
+      - name: Trace lazy-delta argument path
+        run: timeout 90s node --stack-size=32768 genesis/shared-subterm-lazy-delta-pair-path.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shared-subterm-lazy-delta-pair-path-${{ github.sha }}
+          path: genesis/evidence/shared-subterm-lazy-delta-pair-path.json
+          if-no-files-found: error
