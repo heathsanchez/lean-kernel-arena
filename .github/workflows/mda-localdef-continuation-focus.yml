@@ -1,0 +1,23 @@
+name: MDA LocalDef continuation focus
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/localdef-continuation-focus.mjs'
+      - '.github/workflows/mda-localdef-continuation-focus.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  focus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Probe exact LocalDef continuation
+        run: timeout 120s node experiments/localdef-continuation-focus.mjs
