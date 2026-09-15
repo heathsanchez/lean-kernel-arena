@@ -54,6 +54,16 @@ function administrative(k,t){
   }
   return cur;
 }
+function unfoldDefOnly(k,t){
+  const cur=administrative(k,t),s=rawSpine(cur);
+  if(!Array.isArray(s.head)||s.head[0]!=="const")return null;
+  const d=k.env.get(s.head[1]);
+  if(d?.kind!=="def")return null;
+  k.tick();k.need("declarations");k.need("reduction");
+  let out=k.instantiateDeclaration(s.head,d.value);
+  out=administrative(k,rebuild(k,out,s.args));
+  return out;
+}
 function rawIota(k,t){
   const s=rawSpine(t),rh=s.head,rargs=s.args;
   if(!Array.isArray(rh)||rh[0]!=="const")return null;
@@ -138,7 +148,13 @@ function install(enabled){
       const kx=headKind(this,x),ky=headKind(this,y);
       // A folded definition is cheaper to expose than evaluating an already
       // exposed recursor. This is the unroll-vs-evaluate separator.
-      if(ky==="def"&&kx!=="def"){
+      if(kx==="rec"&&ky==="def"){
+        const ny=unfoldDefOnly(this,y);if(ny!==null&&ny!==y){y=ny;continue;}
+        const nx=reduceHeadOnce(this,x,true);if(nx!==null&&nx!==x){x=nx;continue;}
+      }else if(ky==="rec"&&kx==="def"){
+        const nx=unfoldDefOnly(this,x);if(nx!==null&&nx!==x){x=nx;continue;}
+        const ny=reduceHeadOnce(this,y,true);if(ny!==null&&ny!==y){y=ny;continue;}
+      }else if(ky==="def"&&kx!=="def"){
         const ny=reduceHeadOnce(this,y,true);if(ny!==null&&ny!==y){y=ny;continue;}
         const nx=reduceHeadOnce(this,x,true);if(nx!==null&&nx!==x){x=nx;continue;}
       }else{
