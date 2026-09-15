@@ -1,0 +1,30 @@
+name: MDA Kernel RealityGraph v1
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/kernel-realitygraph-v1.mjs'
+      - 'genesis/evidence/kernel-realitygraph-memory-v1.json'
+      - '.github/workflows/mda-kernel-realitygraph-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        probe: [orbit, context, delta]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      KERNEL_RG_PROBE: ${{ matrix.probe }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Run RealityGraph residual probe
+        run: timeout 660s node experiments/kernel-realitygraph-v1.mjs
