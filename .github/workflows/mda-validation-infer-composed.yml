@@ -1,0 +1,30 @@
+name: MDA validation + infer composition
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/validation-infer-composed.mjs'
+      - '.github/workflows/mda-validation-infer-composed.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Test composed exact consequence reuse
+        run: timeout 180s node --stack-size=32768 experiments/validation-infer-composed.mjs
+      - name: Preserve composition evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-validation-infer-composed-${{ github.sha }}
+          path: genesis/evidence/validation-infer-composed.json
+          if-no-files-found: warn
