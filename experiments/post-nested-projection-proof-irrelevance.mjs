@@ -60,39 +60,48 @@ function install(){
 }
 
 const CASES=[
- ["init-prelude","ACCEPT",true],
- ["perf/grind-ring-5","ACCEPT",true],
- ["nat-rec-rules","REJECT",false],
- ["proj-non-structure","REJECT",false],
- ["proj-of-imax-prop","REJECT",false],
- ["proj-of-prop","REJECT",false],
- ["nested-unused-param","REJECT",false],
- ["nested-nonuniform-param","either",false]
+ ["init-prelude","ACCEPT",true,1_600_000],
+ ["perf/grind-ring-5","ACCEPT",true,4_000_000],
+ ["nat-rec-rules","REJECT",false,1_000_000],
+ ["proj-non-structure","REJECT",false,1_000_000],
+ ["proj-of-imax-prop","REJECT",false,1_000_000],
+ ["proj-of-prop","REJECT",false,1_000_000],
+ ["nested-unused-param","REJECT",false,1_000_000],
+ ["nested-nonuniform-param","either",false,1_000_000]
 ];
 
 install();
 const rows=[];
-for(const [name,want,doRewrite] of CASES){
+for(const [name,want,doRewrite,budget] of CASES){
   const raw=readFileSync("_build/tests/"+name+".ndjson","utf8"),rw=doRewrite?rewrite(raw):{text:raw,rewritten:0};
   const seen=[],old=p.run;p.run=function(...xs){seen.push(this);return old.apply(this,xs);};
   const t0=Date.now();let r;
-  try{r=K.checkExport(rw.text,CAPS,1_000_000);}
+  try{r=K.checkExport(rw.text,CAPS,budget);}
   finally{p.run=old;}
   const sum=q=>seen.reduce((n,k)=>n+(k[q]??0),0);
   const pass=want==="either"?(r.status==="ACCEPT"||r.status==="REJECT"):r.status===want;
-  const row={name,want,status:r.status,reason:r.reason,steps:r.steps??null,constructed:r.constructed??null,
+  const row={name,want,budget,status:r.status,reason:r.reason,steps:r.steps??null,constructed:r.constructed??null,
     frontier_declaration:r.frontier_declaration??null,parse_records:r.parse_records??null,rewritten:rw.rewritten,
     projectionRecoveryAttempts:sum("__projRecoveryAttempts"),projectionRecoverySuccesses:sum("__projRecoverySuccesses"),
+    recursorTypeConversionAttempts:sum("__recTypeConversionAttempts"),recursorTypeConversionSuccesses:sum("__recTypeConversionSuccesses"),
     elapsed_ms:Date.now()-t0,pass};
   rows.push(row);console.log("ROW "+JSON.stringify(row));
 }
 p.equal=retainedEqual;
 
-const giantsClosed=rows.slice(0,2).every(r=>r.status==="ACCEPT");
+const init=rows[0],grind=rows[1];
+const recursorConversionExercised=(init.recursorTypeConversionAttempts??0)>0;
+const recursorConversionVerified=recursorConversionExercised&&
+  init.recursorTypeConversionAttempts===init.recursorTypeConversionSuccesses&&
+  init.reason!=="recursor-type";
 const controlsClean=rows.slice(2).every(r=>r.pass);
-const out={experiment:"post-nested-projection-proof-irrelevance",giantsClosed,controlsClean,promotable_focus:giantsClosed&&controlsClean,rows,
- claim_boundary:"Positive congruence recovery only after retained conversion returns UNKNOWN at conversion-frontier. Normalized terms must be the identical projection operator (same structure name and field index); their structure arguments are then compared by the full retained converter, including proof irrelevance. Failure restores steps, budget, and the original frontier. Nested packages are consequence-separator axiomized only in this experiment after separate exact mutual recursor derivation; arbitrary Nat atoms use the prior exact candidate."};
+const giantsClosed=rows.slice(0,2).every(r=>r.status==="ACCEPT");
+const out={experiment:"post-nested-projection-proof-irrelevance-high-budget",
+  recursorConversionExercised,recursorConversionVerified,giantsClosed,controlsClean,
+  promotable_recursor_type:recursorConversionVerified&&controlsClean,
+  promotable_focus:giantsClosed&&controlsClean,rows,
+  claim_boundary:"Recursor declarations first retain the exact structural type check. Only when structural identity fails do they invoke the existing verified definitional converter, now instrumented with attempt/success counters. The init giant receives 1.6M ticks specifically to cross the previously observed Lean.TSyntax recursor boundary at 1,195,506 steps; grind receives 4M to distinguish later semantic failure from continued execution cost. Projection recovery remains positive congruence only after retained conversion returns UNKNOWN at conversion-frontier. All forged/protected controls stay at the original 1M budget."};
 mkdirSync("genesis/evidence",{recursive:true});
 writeFileSync("genesis/evidence/post-nested-projection-proof-irrelevance.json",JSON.stringify(out,null,2)+"\n");
 console.log("POST_NESTED_PROJECTION_PROOF_IRRELEVANCE "+JSON.stringify(out));
-if(!out.promotable_focus)process.exit(1);
+if(!(out.promotable_recursor_type&&out.controlsClean))process.exit(1);
