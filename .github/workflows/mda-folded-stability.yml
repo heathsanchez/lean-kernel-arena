@@ -1,0 +1,21 @@
+name: MDA folded stability
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/folded-stability.mjs'
+      - '.github/workflows/mda-folded-stability.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: timeout 30s node genesis/test.mjs
+      - run: timeout 100s node experiments/folded-stability.mjs
