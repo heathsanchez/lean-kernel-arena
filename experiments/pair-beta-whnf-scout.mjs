@@ -24,7 +24,7 @@ print(json.dumps(rows))
 const focusRows=JSON.parse(execFileSync("python3",["-c",py],{input:data,maxBuffer:50000000,timeout:10000}));
 
 const proto=K.Kernel.prototype,retainedRun=proto.run,retainedEqual=proto.equal,retainedWhnf=proto.whnf;
-const stats={eqHits:0,eqStores:0,earlyPi:0,frontiers:0,projectionEligible:0,projectionSuccess:0,argChecks:0,whnfQueries:0,whnfHits:0,whnfStores:0,whnfCanonNodes:0,whnfLocalBypass:0,localWhnfQueries:0,localWhnfHits:0,localWhnfStores:0,natPrimitiveQueries:0,natAdd:0,natMul:0,natMod:0,betaQueries:0,betaEligible:0,betaSuccesses:0,betaBinders:0,betaSubstNodes:0,betaSubstHits:0,betaFallbacks:0};
+const stats={eqHits:0,eqStores:0,earlyPi:0,frontiers:0,projectionEligible:0,projectionSuccess:0,argChecks:0,whnfQueries:0,whnfHits:0,whnfStores:0,whnfCanonNodes:0,whnfLocalBypass:0,localWhnfQueries:0,localWhnfHits:0,localWhnfStores:0,natPrimitiveQueries:0,natAdd:0,natMul:0,natMod:0,headDecide:0,headForallFin:0,headBallLT:0,headDecidableOfIff:0,headEqFin:0,headMagmaOp:0,headCountermodelOp:0,betaQueries:0,betaEligible:0,betaSuccesses:0,betaBinders:0,betaSubstNodes:0,betaSubstHits:0,betaFallbacks:0};
 
 function objectId(k,x){
   k.__pairIds??=new WeakMap();k.__pairNextId??=1;
@@ -53,6 +53,21 @@ function lname(...parts){
 }
 const NAT_ZERO=lname("Nat","zero"),NAT_SUCC=lname("Nat","succ");
 const NAT_ADD=lname("Nat","add"),NAT_MUL=lname("Nat","mul"),NAT_MOD=lname("Nat","mod");
+const DECIDE=lname("Decidable","decide"),FORALL_FIN=lname("Nat","decidableForallFin"),BALL_LT=lname("Nat","decidableBallLT");
+const DECIDABLE_OF_IFF=lname("decidable_of_iff"),EQ_FIN=lname("instDecidableEqFin"),MAGMA_OP=lname("Magma","op"),COUNTERMODEL_OP=lname("countermodel","op");
+function countHead(e){
+  if(!Array.isArray(e)||e[0]!=="app")return;
+  const sp=rawSpine(e);if(sp.head?.[0]!=="const")return;
+  switch(sp.head[1]){
+    case DECIDE:stats.headDecide++;break;
+    case FORALL_FIN:stats.headForallFin++;break;
+    case BALL_LT:stats.headBallLT++;break;
+    case DECIDABLE_OF_IFF:stats.headDecidableOfIff++;break;
+    case EQ_FIN:stats.headEqFin++;break;
+    case MAGMA_OP:stats.headMagmaOp++;break;
+    case COUNTERMODEL_OP:stats.headCountermodelOp++;break;
+  }
+}
 
 function closedNat(e,limit=1000000){
   if(!Array.isArray(e))return null;
@@ -187,6 +202,7 @@ function install(enabled){
     return retainedRun.apply(this,args);
   };
   proto.whnf=function(e){
+    countHead(e);
     if(Array.isArray(e)&&e[0]==="app"){
       const nat=nativeNatPrimitive(this,e);
       if(nat!==null)return nat;
