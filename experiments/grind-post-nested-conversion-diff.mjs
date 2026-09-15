@@ -24,24 +24,25 @@ function rewrite(input){
  }
  return {text:out.join("\n")+"\n",rewritten};
 }
-function firstDiff(a,b){
- const stack=[{a,b,path:"$",binderDepth:0,trail:[]}];let common=0;
+function firstDiff(a,b,rootCtx=[]){
+ const stack=[{a,b,path:"$",binderDepth:0,trail:[],ctx:[...rootCtx]}];let common=0;
  while(stack.length){
   const q=stack.pop(),x=q.a,y=q.b;
   if(x===y){common++;continue;}
   if(!Array.isArray(x)||!Array.isArray(y))
-    return {path:q.path,left:x,right:y,common,binderDepth:q.binderDepth,trail:q.trail.slice(-16)};
+    return {path:q.path,left:x,right:y,common,binderDepth:q.binderDepth,trail:q.trail.slice(-16),ctx:q.ctx};
   if(x.length!==y.length||x[0]!==y[0])
     return {path:q.path,leftTag:x[0],rightTag:y[0],leftLen:x.length,rightLen:y.length,common,
-      binderDepth:q.binderDepth,trail:q.trail.slice(-16),
+      binderDepth:q.binderDepth,trail:q.trail.slice(-16),ctx:q.ctx,
       left:JSON.stringify(x).slice(0,800),right:JSON.stringify(y).slice(0,800)};
   const here={path:q.path,leftTag:x[0],rightTag:y[0],
     leftHead:JSON.stringify(x).slice(0,220),rightHead:JSON.stringify(y).slice(0,220),
     binderDepth:q.binderDepth};
   for(let i=x.length-1;i>=1;i--){
     const inc=((x[0]==="pi"||x[0]==="lam")&&i===2)||(x[0]==="let"&&i===3)?1:0;
+    const nextCtx=inc?[...q.ctx,x[1]]:q.ctx;
     stack.push({a:x[i],b:y[i],path:q.path+"["+i+"]",binderDepth:q.binderDepth+inc,
-      trail:q.trail.concat([here])});
+      trail:q.trail.concat([here]),ctx:nextCtx});
   }
   common++;
  }
@@ -71,10 +72,26 @@ for(const [index,k] of kernels.entries()){
  let x,y,diag;
  try{
   x=k.normal(c.a);y=k.normal(c.b);
-  const diff=firstDiff(x,y);
+  const rawDiff=firstDiff(x,y,c.ctx??[]);
+  const diffCtx=rawDiff.ctx??[]; const diff={...rawDiff}; delete diff.ctx;
+  let differingVar=null;
+  if(typeof diff.left==="number"&&typeof diff.right==="number"){
+    const lv=["var",diff.left],rv=["var",diff.right];
+    try{
+      const lt=k.infer(lv,diffCtx),rt=k.infer(rv,diffCtx);
+      const lsort=k.sortOf(lt,diffCtx),rsort=k.sortOf(rt,diffCtx);
+      const ln=k.normal(lt),rn=k.normal(rt);
+      differingVar={ctxDepth:diffCtx.length,leftIndex:diff.left,rightIndex:diff.right,
+        leftType:JSON.stringify(lt),rightType:JSON.stringify(rt),
+        leftTypeNormal:JSON.stringify(ln),rightTypeNormal:JSON.stringify(rn),
+        leftSort:JSON.stringify(lsort),rightSort:JSON.stringify(rsort),
+        sameRawType:k.same(lt,rt),sameNormalType:k.same(ln,rn),
+        leftIsProof:JSON.stringify(lsort)==="0",rightIsProof:JSON.stringify(rsort)==="0"};
+    }catch(e){differingVar={error:String(e?.stack??e).slice(0,1400)};}
+  }
   diag={index,localDefs:k.localDefs===true,atSteps:c.atSteps,ctxDepth:c.ctxDepth,
     leftBytes:JSON.stringify(x).length,rightBytes:JSON.stringify(y).length,
-    leftNodes:nodeCount(x),rightNodes:nodeCount(y),diff,
+    leftNodes:nodeCount(x),rightNodes:nodeCount(y),diff,differingVar,
     ctx:(c.ctx??[]).map((t,i)=>({slot:i,bytes:JSON.stringify(t).length,head:JSON.stringify(t).slice(0,500)}))};
  }catch(e){diag={index,localDefs:k.localDefs===true,error:String(e?.stack??e).slice(0,1200)};}
  captures.push(diag);
