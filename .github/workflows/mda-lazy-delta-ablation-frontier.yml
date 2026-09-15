@@ -1,0 +1,38 @@
+name: MDA lazy-delta ablation frontier
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/kernel-no-lazy-delta.mjs'
+      - 'genesis/lazy-delta-ablation-frontier.mjs'
+      - '.github/workflows/mda-lazy-delta-ablation-frontier.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ablate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build focused witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test perf/shared-subterm
+          ./lka.py build-test perf/church-numerals
+          ./lka.py build-test perf/args-before-unfold
+          ./lka.py build-test perf/folded-constant-first
+          ./lka.py build-test perf/discarded-argument-match
+          ./lka.py build-test undecidability/alg-conv-trans-acc-left
+          ./lka.py build-test undecidability/alg-conv-trans-acc
+      - name: Ablate lazy-delta
+        run: timeout 120s node --stack-size=32768 genesis/lazy-delta-ablation-frontier.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lazy-delta-ablation-frontier-${{ github.sha }}
+          path: genesis/evidence/lazy-delta-ablation-frontier.json
+          if-no-files-found: error
