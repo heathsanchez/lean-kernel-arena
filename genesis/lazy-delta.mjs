@@ -16,7 +16,7 @@ import { Kernel, Stop } from "./kernel-base.mjs";
 // back to the retained converter. No new definitional equality rule is added.
 
 const fallbackEqual = Kernel.prototype.equal;
-const SPECULATION_CAP = 650000;
+const SPECULATION_CAP = 950000;
 
 function rawSpine(e) {
   const args=[];

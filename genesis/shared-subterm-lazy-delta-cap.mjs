@@ -1,0 +1,10 @@
+import {readFileSync,writeFileSync,mkdirSync} from "node:fs";
+import * as K from "./kernel.mjs";
+const CAPS=["sort","binders","application","reduction","declarations","universes","theorems","proof-irrelevance","function-eta","inductive-envelope","single-inductives","reflexive-inductives","inductive-reduction","rule-k","unit-eta","prop-inductives","nat-literals","string-literals","quotients","projections","structure-eta","rigid-conversion","opaque-declarations"];
+const input=readFileSync(new URL("../_build/tests/perf/shared-subterm.ndjson",import.meta.url),"utf8");
+const t0=Date.now(),result=K.checkExport(input,CAPS,1_000_000);
+const out={experiment:"shared-subterm-lazy-delta-cap-950k",result,elapsed_wall_ms:Date.now()-t0};
+mkdirSync("genesis/evidence",{recursive:true});
+writeFileSync("genesis/evidence/shared-subterm-lazy-delta-cap-950k.json",JSON.stringify(out,null,2)+"\n");
+console.log("SHARED_SUBTERM_LAZY_DELTA_CAP_950K "+JSON.stringify(out));
+if(result.status!=="ACCEPT")process.exit(1);
