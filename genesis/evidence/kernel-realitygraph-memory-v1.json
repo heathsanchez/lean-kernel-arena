@@ -1,0 +1,84 @@
+{
+  "schema": "kernel-realitygraph-memory-v1",
+  "trusted_boundary": "diagnostic-routing-only; never changes ACCEPT/REJECT semantics",
+  "retained_kernel": {
+    "accept": 111,
+    "reject": 71,
+    "unknown": 6,
+    "wrong": 0
+  },
+  "residual_family": "magma-list-pair-countermodel",
+  "evidence": [
+    {
+      "probe": "closed-infer-cache",
+      "status": "FALSIFIED_AS_COMPLETION_CAUSE",
+      "evidence_run": 34954606635,
+      "fact": "closed inference counters saturate by 2M while UNKNOWN continues to 8M"
+    },
+    {
+      "probe": "prooftype-consequence-bank",
+      "status": "FALSIFIED",
+      "evidence_run": 34947988952,
+      "fact": "zero positive proofType stores/hits"
+    },
+    {
+      "probe": "proof-irrelevance-recursive-cycle",
+      "status": "FALSIFIED",
+      "evidence_run": 34957192405,
+      "fact": "structural pi cycle detector fires zero times"
+    },
+    {
+      "probe": "localdef-whnf-cache",
+      "status": "FALSIFIED_AS_COMPLETION_CAUSE",
+      "evidence_run": 34955629029,
+      "fact": "~2.9M exact LocalDef WHNF hits do not move completion cliff"
+    },
+    {
+      "probe": "repeated-infer-tail",
+      "status": "FALSIFIED",
+      "evidence_run": 34957498769,
+      "fact": "zero new infer entries after 2M"
+    },
+    {
+      "probe": "repeated-normal-root-tail",
+      "status": "FALSIFIED",
+      "evidence_run": 34958581529,
+      "fact": "zero new normal entries after 2M"
+    },
+    {
+      "probe": "destroyed-structural-sharing",
+      "status": "FALSIFIED",
+      "evidence_run": 34959355285,
+      "fact": "23810 normal tail visits collapse to five exact object identities, not fresh structural copies"
+    },
+    {
+      "probe": "binder-context-normalization-repair",
+      "status": "FALSIFIED_AS_SUFFICIENT",
+      "evidence_run": 34962163790,
+      "fact": "binder-aware normalizer remains UNKNOWN through 3M with zero wrong"
+    }
+  ],
+  "current_signature": {
+    "frontier": "countermodel",
+    "fallback": "LocalDef",
+    "closed_infer_saturated": true,
+    "repeated_exact_state_orbit": true,
+    "orbit_states": 5,
+    "tail_operation": "iterative-normalizer-worklist",
+    "binder_aware_repair_insufficient": true
+  },
+  "next_parallel_probes": [
+    {
+      "id": "orbit",
+      "goal": "identify exact post-repair state-transition SCC/orbit inside iterative normalizer"
+    },
+    {
+      "id": "context",
+      "goal": "measure which de-Bruijn variables are actually unfolded as LocalDefs after binder-aware repair"
+    },
+    {
+      "id": "delta",
+      "goal": "measure phase transitions and work composition after 2M without guessing a larger budget"
+    }
+  ]
+}
