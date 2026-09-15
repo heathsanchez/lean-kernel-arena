@@ -26,7 +26,7 @@ if(rows.length!==188)throw new Error("Arena row count changed");
 const focusRows=rows.filter(r=>r.name.endsWith("good/perf/fueled-chain.ndjson"));
 
 const proto=K.Kernel.prototype,retainedEqual=proto.equal;
-const stats={piProbe:0,piSuccess:0,localVarProbe:0,localVarRelay:0,etaRelay:0,outer:0,inner:0,success:0,fallback:0,argChecks:0,maxDepth:0};
+const stats={piProbe:0,piSuccess:0,localVarProbe:0,localVarRelay:0,etaRelay:0,etaExpand:0,outer:0,inner:0,success:0,fallback:0,argChecks:0,maxDepth:0};
 const fallbackDetails=[];
 function shape(e){
   if(!Array.isArray(e))return typeof e;
@@ -120,6 +120,16 @@ function install(enabled){
             if(ex!==null){stats.etaRelay++;return this.equal(ex,y,ctx);}
             const ey=Array.isArray(y)&&y[0]==="lam"?this.functionEtaContract(y):null;
             if(ey!==null){stats.etaRelay++;return this.equal(x,ey,ctx);}
+            if(Array.isArray(x)&&x[0]==="lam"&&Array.isArray(y)&&y[0]!=="lam"){
+              stats.etaExpand++;
+              const fy=this.make("app",this.shift(y,1),this.make("var",0));
+              return this.equal(x[2],fy,[...ctx,x[1]]);
+            }
+            if(Array.isArray(y)&&y[0]==="lam"&&Array.isArray(x)&&x[0]!=="lam"){
+              stats.etaExpand++;
+              const fx=this.make("app",this.shift(x,1),this.make("var",0));
+              return this.equal(fx,y[2],[...ctx,y[1]]);
+            }
           }
           return this.equal(x,y,ctx);
         }
