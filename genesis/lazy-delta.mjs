@@ -16,7 +16,7 @@ import { Kernel, Stop } from "./kernel-base.mjs";
 // back to the retained converter. No new definitional equality rule is added.
 
 const fallbackEqual = Kernel.prototype.equal;
-const SPECULATION_CAP = 950000;
+const SPECULATION_CAP = 650000;
 
 function rawSpine(e) {
   const args=[];
@@ -153,6 +153,16 @@ function reduceHeadOnce(kernel,t,allowMajor=true) {
   return cur===t ? null : cur;
 }
 
+function traceSig(kernel,t) {
+  const s=rawSpine(t),h=s.head;
+  let head=null,kind=null;
+  if(Array.isArray(h)) {
+    head=h[0]==="const"?h[1]:h[0];
+    kind=h[0]==="const"?(kernel.env.get(h[1])?.kind??"const"):h[0];
+  }
+  return {head,kind,args:s.args.length,tag:Array.isArray(t)?t[0]:typeof t};
+}
+
 Kernel.prototype.equal = function(a,b,ctx=[]) {
   // This execution optimization was acquired after function eta in the retained
   // developmental sequence. Do not let it mask that capability's ablation.
@@ -160,6 +170,7 @@ Kernel.prototype.equal = function(a,b,ctx=[]) {
     return fallbackEqual.call(this,a,b,ctx);
 
   const depth=this._lazyDeltaDepth??0;
+  if(depth>0) this.__lazyDeltaLastPair={steps:this.steps,a:traceSig(this,a),b:traceSig(this,b),ctx:ctx.length};
   if(this.same(a,b)) return;
 
   const sa=rawSpine(a),sb=rawSpine(b);
@@ -173,6 +184,7 @@ Kernel.prototype.equal = function(a,b,ctx=[]) {
       return fallbackEqual.call(this,a,b,ctx);
 
     const snap={steps:this.steps,budget:this.budget,frontier:this.conversionFrontier};
+    this.__lazyDeltaTopStarts=(this.__lazyDeltaTopStarts??0)+1;
     this.budget=Math.min(this.budget,this.steps+SPECULATION_CAP);
     this._lazyDeltaDepth=1;
     const order=sa.args.map((_,i)=>i)
@@ -182,11 +194,16 @@ Kernel.prototype.equal = function(a,b,ctx=[]) {
       for(const i of order) this.equal(sa.args[i],sb.args[i],ctx);
       this._lazyDeltaDepth=0;
       this.budget=snap.budget;
+      this.__lazyDeltaTopSuccesses=(this.__lazyDeltaTopSuccesses??0)+1;
+      this.__lazyDeltaLastSuccess={start:snap.steps,end:this.steps,delta:this.steps-snap.steps};
       return;
     } catch(e) {
       this._lazyDeltaDepth=0;
       this.budget=snap.budget;
       if(!(e instanceof Stop || e instanceof RangeError)) throw e;
+      this.__lazyDeltaTopFailures=(this.__lazyDeltaTopFailures??0)+1;
+      this.__lazyDeltaLastFailure={start:snap.steps,failedAt:this.steps,delta:this.steps-snap.steps,
+        reason:e.message,lastPair:this.__lazyDeltaLastPair??null};
       this.steps=snap.steps;
       this.conversionFrontier=snap.frontier;
       return fallbackEqual.call(this,a,b,ctx);
