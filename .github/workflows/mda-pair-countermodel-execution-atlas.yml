@@ -1,0 +1,30 @@
+name: MDA pair countermodel execution atlas
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/pair-countermodel-execution-atlas.mjs'
+      - '.github/workflows/mda-pair-countermodel-execution-atlas.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Localize countermodel execution cliff
+        run: timeout 420s node experiments/pair-countermodel-execution-atlas.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pair-countermodel-execution-atlas-${{ github.sha }}
+          path: genesis/evidence/pair-combined-whnf.json
+          if-no-files-found: warn
