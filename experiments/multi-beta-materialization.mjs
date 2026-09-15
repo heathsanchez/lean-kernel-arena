@@ -148,7 +148,10 @@ function evalRows(mode,enabled,subset){
     totalSteps+=r.steps??0;totalConstructed+=r.constructed??0;
     if(r.status!=="UNKNOWN"&&r.status!==row.expected)wrong++;
     results.push({name:row.name,expected:row.expected,status:r.status,reason:r.reason,
-      steps:r.steps??null,constructed:r.constructed??null,frontier_declaration:r.frontier_declaration??null});
+      steps:r.steps??null,constructed:r.constructed??null,frontier_declaration:r.frontier_declaration??null,
+      diagnostic_error:r.diagnostic_error??null,stack_attempt_reason:r.stack_attempt_reason??null,
+      stack_attempt_steps:r.stack_attempt_steps??null,fallback_mode:r.fallback_mode??null,
+      fallback_attempt_reason:r.fallback_attempt_reason??null,fallback_attempt_steps:r.fallback_attempt_steps??null});
   }
   const delta={};for(const k of Object.keys(before))delta[k]=stats[k]-before[k];
   return {mode,counts,wrong,totalSteps,totalConstructed,elapsed_ms:Date.now()-t0,stats:delta,results};
