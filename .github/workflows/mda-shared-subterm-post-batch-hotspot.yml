@@ -1,0 +1,30 @@
+name: MDA shared-subterm post-batch hotspot
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/shared-subterm-post-batch-hotspot.mjs'
+      - '.github/workflows/mda-shared-subterm-post-batch-hotspot.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  experiment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build focused witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-test perf/shared-subterm
+      - name: Profile post-batch hotspot
+        run: timeout 150s node --stack-size=32768 genesis/shared-subterm-post-batch-hotspot.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shared-subterm-post-batch-hotspot-${{ github.sha }}
+          path: genesis/evidence/shared-subterm-post-batch-hotspot.json
+          if-no-files-found: error
