@@ -4,6 +4,7 @@ on:
     branches: [mda-kernel-genesis-v1]
     paths:
       - 'experiments/zero-param-nested-parser-frontier.mjs'
+      - 'experiments/make-zero-param-nested-parser-candidate.mjs'
       - '.github/workflows/mda-zero-param-nested-parser-frontier.yml'
   workflow_dispatch:
 permissions:
@@ -23,33 +24,7 @@ jobs:
           ./lka.py build-test nested-unused-param
           ./lka.py build-test nested-nonuniform-param
       - name: Create zero-parameter nested parser candidate
-        run: |
-          rm -rf /tmp/mathgraph-zero-nested
-          cp -R genesis /tmp/mathgraph-zero-nested
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path("/tmp/mathgraph-zero-nested/kernel-base.mjs")
-          s=p.read_text()
-          s=s.replace("input.length>2000000","input.length>16000000")
-          s=s.replace("++parsed>100000","++parsed>300000")
-          old='if(v.recs.length!==v.types.length) reject("inductive-recursor-count");'
-          new='''const nestedRuleCtors=new Set(v.recs.flatMap(r=>(r?.rules??[]).map(rr=>rr?.ctor)));
-        const source=v.types.length===1?v.types[0]:null;
-        const zeroNestedEnvelope=!!source &&
-          source.numParams===0 && source.numIndices===0 && source.isUnsafe===false &&
-          Number.isSafeInteger(source.numNested) && source.numNested>0 &&
-          v.recs.length===1+source.numNested &&
-          v.recs.every(r=>r && r.numMotives===1+source.numNested &&
-            r.numMinors===nestedRuleCtors.size);
-        if(!zeroNestedEnvelope && v.recs.length!==v.types.length) reject("inductive-recursor-count");'''
-          if old not in s: raise SystemExit("recursor-count patch point missing")
-          s=s.replace(old,new,1)
-          old2='if(rec.numMinors!==v.ctors.length) reject("inductive-minor-count");'
-          new2='if(!zeroNestedEnvelope && rec.numMinors!==v.ctors.length) reject("inductive-minor-count");'
-          if old2 not in s: raise SystemExit("minor-count patch point missing")
-          s=s.replace(old2,new2,1)
-          p.write_text(s)
-          PY
+        run: node experiments/make-zero-param-nested-parser-candidate.mjs
       - name: Expose next nested frontier
         run: timeout 180s node --stack-size=32768 experiments/zero-param-nested-parser-frontier.mjs
       - if: always()
