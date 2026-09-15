@@ -1,0 +1,30 @@
+name: MDA residual hotspot atlas
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/residual-hotspot-atlas.mjs'
+      - '.github/workflows/mda-residual-hotspot-atlas.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Measure residual hotspots
+        run: timeout 420s node experiments/residual-hotspot-atlas.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: residual-hotspot-atlas-${{ github.sha }}
+          path: genesis/evidence/residual-hotspot-atlas.json
+          if-no-files-found: warn
