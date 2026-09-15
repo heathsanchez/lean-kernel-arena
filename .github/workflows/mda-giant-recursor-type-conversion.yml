@@ -20,6 +20,7 @@ jobs:
         shell: 'nix develop -c bash -euxo pipefail {0}'
         run: |
           ./lka.py build-test init-prelude
+          ./lka.py build-test perf/grind-ring-5
           ./lka.py build-test nat-rec-rules
           ./lka.py build-test proj-non-structure
           ./lka.py build-test proj-of-imax-prop
