@@ -1,0 +1,30 @@
+name: MDA structural substitution keys
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/structural-substitution-keys.mjs'
+      - '.github/workflows/mda-structural-substitution-keys.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Test exact structural substitution cache keys
+        run: timeout 660s node experiments/structural-substitution-keys.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: structural-substitution-keys-${{ github.sha }}
+          path: genesis/evidence/structural-substitution-keys.json
+          if-no-files-found: warn
