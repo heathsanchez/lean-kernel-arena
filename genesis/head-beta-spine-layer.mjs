@@ -27,7 +27,7 @@ function materialize(k,body,args){
     if(j<f.capture){
      const ai=f.capture-1-j,shift=f.extra+f.depth;
      if(shift===0){vals.push(args[ai]);k.__headBetaDirectSplices=(k.__headBetaDirectSplices??0)+1;}
-     else work.push({kind:"visit",term:args[ai],capture:ai,depth:0,extra:shift});
+     else vals.push(k.shift(args[ai],shift));
     }else{
      const ni=f.depth+(j-f.capture)+f.extra;
      vals.push(ni===i?e:k.make("var",ni));
