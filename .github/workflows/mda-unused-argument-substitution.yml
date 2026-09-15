@@ -1,0 +1,30 @@
+name: MDA unused argument substitution
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/unused-argument-substitution.mjs'
+      - '.github/workflows/mda-unused-argument-substitution.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  replay:
+    runs-on: macos-15
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: node genesis/test.mjs
+      - name: Compile argument-independent substitutions
+        run: node experiments/unused-argument-substitution.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-unused-substitution-${{ github.sha }}
+          path: genesis/evidence/unused-argument-substitution.json
+          if-no-files-found: warn
