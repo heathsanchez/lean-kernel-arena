@@ -1,0 +1,23 @@
+name: MDA Kernel RealityGraph post-support tail
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/kernel-realitygraph-post-support-tail.mjs'
+      - '.github/workflows/mda-kernel-realitygraph-post-support-tail.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Profile post-support tail
+        run: timeout 660s node experiments/kernel-realitygraph-post-support-tail.mjs
