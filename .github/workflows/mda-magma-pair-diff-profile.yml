@@ -1,0 +1,23 @@
+name: MDA magma pair diff profile
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/magma-pair-diff-profile.mjs'
+      - '.github/workflows/mda-magma-pair-diff-profile.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Profile all aligned frontier differences
+        run: timeout 90s node experiments/magma-pair-diff-profile.mjs
