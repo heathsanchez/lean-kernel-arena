@@ -1,0 +1,44 @@
+name: MDA giant recursor type conversion
+on:
+  push:
+    branches:
+      - mda-kernel-genesis-v1
+    paths:
+      - experiments/make-recursor-type-conversion-candidate.mjs
+      - .github/workflows/mda-giant-recursor-type-conversion.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  experiment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test init-prelude
+          ./lka.py build-test nat-rec-rules
+          ./lka.py build-test proj-non-structure
+          ./lka.py build-test proj-of-imax-prop
+          ./lka.py build-test proj-of-prop
+          ./lka.py build-test nested-unused-param
+          ./lka.py build-test nested-nonuniform-param
+      - name: Prepare nested parser candidate
+        run: node experiments/make-zero-param-nested-parser-candidate.mjs
+      - name: Add arbitrary precision Nat candidate
+        run: node experiments/make-arbitrary-nat-candidate.mjs
+      - name: Expose optParam constructor annotations
+        run: node experiments/make-optparam-field-domain-candidate.mjs
+      - name: Permit verified recursor type conversion
+        run: node experiments/make-recursor-type-conversion-candidate.mjs
+      - name: Test init beyond TSyntax
+        run: timeout 300s node --stack-size=32768 experiments/post-nested-projection-proof-irrelevance.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: giant-recursor-type-conversion-evidence
+          path: genesis/evidence/post-nested-projection-proof-irrelevance.json
+          if-no-files-found: error
