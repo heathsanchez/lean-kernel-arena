@@ -1,4 +1,5 @@
 name: MDA minimal kernel model boundary
+# Replayed after true reduced capability basis.
 on:
   push:
     branches: [mda-kernel-genesis-v1]
