@@ -11,7 +11,7 @@ const CAPS=[
   "unit-eta","prop-inductives","nat-literals","string-literals","quotients",
   "projections","structure-eta","rigid-conversion","opaque-declarations"
 ];
-const BUDGET=1_000_000;
+const BUDGET=1_000_000,PI_CAP=512,DEF_CAP=6500,VAR_CAP=15500;
 const ALLOWED_UNKNOWN=new Set(["init-prelude","perf/grind-ring-5","perf/shared-subterm"]);
 const MUST_ACCEPT=new Set([
   "undecidability/alg-conv-trans-acc-left",
@@ -25,7 +25,41 @@ function snap(k){return {steps:k.steps,budget:k.budget,frontier:k.conversionFron
 function restore(k,s){k.steps=s.steps;k.budget=s.budget;k.conversionFrontier=s.frontier;}
 function fallbackable(e){return e instanceof K.Stop||e instanceof RangeError;}
 function rawSpine(e){const args=[];let h=e;while(Array.isArray(h)&&h[0]==="app"){args.push(h[2]);h=h[1];}args.reverse();return {head:h,args};}
-function sameHead(k,a,b){return a===b||(Array.isArray(a)&&Array.isArray(b)&&k.same(a,b));}
+function cls(k,h){if(!Array.isArray(h))return typeof h;if(h[0]!=="const")return h[0];return "const:"+(k.env.get(h[1])?.kind??"unknown");}
+function defSensitive(k,name,seen=new Set()){
+  k.__recDefSensitive??=new Map();
+  if(k.__recDefSensitive.has(name))return k.__recDefSensitive.get(name);
+  if(seen.has(name))return false;
+  seen.add(name);
+  const d=k.env.get(name);
+  if(d?.kind!=="def"||!Array.isArray(d.value)){k.__recDefSensitive.set(name,false);return false;}
+  let found=false,work=[d.value],n=0;
+  while(work.length&&n++<512&&!found){
+    const e=work.pop();if(!Array.isArray(e))continue;
+    if(e[0]==="const"){
+      const q=k.env.get(e[1]);
+      if(q?.kind==="rec"){found=true;break;}
+      if(q?.kind==="def"&&defSensitive(k,e[1],new Set(seen))){found=true;break;}
+    }
+    for(let i=1;i<e.length;i++)if(Array.isArray(e[i]))work.push(e[i]);
+  }
+  k.__recDefSensitive.set(name,found);return found;
+}
+function sensitive(k,e){
+  k.__recTermSensitive??=new WeakMap();
+  if(Array.isArray(e)&&k.__recTermSensitive.has(e))return k.__recTermSensitive.get(e);
+  let found=false,work=[e],n=0;
+  while(work.length&&n++<512&&!found){
+    const x=work.pop();if(!Array.isArray(x))continue;
+    if(x[0]==="const"){
+      const d=k.env.get(x[1]);
+      if(d?.kind==="rec"||(d?.kind==="def"&&defSensitive(k,x[1]))){found=true;break;}
+    }
+    for(let i=1;i<x.length;i++)if(Array.isArray(x[i]))work.push(x[i]);
+  }
+  if(Array.isArray(e))k.__recTermSensitive.set(e,found);
+  return found;
+}
 
 p.whnf=function(e){
   const out=retainedWhnf.call(this,e);
@@ -61,26 +95,34 @@ p.whnf=function(e){
 p.equal=function(a,b,ctx=[]){
   if(this.same(a,b))return;
   if(this.localDefs)return retainedEqual.call(this,a,b,ctx);
-  let pairs=null,app=false;
-  if(Array.isArray(a)&&Array.isArray(b)&&a[0]===b[0]&&(a[0]==="pi"||a[0]==="lam")){
+  let pairs=null,cap=0,kind=null;
+  if(Array.isArray(a)&&Array.isArray(b)&&a[0]==="pi"&&b[0]==="pi"&&(sensitive(this,a)||sensitive(this,b))){
+    kind="pi";cap=PI_CAP;
     pairs=[[a[1],b[1],ctx],[a[2],b[2],[...ctx,a[1]]]];
   }else{
     const sa=rawSpine(a),sb=rawSpine(b);
-    if(sa.args.length>0&&sa.args.length===sb.args.length&&sameHead(this,sa.head,sb.head)){
-      app=true;pairs=sa.args.map((x,i)=>[x,sb.args[i],ctx]);
+    if(sa.args.length>0&&sa.args.length===sb.args.length&&(sa.head===sb.head||this.same(sa.head,sb.head))){
+      const k=cls(this,sa.head);
+      if(k==="const:def"&&Array.isArray(sa.head)&&defSensitive(this,sa.head[1])){
+        kind=k;cap=DEF_CAP;pairs=sa.args.map((x,i)=>[x,sb.args[i],ctx]);
+      }else if(k==="var"&&sa.args.some((x,i)=>sensitive(this,x)||sensitive(this,sb.args[i]))){
+        kind=k;cap=VAR_CAP;pairs=sa.args.map((x,i)=>[x,sb.args[i],ctx]);
+      }
     }
   }
   if(!pairs)return retainedEqual.call(this,a,b,ctx);
-  const s=snap(this);
+  const snap0=snap(this);
+  this.budget=Math.min(snap0.budget,snap0.steps+cap);
   try{
     for(const [x,y,c] of pairs)this.equal(x,y,c);
+    this.budget=snap0.budget;
     this.__leanOrderHits=(this.__leanOrderHits??0)+1;
-    if(app)this.__leanOrderAppHits=(this.__leanOrderAppHits??0)+1;
-    else this.__leanOrderBinderHits=(this.__leanOrderBinderHits??0)+1;
     return;
   }catch(err){
+    this.budget=snap0.budget;
     if(!fallbackable(err))throw err;
-    restore(this,s);return retainedEqual.call(this,a,b,ctx);
+    restore(this,snap0);
+    return retainedEqual.call(this,a,b,ctx);
   }
 };
 
@@ -134,7 +176,7 @@ p.equal=retainedEqual;p.whnf=retainedWhnf;
 const incorrect=rows.filter(r=>r.status!=="UNKNOWN"&&!r.correct);
 const unexpectedUnknown=rows.filter(r=>r.status==="UNKNOWN"&&!ALLOWED_UNKNOWN.has(r.name));
 const summary={
-  experiment:"lean-like-conversion-order-sharded-diagnostic",
+  experiment:"recursor-gated-creative-sharded-replay",
   shardIndex:SHARD_INDEX,shardCount:SHARD_COUNT,budget:BUDGET,
   selected:selected.length,completed:rows.length,counts,elapsed_ms:Date.now()-t0,
   incorrect,unexpectedUnknown,
