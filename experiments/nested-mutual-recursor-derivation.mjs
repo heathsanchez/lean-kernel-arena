@@ -3,6 +3,16 @@ import {readFileSync,writeFileSync,mkdirSync} from "node:fs";
 const TARGETS=["init-prelude","perf/grind-ring-5"];
 const S=u=>["sort",u], V=i=>["var",i], Pi=(a,b)=>["pi",a,b], Lam=(a,b)=>["lam",a,b], App=(f,a)=>["app",f,a];
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+function firstDiff(a,b,path="$"){
+ if(typeof a!==typeof b)return {path,a,b};
+ if(Array.isArray(a)!==Array.isArray(b))return {path,a,b};
+ if(Array.isArray(a)){
+  if(a.length!==b.length)return {path:path+".length",a:a.length,b:b.length,a0:a.slice(0,4),b0:b.slice(0,4)};
+  for(let i=0;i<a.length;i++){const d=firstDiff(a[i],b[i],path+"["+i+"]");if(d)return d;}
+  return null;
+ }
+ return a===b?null:{path,a,b};
+}
 const appN=(f,args)=>{for(const a of args)f=App(f,a);return f;};
 const mkBinders=(tag,types,body)=>{for(let i=types.length-1;i>=0;i--)body=[tag,types[i],body];return body;};
 
@@ -191,11 +201,11 @@ function analyze(name){
   const typeChecks=[],ruleChecks=[];
   for(let ti=0;ti<m;ti++){
    const r=recForTarget[ti],typeOK=same(r.type,expectedTypes[ti]);
-   typeChecks.push({target:targets[ti].name,rec:r.name,typeOK});
+   typeChecks.push({target:targets[ti].name,rec:r.name,typeOK,diff:typeOK?null:firstDiff(r.type,expectedTypes[ti])});
    for(const rr of r.rules){
     const g=global.findIndex(c=>c.name===rr.ctor);
     const ok=g>=0&&same(rr.rhs,expectedRules[g])&&rr.nfields===global[g].fields.length;
-    ruleChecks.push({rec:r.name,ctor:rr.ctor,ok,g});
+    ruleChecks.push({rec:r.name,ctor:rr.ctor,ok,g,diff:ok?null:firstDiff(rr.rhs,g>=0?expectedRules[g]:null)});
    }
   }
   const allTypes=typeChecks.every(x=>x.typeOK),allRules=ruleChecks.length===C&&ruleChecks.every(x=>x.ok);
