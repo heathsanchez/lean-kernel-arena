@@ -27,6 +27,19 @@ const focusRows=rows.filter(r=>r.name.endsWith("good/perf/fueled-chain.ndjson"))
 
 const proto=K.Kernel.prototype,retainedEqual=proto.equal;
 const stats={piProbe:0,piSuccess:0,rigidProbe:0,rigidSuccess:0,rigidFallback:0,argChecks:0};
+const fallbackDetails=[];
+function shape(e){
+  if(!Array.isArray(e))return typeof e;
+  let h=e,n=0;while(Array.isArray(h)&&h[0]==="app"){n++;h=h[1];}
+  if(n){
+    if(Array.isArray(h)&&h[0]==="var")return "app:var:"+h[1]+":"+n;
+    if(Array.isArray(h)&&h[0]==="const")return "app:const:"+h[1]+":"+n;
+    return "app:"+(h?.[0]??typeof h)+":"+n;
+  }
+  if(e[0]==="var")return "var:"+e[1];
+  if(e[0]==="const")return "const:"+e[1];
+  return e[0];
+}
 
 function appHeadVar(e){
   if(!Array.isArray(e)||e[0]!=="app")return false;
@@ -90,7 +103,16 @@ function install(enabled){
       for(const i of order){
         if(sa.args[i]===sb.args[i])continue;
         stats.argChecks++;
-        this.equal(sa.args[i],sb.args[i],ctx);
+        try{
+          this.equal(sa.args[i],sb.args[i],ctx);
+        }catch(e){
+          if(fallbackDetails.length<20) fallbackDetails.push({
+            head:sa.head?.[1]??null,ctx:ctx.length,index:i,
+            left:shape(sa.args[i]),right:shape(sb.args[i]),
+            spent:this.steps-snap.steps,error:String(e?.message??e),status:e?.status??null
+          });
+          throw e;
+        }
       }
       this.budget=snap.budget;
       stats.rigidSuccess++;
@@ -122,7 +144,7 @@ function evalRows(mode,enabled,subset){
 }
 
 const focus=evalRows("focus-candidate",true,focusRows);
-console.log("LOCALDEF_RIGID_CONGRUENCE_FOCUS "+JSON.stringify(focus));
+console.log("LOCALDEF_RIGID_CONGRUENCE_FOCUS "+JSON.stringify({...focus,fallbackDetails}));
 if(focus.wrong)throw new Error("focus wrong");
 if(focus.results[0]?.status!=="ACCEPT"){install(false);process.exit(0);}
 
