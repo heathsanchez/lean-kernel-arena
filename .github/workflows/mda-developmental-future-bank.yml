@@ -1,0 +1,29 @@
+name: MDA developmental future bank
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/developmental-future-bank.mjs'
+      - '.github/workflows/mda-developmental-future-bank.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  future-bank:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Compile developmental consequence bank
+        run: timeout 600s node experiments/developmental-future-bank.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mda-developmental-future-bank-${{ github.sha }}
+          path: genesis/evidence/developmental-future-bank.json
+          if-no-files-found: error
+          retention-days: 7
