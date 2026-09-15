@@ -4,7 +4,9 @@ import {createHash} from "node:crypto";
 import * as K from "../genesis/kernel.mjs";
 import {Stop,UNKNOWN} from "../genesis/kernel-base.mjs";
 
-const caps=JSON.parse(readFileSync(new URL("../genesis/evidence/retained.json",import.meta.url),"utf8"));\nconst scopeMode=process.env.KERNEL_RG_SCOPE??"closed";\nif(!["closed","support"].includes(scopeMode))throw new Error("bad scope mode "+scopeMode);
+const caps=JSON.parse(readFileSync(new URL("../genesis/evidence/retained.json",import.meta.url),"utf8"));
+const scopeMode=process.env.KERNEL_RG_SCOPE??"closed";
+if(!["closed","support"].includes(scopeMode))throw new Error("bad scope mode "+scopeMode);
 const expectedHash="0cdb181ce17bc4f685beea8d3ccb90675ecc029cae9c4dc86629d2adbcb6e8dd";
 const response=await fetch("https://arena.lean-lang.org/lean-arena-tests.tar.gz",{signal:AbortSignal.timeout(15000)});
 if(!response.ok)throw new Error("Arena corpus fetch: "+response.status);
