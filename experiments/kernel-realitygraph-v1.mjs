@@ -4,7 +4,10 @@ import {createHash} from "node:crypto";
 import * as K from "../genesis/kernel.mjs";
 import {Stop,UNKNOWN} from "../genesis/kernel-base.mjs";
 
-const caps=JSON.parse(readFileSync(new URL("../genesis/evidence/retained.json",import.meta.url),"utf8"));\nconst rgMemory=JSON.parse(readFileSync(new URL("../genesis/evidence/kernel-realitygraph-memory-v1.json",import.meta.url),"utf8"));\nconst rgProbe=process.env.KERNEL_RG_PROBE??"orbit";\nif(!rgMemory.next_parallel_probes.some(p=>p.id===rgProbe))throw new Error("unknown RealityGraph probe: "+rgProbe);
+const caps=JSON.parse(readFileSync(new URL("../genesis/evidence/retained.json",import.meta.url),"utf8"));
+const rgMemory=JSON.parse(readFileSync(new URL("../genesis/evidence/kernel-realitygraph-memory-v1.json",import.meta.url),"utf8"));
+const rgProbe=process.env.KERNEL_RG_PROBE??"orbit";
+if(!rgMemory.next_parallel_probes.some(p=>p.id===rgProbe))throw new Error("unknown RealityGraph probe: "+rgProbe);
 const expectedHash="0cdb181ce17bc4f685beea8d3ccb90675ecc029cae9c4dc86629d2adbcb6e8dd";
 const response=await fetch("https://arena.lean-lang.org/lean-arena-tests.tar.gz",{signal:AbortSignal.timeout(15000)});
 if(!response.ok)throw new Error("Arena corpus fetch: "+response.status);
