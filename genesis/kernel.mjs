@@ -7,7 +7,4 @@ import "./lazy-delta.mjs";
 import "./early-proof-irrelevance.mjs";
 import "./consequence-cache.mjs";
 import "./localdef-continuation.mjs";
-import { installCtorLocalCheapest } from "./ctor-local-cheapest.mjs";
 export * from "./kernel-semantic.mjs";
-
-installCtorLocalCheapest();
