@@ -1,0 +1,23 @@
+name: MDA spine focus
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/spine-focus.mjs'
+      - '.github/workflows/mda-spine-focus.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  focus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Probe conversion frontier
+        run: timeout 90s node experiments/spine-focus.mjs
