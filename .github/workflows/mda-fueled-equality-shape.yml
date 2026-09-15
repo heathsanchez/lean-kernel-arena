@@ -1,0 +1,23 @@
+name: MDA fueled equality shape
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/fueled-equality-shape.mjs'
+      - '.github/workflows/mda-fueled-equality-shape.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Profile fueled-chain equality identities
+        run: timeout 180s node experiments/fueled-equality-shape.mjs
