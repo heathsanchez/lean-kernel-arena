@@ -1,0 +1,29 @@
+name: MDA fueled lazy Pi profile
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/fueled-lazy-pi-profile.mjs'
+      - '.github/workflows/mda-fueled-lazy-pi-profile.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  profile:
+    strategy:
+      fail-fast: false
+      matrix:
+        budget: [1000000, 2000000, 4000000]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Profile post-lazy fueled continuation
+        env:
+          BUDGET: ${{ matrix.budget }}
+        run: timeout 420s node experiments/fueled-lazy-pi-profile.mjs
