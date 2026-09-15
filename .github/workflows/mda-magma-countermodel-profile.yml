@@ -1,0 +1,23 @@
+name: MDA magma countermodel profile
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/magma-countermodel-profile.mjs'
+      - '.github/workflows/mda-magma-countermodel-profile.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  profile:
+    runs-on: macos-15
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: node genesis/test.mjs
+      - name: Profile post-proof magma frontier
+        run: node experiments/magma-countermodel-profile.mjs
