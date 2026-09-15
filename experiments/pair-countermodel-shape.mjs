@@ -83,8 +83,8 @@ const py=[
 "    targets=[]",
 "    for kind,name,v in decls:",
 "      if name.endswith('countermodel'):",
-"        targets.append({'kind':kind,'name':name,'type':analyze_expr(exprs,v.get('type')),",
-"          'value':analyze_expr(exprs,v.get('value')) if 'value' in v else None,'level_params':len(v.get('levelParams',[]))})",
+"        targets.append({'kind':kind,'name':name,'type':analyze_expr(exprs,v.get('type'),names),",
+"          'value':analyze_expr(exprs,v.get('value'),names) if 'value' in v else None,'level_params':len(v.get('levelParams',[]))})",
 "    out.append({'name':p,'expr_records':len(exprs),'declarations':len(decls),'targets':targets})",
 "print(json.dumps(out))"
 ].join("\n");
