@@ -1,0 +1,23 @@
+name: MDA LocalDef fallback WHNF
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/localdef-fallback-whnf.mjs'
+      - '.github/workflows/mda-localdef-fallback-whnf.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  trace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Trace LocalDef fallback WHNF
+        run: timeout 180s node experiments/localdef-fallback-whnf.mjs
