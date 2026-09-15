@@ -24,7 +24,7 @@ print(json.dumps(rows))
 const focusRows=JSON.parse(execFileSync("python3",["-c",py],{input:data,maxBuffer:50000000,timeout:10000}));
 
 const proto=K.Kernel.prototype,retainedRun=proto.run,retainedEqual=proto.equal,retainedWhnf=proto.whnf;
-const stats={eqHits:0,eqStores:0,earlyPi:0,frontiers:0,projectionEligible:0,projectionSuccess:0,argChecks:0,whnfQueries:0,whnfHits:0,whnfStores:0,whnfCanonNodes:0,whnfLocalBypass:0,localWhnfQueries:0,localWhnfHits:0,localWhnfStores:0,natPrimitiveQueries:0,natOperandWhnf:0,natOperandClosedAfterWhnf:0,natAdd:0,natMul:0,natMod:0,headDecide:0,headForallFin:0,headBallLT:0,headDecidableOfIff:0,headEqFin:0,headMagmaOp:0,headCountermodelOp:0,betaQueries:0,betaEligible:0,betaSuccesses:0,betaBinders:0,betaSubstNodes:0,betaSubstHits:0,betaFallbacks:0};
+const stats={eqHits:0,eqStores:0,earlyPi:0,frontiers:0,projectionEligible:0,projectionSuccess:0,argChecks:0,whnfQueries:0,whnfHits:0,whnfStores:0,whnfCanonNodes:0,whnfLocalBypass:0,localWhnfQueries:0,localWhnfHits:0,localWhnfStores:0,natPrimitiveQueries:0,natOperandWhnf:0,natOperandClosedAfterWhnf:0,natAdd:0,natMul:0,natMod:0,natAddZero:0,natMulZero:0,natModZero:0,headDecide:0,headForallFin:0,headBallLT:0,headDecidableOfIff:0,headEqFin:0,headMagmaOp:0,headCountermodelOp:0,betaQueries:0,betaEligible:0,betaSuccesses:0,betaBinders:0,betaSubstNodes:0,betaSubstHits:0,betaFallbacks:0};
 const decideSamples=[];
 
 function objectId(k,x){
@@ -124,7 +124,16 @@ function nativeNatPrimitive(k,e){
   const h=sp.head[1];
   if(h!==NAT_ADD&&h!==NAT_MUL&&h!==NAT_MOD)return null;
   stats.natPrimitiveQueries++;
-  const a=exposeClosedNat(k,sp.args[0]),b=exposeClosedNat(k,sp.args[1]);
+  const a=exposeClosedNat(k,sp.args[0]);
+  if(h===NAT_MOD&&a===0){
+    k.tick();k.need("reduction");stats.natModZero++;return natWhnf(k,0);
+  }
+  const b=exposeClosedNat(k,sp.args[1]);
+  if(b===0){
+    k.tick();k.need("reduction");
+    if(h===NAT_MUL){stats.natMulZero++;return natWhnf(k,0);}
+    if(h===NAT_ADD){stats.natAddZero++;return structuralWhnf(k,sp.args[0]);}
+  }
   if(a===null||b===null)return null;
   let v;
   if(h===NAT_ADD){v=a+b;stats.natAdd++;}
