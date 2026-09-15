@@ -22,7 +22,7 @@ jobs:
         run: |
           ./lka.py build-test init-prelude
           ./lka.py build-test perf/grind-ring-5
-          ./lka.py build-test tutorial/101_natLitEq
+          ./lka.py build-test nat-rec-rules
           ./lka.py build-test nested-unused-param
           ./lka.py build-test nested-nonuniform-param
       - name: Prepare nested parser candidate
