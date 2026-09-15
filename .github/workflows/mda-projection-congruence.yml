@@ -1,0 +1,30 @@
+name: MDA projection congruence
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/projection-congruence.mjs'
+      - '.github/workflows/mda-projection-congruence.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Replay exact projection congruence
+        run: timeout 150s node experiments/projection-congruence.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-projection-congruence-${{ github.sha }}
+          path: genesis/evidence/projection-congruence.json
+          if-no-files-found: warn
