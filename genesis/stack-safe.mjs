@@ -155,10 +155,108 @@ Kernel.prototype.same = function(a,b) {
   return true;
 };
 
+// A slower but fully iterative head evaluator used only after the retained
+// checker has actually demonstrated a host-stack obstruction.
+function fullStackWhnf(term) {
+  const originalTerm=term;
+  let cur=term,args=[],dirty=false;
+
+  const absorbApps=t=>{
+    const fresh=[];
+    while(Array.isArray(t) && t[0]==="app") {
+      this.tick();
+      this.need("application");
+      fresh.push(t[2]);
+      t=t[1];
+    }
+    fresh.reverse();
+    if(fresh.length) args=fresh.concat(args);
+    return t;
+  };
+  const rebuild=()=>{
+    if(!dirty && cur===originalTerm) return originalTerm;
+    if(!dirty && Array.isArray(originalTerm) && originalTerm[0]==="app") return originalTerm;
+    let out=cur;
+    for(const arg of args) out=this.make("app",out,arg);
+    return out;
+  };
+
+  cur=absorbApps(cur);
+  while(true) {
+    if(!Array.isArray(cur)) return cur;
+
+    if(cur[0]==="let") {
+      this.tick();
+      this.need("reduction");
+      cur=this.substitute(cur[3],cur[2]);
+      dirty=true;
+      cur=absorbApps(cur);
+      continue;
+    }
+
+    if(cur[0]==="const") {
+      this.tick();
+      this.need("declarations");
+      const d=this.env.get(cur[1]);
+      if(!d) this.reject("undeclared-constant");
+      if(d.kind==="def") {
+        this.need("reduction");
+        cur=this.instantiateDeclaration(cur,d.value);
+        dirty=true;
+        cur=absorbApps(cur);
+        continue;
+      }
+      if(args.length && (d.kind==="rec" || d.kind==="quot")) {
+        let out;
+        if(!dirty && Array.isArray(originalTerm) && originalTerm[0]==="app") out=originalTerm;
+        else {
+          out=cur;
+          for(const arg of args) out=this.make("app",out,arg);
+        }
+        return baseWhnf.call(this,out);
+      }
+      if(!args.length) return cur;
+      return rebuild();
+    }
+
+    if(cur[0]==="lam") {
+      this.tick();
+      if(args.length) {
+        this.need("reduction");
+        const arg=args.shift();
+        cur=this.substitute(cur[2],arg);
+        dirty=true;
+        cur=absorbApps(cur);
+        continue;
+      }
+      return cur;
+    }
+
+    if(cur[0]==="nat" || cur[0]==="proj") {
+      const reduced=baseWhnf.call(this,cur);
+      if(reduced!==cur) {
+        cur=reduced;
+        dirty=true;
+        cur=absorbApps(cur);
+        continue;
+      }
+      if(!args.length) return cur;
+      return rebuild();
+    }
+
+    // Rigid neutral head: account for the head whnf call. If the initial
+    // application was unchanged, return it by identity and avoid reconstruction.
+    this.tick();
+    if(!args.length) return cur;
+    return rebuild();
+  }
+}
+
 // Avoid host recursion on long let chains and ordinary application spines.
 // Recursor/quotient heads keep the retained reducer, because those rules inspect
 // the complete application before reducing the function position.
 Kernel.prototype.whnf = function(e) {
+  if(this._fullStackSafe===true) return fullStackWhnf.call(this,e);
   if(Array.isArray(e) && e[0]==="let") {
     let cur=e;
     while(Array.isArray(cur) && cur[0]==="let") {
@@ -274,10 +372,8 @@ Kernel.prototype.instantiateDeclaration = function(ref,term) {
   return vals.pop();
 };
 
-// Inference is a small continuation machine for the mutually alternating
-// application/lambda/let paths. Same-tag Pi spines retain their specialized
-// loop. This removes host recursion without changing typing obligations.
-Kernel.prototype.infer = function(root,rootCtx) {
+// Full continuation evaluator, activated only by the host-stack fallback.
+function continuationInfer(root,rootCtx) {
   let e=root,ctx=rootCtx,value,returning=false;
   const kont=[];
 
@@ -373,4 +469,80 @@ Kernel.prototype.infer = function(root,rootCtx) {
 
     throw new Error("unknown inference continuation");
   }
+};
+
+// Fast retained inference path. Same-tag spines are flattened without replacing
+// the whole evaluator; this preserves the verified local-definition economics.
+Kernel.prototype.infer = function(e,ctx) {
+  if(this._fullStackSafe===true) return continuationInfer.call(this,e,ctx);
+
+  if(Array.isArray(e) && e[0]==="app") {
+    const args=[]; let head=e;
+    while(Array.isArray(head) && head[0]==="app") {
+      this.tick();
+      this.need("application");
+      args.push(head[2]);
+      head=head[1];
+    }
+    args.reverse();
+    let ty=this.infer(head,ctx);
+    for(const arg of args) {
+      const f=this.whnf(ty);
+      if(f[0]!=="pi") this.reject("not-a-function");
+      this.equal(this.infer(arg,ctx),f[1],ctx);
+      ty=this.substitute(f[2],arg);
+    }
+    return ty;
+  }
+
+  if(Array.isArray(e) && e[0]==="lam") {
+    const domains=[]; let cur=e,cctx=ctx;
+    while(Array.isArray(cur) && cur[0]==="lam") {
+      this.tick();
+      this.need("binders");
+      this.sortOf(cur[1],cctx);
+      domains.push(cur[1]);
+      cctx=[...cctx,cur[1]];
+      cur=cur[2];
+    }
+    let ty=this.infer(cur,cctx);
+    for(let i=domains.length-1;i>=0;i--) ty=this.make("pi",domains[i],ty);
+    return ty;
+  }
+
+  if(Array.isArray(e) && e[0]==="pi") {
+    const levels=[]; let cur=e,cctx=ctx;
+    while(Array.isArray(cur) && cur[0]==="pi") {
+      this.tick();
+      this.need("binders");
+      const a=this.sortOf(cur[1],cctx);
+      levels.push(a);
+      cctx=[...cctx,cur[1]];
+      cur=cur[2];
+    }
+    let b=this.sortOf(cur,cctx),out=null;
+    for(let i=levels.length-1;i>=0;i--) {
+      const a=levels[i];
+      const u=(typeof a==="number"&&typeof b==="number")
+        ? (b===0?0:Math.max(a,b))
+        : ["imax",a,b];
+      out=this.make("sort",u);
+      if(i>0) b=this.whnf(out)[1];
+    }
+    return out;
+  }
+
+  if(Array.isArray(e) && e[0]==="let") {
+    let cur=e;
+    while(Array.isArray(cur) && cur[0]==="let") {
+      this.tick();
+      this.need("reduction");
+      this.sortOf(cur[1],ctx);
+      this.equal(this.infer(cur[2],ctx),cur[1],ctx);
+      cur=this.substitute(cur[3],cur[2]);
+    }
+    return this.infer(cur,ctx);
+  }
+
+  return baseInfer.call(this,e,ctx);
 };
