@@ -1,0 +1,23 @@
+name: MDA LocalDef infer return profile
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/pair-localdef-infer-return.mjs'
+      - '.github/workflows/mda-pair-localdef-infer-return.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Profile returning LocalDef inference tail
+        run: timeout 660s node experiments/pair-localdef-infer-return.mjs
