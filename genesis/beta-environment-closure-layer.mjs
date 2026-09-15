@@ -86,11 +86,13 @@ function flattenRoot(k,e){
 }
 
 function closureWhnf(k,root){
+  // Zero-cost dispatch guard: do not charge or traverse ordinary application
+  // spines that cannot possibly enter this separator. The retained evaluator
+  // handles them exactly as before.
+  let raw=root,nargs=0;
+  while(Array.isArray(raw)&&raw[0]==="app"){nargs++;raw=raw[1];}
+  if(nargs<2||!Array.isArray(raw)||raw[0]!=="lam") return null;
   const first=flattenRoot(k,root);
-  // Keep the experiment narrow: only application spines whose raw head is a
-  // lambda and which contain at least two arguments enter the closure machine.
-  if(!Array.isArray(first.head)||first.head[0]!=="lam"||first.args.length<2)
-    return null;
 
   let cl=C(first.head,[]),args=first.args,beta=0;
   for(;;){
