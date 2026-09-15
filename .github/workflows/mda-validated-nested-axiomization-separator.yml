@@ -1,0 +1,35 @@
+name: MDA validated nested axiomization separator
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/validated-nested-axiomization-separator.mjs'
+      - 'experiments/make-zero-param-nested-parser-candidate.mjs'
+      - '.github/workflows/mda-validated-nested-axiomization-separator.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  experiment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build nested witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test init-prelude
+          ./lka.py build-test perf/grind-ring-5
+          ./lka.py build-test nested-unused-param
+          ./lka.py build-test nested-nonuniform-param
+      - name: Prepare large-input parser candidate
+        run: node experiments/make-zero-param-nested-parser-candidate.mjs
+      - name: Test consequence-minimal nested installation
+        run: timeout 180s node --stack-size=32768 experiments/validated-nested-axiomization-separator.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validated-nested-axiomization-${{ github.sha }}
+          path: genesis/evidence/validated-nested-axiomization-separator.json
+          if-no-files-found: error
