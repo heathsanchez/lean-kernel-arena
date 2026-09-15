@@ -16,4 +16,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: timeout 30s node genesis/test.mjs
+      - name: Replay developmental growth
+        run: timeout 30s node genesis/test.mjs
+      - name: Replay independent Arena
+        run: timeout 60s node genesis/arena.mjs
