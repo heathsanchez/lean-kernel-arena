@@ -133,7 +133,7 @@ function analyze(name){
     if(c.numParams!==1)throw new Error("aux-ctor-params:"+cn);
     const sub=new Map((c.levelParams??[]).map((p,i)=>[p,us[i]]));
     let type=instLevels(c.type,sub);type=instantiateForalls(type,[sourceTerm]);
-    const ct=us.length?["const",c.name,us]:["const",c.name];
+    const ch=us.length?["const",c.name,us]:["const",c.name];\n    const ct=appN(ch,[sourceTerm]);
     addCtor(ti,c,ct,type,c.numFields);
    }
   }
