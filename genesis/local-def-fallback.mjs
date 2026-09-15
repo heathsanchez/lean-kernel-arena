@@ -163,7 +163,7 @@ function evaluateFallback(){
       alt=runRow(row,true);
       if(alt.status!=="UNKNOWN") chosen=alt;
     }
-    if(base.status!=="UNKNOWN"&&alt?.status!=="UNKNOWN"&&base.status!==alt.status) conflicts++;
+    if(base.status!=="UNKNOWN"&&alt!==null&&alt.status!=="UNKNOWN"&&base.status!==alt.status) conflicts++;
     counts[chosen.status]=(counts[chosen.status]??0)+1;
     totalSteps+=(base.steps??0)+(alt?.steps??0);
     totalConstructed+=(base.constructed??0)+(alt?.constructed??0);
