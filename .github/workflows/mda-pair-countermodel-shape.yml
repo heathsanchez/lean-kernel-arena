@@ -1,0 +1,28 @@
+name: MDA pair countermodel shape
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/pair-countermodel-shape.mjs'
+      - '.github/workflows/mda-pair-countermodel-shape.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect pair countermodel declaration
+        run: timeout 240s node experiments/pair-countermodel-shape.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pair-countermodel-shape-${{ github.sha }}
+          path: genesis/evidence/pair-countermodel-shape.json
+          if-no-files-found: warn
