@@ -40,7 +40,7 @@ const rows=[];
 for(const [name,want] of CASES){
   const input=readFileSync("_build/tests/"+name+".ndjson","utf8"),rw=rewrite(input),t0=Date.now();
   const largeNats=[];let scanLine=0;
-  for(const line of rw.text.split(/\\r?\\n/)){
+  for(const line of rw.text.split(/\r?\n/)){
     if(!line.trim())continue;scanLine++;
     const q=JSON.parse(line);
     if(typeof q.natVal==="string"&&/^[0-9]+$/.test(q.natVal)&&!Number.isSafeInteger(Number(q.natVal)))
