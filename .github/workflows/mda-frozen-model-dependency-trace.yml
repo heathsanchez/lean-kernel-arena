@@ -1,0 +1,34 @@
+name: MDA frozen model dependency trace
+on:
+  workflow_dispatch:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - '.github/workflows/mda-frozen-model-dependency-trace.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  trace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct reduced retained basis
+        run: timeout 20s node genesis/test.mjs >/dev/null
+      - name: Fetch frozen compiler artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: con-leche-model-dump-bridge-49226dc50b137b5b0ef5fb9c7156724e6e3c6277
+          run-id: 34968205144
+          github-token: ${{ github.token }}
+          path: _artifact
+      - name: Trace exact missing dependency
+        run: |
+          set -euo pipefail
+          DUMP="$(find _artifact -name inmodel_nested.dump.ndjson -print -quit)"
+          test -n "$DUMP"
+          timeout 300s node experiments/con-leche-model-missing-const-v4.mjs "$DUMP"
