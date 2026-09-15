@@ -1,0 +1,29 @@
+name: MDA deferred substitution v2 current
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - '.github/workflows/mda-deferred-v2-current.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Replay direct-redex deferred substitution variants
+        run: timeout 360s node genesis/deferred-substitution-v2.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-deferred-v2-current-${{ github.sha }}
+          path: genesis/evidence/deferred-substitution-v2.json
+          if-no-files-found: warn
