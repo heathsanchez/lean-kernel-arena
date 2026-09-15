@@ -1,0 +1,22 @@
+name: MDA nested lowering reconstruction
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/nested-lowering-reconstruction.mjs'
+      - '.github/workflows/mda-nested-lowering-reconstruction.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build init-prelude
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-test init-prelude
+      - name: Reconstruct nested lowering
+        run: node experiments/nested-lowering-reconstruction.mjs
