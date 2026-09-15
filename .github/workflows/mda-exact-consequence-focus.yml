@@ -1,0 +1,29 @@
+name: MDA exact consequence focus
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/exact-consequence-focus.mjs'
+      - '.github/workflows/mda-exact-consequence-focus.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  focus:
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [retry, proof, getapp, both]
+    runs-on: macos-15
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: node genesis/test.mjs
+      - name: Run exact consequence separator
+        env:
+          MODE: ${{ matrix.mode }}
+        run: node experiments/exact-consequence-focus.mjs
