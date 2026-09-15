@@ -1,0 +1,76 @@
+name: MDA MathGraph Arena submission qualification
+
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'checkers/mathgraph/**'
+      - 'checkers/mathgraph.yaml'
+      - '.github/workflows/mda-mathgraph-arena-submission.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  arena:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build checker exactly through Arena
+        run: ./lka.py build-checker mathgraph
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Generate the PR-equivalent Arena test set
+        run: ./lka.py build-test --skip-declined-by mathgraph --skip-ci
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Run checker exactly through Arena
+        run: ./lka.py run --checker mathgraph
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+
+      - name: Assert no incorrect or error results
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, collections
+          files=list(pathlib.Path("_results").glob("mathgraph_*.json"))
+          if not files:
+              raise SystemExit("no MathGraph Arena results")
+          rows=[json.loads(p.read_text()) for p in files]
+          bad=[r for r in rows if r.get("correctness") in {"incorrect","error"}]
+          status=collections.Counter(r.get("status") for r in rows)
+          corr=collections.Counter(r.get("correctness") for r in rows)
+          summary={"total":len(rows),"status":dict(status),"correctness":dict(corr)}
+          pathlib.Path("mathgraph-arena-summary.json").write_text(json.dumps(summary,indent=2)+"\n")
+          print("MATHGRAPH_ARENA_SUBMISSION "+json.dumps(summary,sort_keys=True))
+          if bad:
+              print(json.dumps(bad[:20],indent=2))
+              raise SystemExit(f"{len(bad)} incorrect/error results")
+          PY
+
+      - name: Verify production source is frozen from qualified runtime
+        run: |
+          for f in kernel.mjs stack-safe.mjs structural-cache.mjs structural-sharing.mjs normal-cache.mjs \
+                   rigid-type-spine.mjs lazy-delta.mjs early-proof-irrelevance.mjs consequence-cache.mjs \
+                   declaration-instantiation-cache.mjs localdef-continuation.mjs localdef-getapp-cache.mjs \
+                   rigid-constructor-reject.mjs scoped-beta-spine.mjs kernel-semantic.mjs kernel-base.mjs; do
+            cmp "genesis/$f" "checkers/mathgraph/$f"
+          done
+
+      - name: Upload submission evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mathgraph-arena-submission-${{ github.sha }}
+          path: |
+            checkers/mathgraph.yaml
+            checkers/mathgraph/
+            mathgraph-arena-summary.json
+            _results/mathgraph_*.json
+          if-no-files-found: error
