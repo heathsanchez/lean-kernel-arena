@@ -1,0 +1,30 @@
+name: MDA rigid type spine full replay
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/rigid-type-spine-full.mjs'
+      - '.github/workflows/mda-rigid-type-spine-full.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Replay rigid inductive-head congruence
+        run: timeout 150s node experiments/rigid-type-spine-full.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-rigid-type-spine-full-${{ github.sha }}
+          path: genesis/evidence/rigid-type-spine-full.json
+          if-no-files-found: warn
