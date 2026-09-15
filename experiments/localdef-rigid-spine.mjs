@@ -27,6 +27,19 @@ const focusRows=rows.filter(r=>r.name.endsWith("good/perf/fueled-chain.ndjson"))
 
 const proto=K.Kernel.prototype,retainedEqual=proto.equal;
 const stats={piProbe:0,piSuccess:0,localVarProbe:0,localVarRelay:0,outer:0,inner:0,success:0,fallback:0,argChecks:0,maxDepth:0};
+const fallbackDetails=[];
+function shape(e){
+  if(!Array.isArray(e))return typeof e;
+  let h=e,n=0;while(Array.isArray(h)&&h[0]==="app"){n++;h=h[1];}
+  if(n){
+    if(Array.isArray(h)&&h[0]==="var")return "app:var:"+h[1]+":"+n;
+    if(Array.isArray(h)&&h[0]==="const")return "app:const:"+h[1]+":"+n;
+    return "app:"+(h?.[0]??typeof h)+":"+n;
+  }
+  if(e[0]==="var")return "var:"+e[1];
+  if(e[0]==="const")return "const:"+e[1];
+  return e[0];
+}
 
 function appHeadVar(e){
   if(!Array.isArray(e)||e[0]!=="app")return false;
@@ -95,6 +108,10 @@ function install(enabled){
         const x=this.whnf(a),y=this.whnf(b);
         if(x!==a||y!==b){
           stats.localVarRelay++;
+          if(fallbackDetails.length<20) fallbackDetails.push({
+            kind:"relay",depth,ctx:ctx.length,beforeLeft:shape(a),beforeRight:shape(b),
+            afterLeft:shape(x),afterRight:shape(y),spent:this.steps-snap.steps
+          });
           return this.equal(x,y,ctx);
         }
       }catch(e){
@@ -127,7 +144,16 @@ function install(enabled){
       for(const i of order){
         if(sa.args[i]===sb.args[i])continue;
         stats.argChecks++;
-        this.equal(sa.args[i],sb.args[i],ctx);
+        try{
+          this.equal(sa.args[i],sb.args[i],ctx);
+        }catch(e){
+          if(fallbackDetails.length<20) fallbackDetails.push({
+            kind:"arg-fail",depth:depth+1,ctx:ctx.length,head:sa.head?.[1]??shape(sa.head),index:i,
+            left:shape(sa.args[i]),right:shape(sb.args[i]),
+            spent:outer?(this.steps-snap.steps):null,error:String(e?.message??e),status:e?.status??null
+          });
+          throw e;
+        }
       }
       this._localDefRigidDepth=depth;
       if(outer)this.budget=snap.budget;
@@ -167,7 +193,7 @@ function evalRows(mode,enabled,subset){
 }
 
 const focus=evalRows("focus-candidate",true,focusRows);
-console.log("LOCALDEF_RIGID_SPINE_FOCUS "+JSON.stringify(focus));
+console.log("LOCALDEF_RIGID_SPINE_FOCUS "+JSON.stringify({...focus,fallbackDetails}));
 if(focus.wrong)throw new Error("focus wrong");
 if(focus.results[0]?.status!=="ACCEPT"){install(false);process.exit(0);}
 
