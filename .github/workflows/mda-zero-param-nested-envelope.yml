@@ -1,0 +1,32 @@
+name: MDA zero-param nested envelope
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/zero-param-nested-envelope.mjs'
+      - '.github/workflows/mda-zero-param-nested-envelope.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  envelope:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build nested witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test init-prelude
+          ./lka.py build-test perf/grind-ring-5
+          ./lka.py build-test nested-unused-param
+          ./lka.py build-test nested-nonuniform-param
+      - name: Verify zero-parameter nested envelope
+        run: node experiments/zero-param-nested-envelope.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zero-param-nested-envelope-${{ github.sha }}
+          path: genesis/evidence/zero-param-nested-envelope.json
+          if-no-files-found: error
