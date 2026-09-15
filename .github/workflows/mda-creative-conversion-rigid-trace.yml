@@ -1,0 +1,39 @@
+name: MDA creative conversion rigid trace
+
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/creative-conversion-rigid-trace.mjs'
+      - '.github/workflows/mda-creative-conversion-rigid-trace.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Reconstruct retained present
+        run: timeout 30s node --stack-size=32768 genesis/test.mjs
+      - name: Build creative conversion witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test undecidability/alg-conv-trans-acc-left
+          ./lka.py build-test undecidability/subject-reduction-redex
+      - name: Trace exact rigid mismatch stack
+        run: timeout 120s node --stack-size=32768 genesis/creative-conversion-rigid-trace.mjs
+      - name: Preserve trace evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: creative-conversion-rigid-trace-${{ github.sha }}
+          path: genesis/evidence/creative-conversion-rigid-trace.json
+          if-no-files-found: error
