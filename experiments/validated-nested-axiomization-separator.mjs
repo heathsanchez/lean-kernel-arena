@@ -39,10 +39,19 @@ function rewrite(input){
 const rows=[];
 for(const [name,want] of CASES){
   const input=readFileSync("_build/tests/"+name+".ndjson","utf8"),rw=rewrite(input),t0=Date.now();
+  const largeNats=[];let scanLine=0;
+  for(const line of rw.text.split(/\\r?\\n/)){
+    if(!line.trim())continue;scanLine++;
+    const q=JSON.parse(line);
+    if(typeof q.natVal==="string"&&/^[0-9]+$/.test(q.natVal)&&!Number.isSafeInteger(Number(q.natVal)))
+      largeNats.push({lineNo:scanLine,ie:Number.isSafeInteger(q.ie)?q.ie:null,digits:q.natVal.length,value:q.natVal.slice(0,96)});
+  }
   const r=K.checkExport(rw.text,CAPS,1_000_000);
   const pass=want==="either"?(r.status==="ACCEPT"||r.status==="REJECT"):r.status===want;
   const row={name,want,status:r.status,reason:r.reason,steps:r.steps??null,constructed:r.constructed??null,
-    parse_records:r.parse_records??null,rewritten:rw.rewritten,elapsed_ms:Date.now()-t0,pass};
+    parse_records:r.parse_records??null,rewritten:rw.rewritten,elapsed_ms:Date.now()-t0,
+    frontier_declaration:r.frontier_declaration??null,conversion_frontier:r.conversion_frontier??null,
+    largeNats:largeNats.slice(0,12),largeNatCount:largeNats.length,pass};
   rows.push(row);console.log("ROW "+JSON.stringify(row));
 }
 const good=rows.slice(0,2),controls=rows.slice(2);
