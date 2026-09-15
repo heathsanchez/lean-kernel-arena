@@ -1,0 +1,29 @@
+name: MDA verified self-improvement loop v1
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/verified-self-improvement-loop-v1.mjs'
+      - '.github/workflows/mda-verified-self-improvement-loop-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  improve:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs >/dev/null
+      - name: Run verified self-improvement loop
+        run: timeout 660s node experiments/verified-self-improvement-loop-v1.mjs
+      - name: Preserve learned policy evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-self-improvement-loop-v1-${{ github.sha }}
+          path: verified-self-improvement-loop-v1.json
+          if-no-files-found: error
