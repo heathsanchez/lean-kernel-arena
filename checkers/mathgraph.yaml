@@ -1,4 +1,4 @@
-version: "0.1.0"
+version: "0.1.1"
 description: |
   **MathGraph** — an experimental independent Lean 4 checker in JavaScript.
 
@@ -14,3 +14,6 @@ build: |
   for f in *.mjs; do node --check "$f"; done
 run: node main.mjs "$IN"
 threads: 1
+declines:
+  - undecidability/alg-conv-trans-acc-left
+  - undecidability/subject-reduction-redex
