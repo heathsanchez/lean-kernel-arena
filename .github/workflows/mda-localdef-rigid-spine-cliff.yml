@@ -1,0 +1,28 @@
+name: MDA LocalDef rigid spine cliff
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - '.github/workflows/mda-localdef-rigid-spine-cliff.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cliff:
+    strategy:
+      fail-fast: false
+      matrix:
+        budget: [1000000, 1200000, 1500000, 2000000]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Measure fueled completion cliff
+        env:
+          FOCUS_BUDGET: ${{ matrix.budget }}
+        run: timeout 300s node experiments/localdef-rigid-spine.mjs
