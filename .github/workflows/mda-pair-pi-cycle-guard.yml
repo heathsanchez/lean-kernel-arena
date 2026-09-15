@@ -1,0 +1,23 @@
+name: MDA proof-irrelevance cycle guard
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/pair-pi-cycle-guard.mjs'
+      - '.github/workflows/mda-pair-pi-cycle-guard.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Test proof-classification cycle guard
+        run: timeout 660s node experiments/pair-pi-cycle-guard.mjs
