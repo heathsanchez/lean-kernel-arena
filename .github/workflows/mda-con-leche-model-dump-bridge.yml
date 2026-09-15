@@ -5,6 +5,7 @@ on:
     paths:
       - 'experiments/con-leche-model-dump-bridge-v1.mjs'
       - 'experiments/con-leche-model-residual-v2.mjs'
+      - 'experiments/con-leche-model-canonicalize-v3.mjs'
       - '.github/workflows/mda-con-leche-model-dump-bridge.yml'
   workflow_dispatch:
 permissions:
@@ -50,6 +51,9 @@ jobs:
       - name: Localize generated single-inductive residual
         run: |
           timeout 300s node experiments/con-leche-model-residual-v2.mjs _tmp/inmodel_nested.dump.ndjson | tee _tmp/model-residual-v2.log
+      - name: Canonicalize fieldless generated model metadata
+        run: |
+          timeout 300s node experiments/con-leche-model-canonicalize-v3.mjs _tmp/inmodel_nested.dump.ndjson | tee _tmp/model-canonicalize-v3.log
       - name: Preserve compiler bridge evidence
         if: always()
         uses: actions/upload-artifact@v4
