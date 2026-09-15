@@ -1,0 +1,30 @@
+name: MDA binder-span separator
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/binder-span-separator.mjs'
+      - '.github/workflows/mda-binder-span-separator.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct frozen retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Prospectively separate binder-span repairs
+        run: timeout 120s node --stack-size=32768 genesis/binder-span-separator.mjs
+      - name: Preserve separator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-binder-span-separator-${{ github.sha }}
+          path: genesis/evidence/binder-span-separator.json
+          if-no-files-found: warn
