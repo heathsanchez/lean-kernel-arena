@@ -26,7 +26,15 @@ jobs:
         env:
           MODE: getapp
         run: node experiments/exact-consequence-focus.mjs
-      - name: Combined consequences
+      - name: Syntactic equality consequence
         env:
-          MODE: both
+          MODE: same
+        run: node experiments/exact-consequence-focus.mjs
+      - name: Application plus syntactic consequences
+        env:
+          MODE: getapp-same
+        run: node experiments/exact-consequence-focus.mjs
+      - name: All exact consequences
+        env:
+          MODE: all
         run: node experiments/exact-consequence-focus.mjs
