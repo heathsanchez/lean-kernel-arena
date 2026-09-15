@@ -1,0 +1,31 @@
+name: MDA grind post nested conversion diff
+on:
+  push:
+    branches:
+      - mda-kernel-genesis-v1
+    paths:
+      - experiments/grind-post-nested-conversion-diff.mjs
+      - .github/workflows/mda-grind-post-nested-conversion-diff.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  experiment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build grind witness
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-test perf/grind-ring-5
+      - name: Prepare nested parser candidate
+        run: node experiments/make-zero-param-nested-parser-candidate.mjs
+      - name: Localize conversion divergence
+        run: timeout 180s node --stack-size=32768 experiments/grind-post-nested-conversion-diff.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: grind-post-nested-conversion-diff-evidence
+          path: genesis/evidence/grind-post-nested-conversion-diff.json
+          if-no-files-found: error
