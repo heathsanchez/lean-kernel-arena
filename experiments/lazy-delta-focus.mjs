@@ -167,7 +167,7 @@ for(const enabled of [false,true]){
     console.log("LAZY_DELTA_FOCUS "+JSON.stringify({
       mode:enabled?"candidate":"baseline",name:row.name,expected:row.expected,
       status:r.status,reason:r.reason,steps:r.steps??null,constructed:r.constructed??null,
-      correct:r.status==="UNKNOWN"||r.status===row.expected
+      correct:r.status==="UNKNOWN"||r.status===row.expected,diagnostic_error:r.diagnostic_error??null
     }));
   }
 }
