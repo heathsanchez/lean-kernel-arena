@@ -1,4 +1,5 @@
 name: MDA verified semantic distillation map
+# true reduced basis rerun
 on:
   push:
     branches: [mda-kernel-genesis-v1]
