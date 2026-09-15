@@ -1,0 +1,30 @@
+name: MDA paid-normal projection retry
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/paid-normal-projection-retry.mjs'
+      - '.github/workflows/mda-paid-normal-projection-retry.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Reuse retained paid normal forms
+        run: timeout 180s node experiments/paid-normal-projection-retry.mjs
+      - name: Preserve separator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-paid-normal-projection-${{ github.sha }}
+          path: genesis/evidence/paid-normal-projection-retry.json
+          if-no-files-found: warn
