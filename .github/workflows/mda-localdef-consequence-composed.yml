@@ -1,0 +1,30 @@
+name: MDA LocalDef consequence composition
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/localdef-consequence-composed.mjs'
+      - '.github/workflows/mda-localdef-consequence-composed.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Test LocalDef continuation plus exact consequence reuse
+        run: timeout 240s node experiments/localdef-consequence-composed.mjs
+      - name: Preserve composition evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-localdef-consequence-composed-${{ github.sha }}
+          path: genesis/evidence/localdef-consequence-composed.json
+          if-no-files-found: warn
