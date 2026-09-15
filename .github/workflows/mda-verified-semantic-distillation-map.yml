@@ -1,0 +1,23 @@
+name: MDA verified semantic distillation map
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/verified-semantic-distillation-map-v1.mjs'
+      - '.github/workflows/mda-verified-semantic-distillation-map.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  map:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained basis
+        run: timeout 20s node genesis/test.mjs >/dev/null
+      - name: Compute necessity witnesses and separator suite
+        run: timeout 660s node experiments/verified-semantic-distillation-map-v1.mjs
