@@ -1,6 +1,6 @@
 version: "0.1.2"
 description: |
-  **MathGraph** — an experimental independent Lean 4 checker in JavaScript.
+  **MathGraph** — an experimental independent Lean 4 checker in JavaScript, qualified through the Arena harness.
 
   It uses a small explicit semantic core with exact decline boundaries, validated
   single-inductive semantics, quotient rules, projections, proof irrelevance, eta,
