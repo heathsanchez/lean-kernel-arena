@@ -1,0 +1,23 @@
+name: MDA beta closure spine focus
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/beta-closure-spine-focus.mjs'
+      - '.github/workflows/mda-beta-closure-spine-focus.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  focus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Carry substitutions through beta spine
+        run: timeout 180s node experiments/beta-closure-spine-focus.mjs
