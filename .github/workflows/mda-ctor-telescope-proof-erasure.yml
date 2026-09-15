@@ -1,0 +1,30 @@
+name: MDA constructor telescope proof erasure
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/ctor-telescope-proof-erasure.mjs'
+      - '.github/workflows/mda-ctor-telescope-proof-erasure.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Test constructor telescope proof erasure
+        run: timeout 240s node experiments/ctor-telescope-proof-erasure.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctor-telescope-proof-erasure-${{ github.sha }}
+          path: genesis/evidence/ctor-telescope-proof-erasure.json
+          if-no-files-found: warn
