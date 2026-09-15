@@ -1,0 +1,33 @@
+name: MDA rigid constructor reject
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/rigid-constructor-reject.mjs'
+      - '.github/workflows/mda-rigid-constructor-reject.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Test rigid constructor rejection escape
+        env:
+          QUANTUM: '1000'
+        run: timeout 420s node experiments/rigid-constructor-reject.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rigid-constructor-reject-${{ github.sha }}
+          path: genesis/evidence/rigid-constructor-reject.json
+          if-no-files-found: ignore
+          retention-days: 7
