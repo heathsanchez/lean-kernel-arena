@@ -17,5 +17,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
       - name: Inspect exact magma pair frontiers
         run: timeout 90s node experiments/magma-pair-frontier.mjs
