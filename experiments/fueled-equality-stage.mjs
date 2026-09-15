@@ -30,7 +30,7 @@ function rawAppHead(e){
 function isTarget(a,b,ctx){
   if(!Array.isArray(a)||a[0]!=="pi"||ctx.length!==7)return false;
   const {h,n}=rawAppHead(b);
-  return n>0&&Array.isArray(h)&&h[0]==="var"&&h[1]===2;
+  return n===2&&Array.isArray(h)&&h[0]==="var";
 }
 function smallShape(e){
   if(!Array.isArray(e))return typeof e;
@@ -62,7 +62,7 @@ proto.equal=function(a,b,ctx=[]){
   if(hit||!isTarget(a,b,ctx))return retainedEqual.call(this,a,b,ctx);
   hit=true;
   console.log("FUELED_EQUALITY_TARGET "+JSON.stringify({
-    at_steps:this.steps,ctx:ctx.length,left:smallShape(a),right:smallShape(b),budget:this.budget
+    at_steps:this.steps,ctx:ctx.length,left:smallShape(a),right:smallShape(b),right_head_var:rawAppHead(b).h?.[1]??null,budget:this.budget
   }));
   const rawSame=record(this,"same-raw",()=>this.same(a,b));
   if(rawSame)return;
