@@ -392,7 +392,7 @@ function runInductiveEnvelopeTests(base,emit=()=>{}) {
 
 
 function runEmptyInductiveTests(base,emit=()=>{}) {
-  const caps=[...base,"empty-inductives"];
+  const caps=base;
   const meta={meta:{format:{version:"3.1.0"}}};
   const rows=[
     meta,
@@ -442,7 +442,7 @@ function runEmptyInductiveTests(base,emit=()=>{}) {
 
 
 function runEnumInductiveTests(base,emit=()=>{}) {
-  const caps=[...base,"enum-inductives"];
+  const caps=base;
   const meta={meta:{format:{version:"3.1.0"}}};
   const rows=[
     meta,
