@@ -39,7 +39,8 @@ if(rows.length!==188) throw new Error("Arena row count changed");
 
 const proto=K.Kernel.prototype;
 const retainedRun=proto.run,retainedWhnf=proto.whnf;
-const stats={queries:0,chains:0,redexes:0,maxChain:0,materializedNodes:0,varSubstitutions:0};
+const stats={queries:0,chains:0,redexes:0,maxChain:0,materializedNodes:0,varSubstitutions:0,
+  iterativeCalls:0,flattenApps:0,rebuildApps:0,defUnfolds:0,recFrames:0,recReductions:0,recBlocked:0};
 
 function collect(root){
   const args=[];let cur=root;
@@ -115,11 +116,12 @@ function materialize(k,body,args){
 
 
 function iterativeRecWhnf(k,root){
+  stats.iterativeCalls++;
   const frames=[];
 
   function rebuild(head,args){
     let out=head;
-    for(const a of args) out=k.make("app",out,a);
+    for(const a of args){ stats.rebuildApps++; out=k.make("app",out,a); }
     return out;
   }
 
@@ -127,6 +129,7 @@ function iterativeRecWhnf(k,root){
     const args=[];
     let head=term;
     while(Array.isArray(head)&&head[0]==="app"){
+      stats.flattenApps++;
       k.tick(); k.need("application");
       args.push(head[2]); head=head[1];
     }
@@ -148,6 +151,7 @@ function iterativeRecWhnf(k,root){
       if(paramsMatch){
         const rule=rd.rules.find(rr=>rr.ctor===md.name);
         if(rule){
+          stats.recReductions++;
           k.need("inductive-reduction"); k.need("reduction");
           let rhs=k.instantiateDeclaration(rh,rule.rhs);
           const prefix=rargs.slice(0,rd.numParams+1+rd.numMinors);
@@ -158,6 +162,7 @@ function iterativeRecWhnf(k,root){
       }
     }
 
+    stats.recBlocked++;
     return {value:rebuild(rh,rargs)};
   }
 
@@ -198,6 +203,7 @@ function iterativeRecWhnf(k,root){
       if(!d) k.reject("undeclared-constant");
 
       if(d.kind==="def"){
+        stats.defUnfolds++;
         k.need("reduction");
         state=flatten(rebuild(k.instantiateDeclaration(head,d.value),args));
         continue;
@@ -206,6 +212,7 @@ function iterativeRecWhnf(k,root){
       if(d.kind==="rec"){
         const total=d.numParams+1+d.numMinors+d.numIndices+1;
         if(args.length>=total){
+          stats.recFrames++;
           frames.push({head,args,d,total});
           state=flatten(args[total-1]);
           continue;
