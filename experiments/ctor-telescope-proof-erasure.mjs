@@ -87,7 +87,7 @@ function install(enabled){
     return retainedRun.apply(this,args);
   };
   proto.equal=function(a,b,ctx=[]){
-    if(this.localDefs || (this._ctorProofEraseDepth??0)>0 ||
+    if((this._ctorProofEraseDepth??0)>0 ||
        !this.caps.has("proof-irrelevance"))
       return retainedEqual.call(this,a,b,ctx);
     if(this.same(a,b)) return;
@@ -211,7 +211,7 @@ const summary={arena_sha256:sha,budget:1_000_000,speculation_cap:CAP,focus,
     elapsed_ms:candidate.elapsed_ms,stats:candidate.stats,protectedChanged,resolved,regressions,remaining},
   lawful:candidate.wrong===0&&protectedChanged===0,
   promotable:candidate.wrong===0&&protectedChanged===0&&resolved.some(r=>r.name.endsWith("fueled-chain.ndjson")),
-  claim_boundary:"Positive constructor congruence modulo proof irrelevance. Proof-valued argument positions are derived from the constructor's own dependent Pi telescope under symbolic binders; proof terms at those positions are never inspected. Every non-proof argument must be syntactically or definitionally equal. Failed probes rollback to retained conversion."
+  claim_boundary:"Positive constructor congruence modulo proof irrelevance, including LocalDef execution. Proof-valued argument positions are derived from the constructor's own dependent Pi telescope under symbolic binders; proof terms at those positions are never inspected. Every non-proof argument must be syntactically or definitionally equal. Failed probes rollback to retained conversion."
 };
 mkdirSync(new URL("../genesis/evidence/",import.meta.url),{recursive:true});
 writeFileSync(new URL("../genesis/evidence/ctor-telescope-proof-erasure.json",import.meta.url),JSON.stringify(summary,null,2)+"\n");
