@@ -1,0 +1,23 @@
+name: MDA Pi neutral control
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/pi-neutral-control.mjs'
+      - '.github/workflows/mda-pi-neutral-control.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Test Pi-neutral control effect
+        run: timeout 420s node experiments/pi-neutral-control.mjs
