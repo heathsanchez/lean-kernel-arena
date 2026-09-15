@@ -104,11 +104,13 @@ function quotientType(kind,lps) {
 }
 class Stop extends Error { constructor(status, reason) { super(reason); this.status=status; } }
 class Kernel {
-  constructor(capabilities=[], budget=50000) {
+  constructor(capabilities=[], budget=50000, options={}) {
     this.caps=new Set(capabilities); this.budget=budget;
+    this.localDefs=options?.localDefs===true;
+    this._activeCtx=[];
   }
   run(term, expected, declarations=[], parameters=[]) {
-    this.steps=0; this.env=new Map(); this.allocations=0; this.params=new Set(parameters); this.currentDeclaration=null; this.conversionFrontier=null;
+    this.steps=0; this.env=new Map(); this.allocations=0; this.params=new Set(parameters); this.currentDeclaration=null; this.conversionFrontier=null; this._activeCtx=[];
     const start=Date.now();
     try {
       if (!this.caps.size) this.unknown("empty-present");
@@ -586,6 +588,19 @@ class Kernel {
   }
   whnf(e) {
     this.tick();
+    if(this.localDefs && Array.isArray(e) && e[0]==="var") {
+      const ctx=this._activeCtx??[];
+      if(e[1]<ctx.length) {
+        const entry=ctx[ctx.length-1-e[1]];
+        if(entry?.__localDef===true) {
+          this.need("reduction");
+          // A local definition was created outside this slot. Lift its exact
+          // value across the definition slot plus any inner binders, then
+          // continue weak-head reduction without copying the surrounding body.
+          return this.whnf(this.shift(entry.value,e[1]+1));
+        }
+      }
+    }
     if(e[0]==="nat") {
       this.need("nat-literals");
       const zero=["const",leanName("Nat","zero")],succ=["const",leanName("Nat","succ")];
@@ -758,6 +773,12 @@ class Kernel {
     return levelsEqual(u,0,()=>this.tick()) ? t : null;
   }
   equal(a,b,ctx=[]) {
+    if(!this.localDefs) return this.equalCore(a,b,ctx);
+    const old=this._activeCtx; this._activeCtx=ctx;
+    try { return this.equalCore(a,b,ctx); }
+    finally { this._activeCtx=old; }
+  }
+  equalCore(a,b,ctx=[]) {
     this.tick();
     if(this.same(a,b)) return;
     const x=this.normal(a),y=this.normal(b);
@@ -845,18 +866,33 @@ class Kernel {
     return walk(term);
   }
   sortOf(e,ctx) {
+    if(!this.localDefs) return this.sortOfCore(e,ctx);
+    const old=this._activeCtx; this._activeCtx=ctx;
+    try { return this.sortOfCore(e,ctx); }
+    finally { this._activeCtx=old; }
+  }
+  sortOfCore(e,ctx) {
     const t=this.whnf(this.infer(e,ctx));
     if(t[0]!=="sort") this.reject("not-a-type");
     return t[1];
   }
   infer(e,ctx) {
+    if(!this.localDefs) return this.inferCore(e,ctx);
+    const old=this._activeCtx; this._activeCtx=ctx;
+    try { return this.inferCore(e,ctx); }
+    finally { this._activeCtx=old; }
+  }
+  inferCore(e,ctx) {
     this.tick();
     switch(e[0]) {
       case "sort": this.need("sort"); return this.make("sort",levelSucc(e[1]));
-      case "var":
+      case "var": {
         this.need("binders");
         if(e[1]>=ctx.length) this.reject("unbound-variable");
-        return this.shift(ctx[ctx.length-1-e[1]],e[1]+1);
+        const entry=ctx[ctx.length-1-e[1]];
+        const ty=this.localDefs && entry?.__localDef===true ? entry.type : entry;
+        return this.shift(ty,e[1]+1);
+      }
       case "const":
         this.need("declarations");
         if(!this.env.has(e[1])) this.reject("undeclared-constant");
@@ -892,9 +928,15 @@ class Kernel {
       case "let":
         this.need("reduction"); this.sortOf(e[1],ctx);
         this.equal(this.infer(e[2],ctx),e[1],ctx);
-        // A let introduces a local definition, not merely a local type.
-        // Until the context representation retains that definition safely,
-        // preserve exact semantics by substituting the checked value.
+        if(this.localDefs) {
+          const entry={__localDef:true,type:e[1],value:e[2]};
+          const bodyType=this.infer(e[3],[...ctx,entry]);
+          // Only the inferred result type crosses the let boundary. This is
+          // extensionally the same substitution as the retained eager path,
+          // but the term body itself is never copied.
+          return this.substitute(bodyType,e[2]);
+        }
+        // Retained checker: exact eager substitution.
         return this.infer(this.substitute(e[3],e[2]),ctx);
       default: this.unknown("inference-frontier");
     }
@@ -1154,7 +1196,15 @@ function checkExport(input,capabilities,budget=200000) {
     }
     if(!header) fail("missing-header");
     if(quotStage!==0 && quotStage!==quotKinds.length) reject("quotient-package-incomplete");
-    const result=new Kernel(capabilities,budget).run(S(0),S(1),decls);
+    const retained=new Kernel(capabilities,budget).run(S(0),S(1),decls);
+    let result=retained;
+    if(retained.status===UNKNOWN) {
+      const local=new Kernel(capabilities,budget,{localDefs:true}).run(S(0),S(1),decls);
+      if(local.status!==UNKNOWN) {
+        result={...local,fallback_mode:"local-def",retained_reason:retained.reason,
+          retained_steps:retained.steps??null};
+      }
+    }
     return {...result,parse_records:parsed,elapsed_ms:Date.now()-start};
   } catch(e) {
     if(e instanceof Stop) return out(e.status,e.message);
