@@ -15,7 +15,7 @@ import io,tarfile,json,sys
 data=sys.stdin.buffer.read(); rows=[]
 with tarfile.open(fileobj=io.BytesIO(data),mode="r:gz") as a:
   for m in a:
-    if not m.isfile() or not m.name.endswith(".ndjson"): continue
+    if not m.isfile() or not m.name.endswith(".ndjson") or m.size>2000000: continue
     p="/".join(m.name.split("/")[-3:])
     parts=m.name.split("/")
     expected="ACCEPT" if "good" in parts else "REJECT" if "bad" in parts else None
@@ -36,7 +36,7 @@ function mechanism(name){
 }
 
 const proto=K.Kernel.prototype;
-const baseRun=proto.run, baseProofType=proto.proofType, baseGetApp=proto.getApp;
+const baseRun=proto.run, baseProofType=proto.proofType, baseGetApp=proto.getApp, baseSame=proto.same;
 
 function objectId(k,x){
   k.__dfbIds??=new WeakMap(); k.__dfbNextId??=1;
@@ -52,7 +52,7 @@ function ctxKey(k,ctx){
 function paramsKey(k){ return [...(k.params??[])].sort().join("\u0000"); }
 
 function install(mode){
-  proto.run=baseRun; proto.proofType=baseProofType; proto.getApp=baseGetApp;
+  proto.run=baseRun; proto.proofType=baseProofType; proto.getApp=baseGetApp; proto.same=baseSame; proto.same=baseSame;
   if(mode==="baseline") return;
   const useProof=mode==="proof"||mode==="both";
   const useGetApp=mode==="getapp"||mode==="both";
@@ -104,7 +104,7 @@ function runMode(mode){
   return {mode,elapsed_ms:Date.now()-t0,results};
 }
 
-const modes=["baseline","proof","getapp","both"];
+const modes=["baseline","proof","getapp","same","both","getapp-same","proof-same","all"];
 const runs=Object.fromEntries(modes.map(mode=>[mode,runMode(mode)]));
 proto.run=baseRun; proto.proofType=baseProofType; proto.getApp=baseGetApp;
 
