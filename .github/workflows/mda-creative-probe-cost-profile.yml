@@ -1,0 +1,39 @@
+name: MDA creative probe cost profile
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/creative-probe-cost-profile.mjs'
+      - '.github/workflows/mda-creative-probe-cost-profile.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Reconstruct retained present
+        run: timeout 30s node --stack-size=32768 genesis/test.mjs
+      - name: Build five boundary witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test undecidability/alg-conv-trans-acc-left
+          ./lka.py build-test undecidability/alg-conv-trans-acc-right
+          ./lka.py build-test undecidability/subject-reduction-redex
+          ./lka.py build-test undecidability/alg-conv-trans-acc
+          ./lka.py build-test undecidability/subject-reduction-reduct
+      - name: Profile successful probe costs
+        run: timeout 120s node --stack-size=32768 genesis/creative-probe-cost-profile.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: creative-probe-cost-profile-${{ github.sha }}
+          path: genesis/evidence/creative-probe-cost-profile.json
+          if-no-files-found: error
