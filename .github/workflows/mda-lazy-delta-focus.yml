@@ -1,0 +1,23 @@
+name: MDA lazy delta focus
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/lazy-delta-focus.mjs'
+      - '.github/workflows/mda-lazy-delta-focus.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  focus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Probe lazy delta frontier
+        run: timeout 90s node experiments/lazy-delta-focus.mjs
