@@ -1,0 +1,30 @@
+name: MDA binder origin atlas
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/binder-origins.mjs'
+      - '.github/workflows/mda-binder-origins.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct frozen retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Attribute recursive binder work to originating call sites
+        run: timeout 120s node --stack-size=32768 genesis/binder-origins.mjs
+      - name: Preserve origin atlas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-binder-origins-${{ github.sha }}
+          path: genesis/evidence/binder-origins.json
+          if-no-files-found: warn
