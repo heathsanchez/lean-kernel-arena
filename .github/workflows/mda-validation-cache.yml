@@ -1,0 +1,30 @@
+name: MDA validation consequence cache
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/validation-cache.mjs'
+      - '.github/workflows/mda-validation-cache.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Test exact successful validation reuse
+        run: timeout 150s node experiments/validation-cache.mjs
+      - name: Preserve separator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-validation-cache-${{ github.sha }}
+          path: genesis/evidence/validation-cache-separator.json
+          if-no-files-found: warn
