@@ -1,0 +1,23 @@
+name: MDA LocalDef WHNF caller trace
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/pair-localdef-whnf-caller.mjs'
+      - '.github/workflows/mda-localdef-whnf-caller.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Trace caller above LocalDef WHNF loop
+        run: timeout 420s node experiments/pair-localdef-whnf-caller.mjs
