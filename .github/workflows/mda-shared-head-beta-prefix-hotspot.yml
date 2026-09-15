@@ -1,0 +1,31 @@
+name: MDA shared head beta prefix hotspot
+on:
+  push:
+    branches:
+      - mda-kernel-genesis-v1
+    paths:
+      - genesis/shared-head-beta-prefix-hotspot.mjs
+      - genesis/head-beta-spine-layer.mjs
+      - genesis/recursor-prefix-cache-layer.mjs
+      - .github/workflows/mda-shared-head-beta-prefix-hotspot.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build shared witness
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-test perf/shared-subterm
+      - name: Profile retained best shared representation
+        run: timeout 150s node --stack-size=32768 genesis/shared-head-beta-prefix-hotspot.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shared-head-beta-prefix-hotspot-evidence
+          path: genesis/evidence/shared-head-beta-prefix-hotspot.json
+          if-no-files-found: error
