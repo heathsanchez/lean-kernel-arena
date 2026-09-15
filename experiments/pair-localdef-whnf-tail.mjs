@@ -111,15 +111,15 @@ function rawShape(e){
   return {tag:e[0],spine:n,head};
 }
 function tailRecord(k,e){
-  if(k.localDefs!==true || k.steps<2000000 || !Array.isArray(e) ||
-     !(typeof k.currentDeclaration==="string"&&k.currentDeclaration.includes("countermodel"))) return;
+  if(k.localDefs!==true || k.steps<2000000 || !Array.isArray(e)) return;
   whnfTail.calls++;
   let id=whnfTail.ids.get(e);
   if(id===undefined){
     id=whnfTail.next++;whnfTail.ids.set(e,id);
-    whnfTail.records.set(id,{id,count:0,...rawShape(e),firstStep:k.steps,lastStep:k.steps});
+    whnfTail.records.set(id,{id,count:0,...rawShape(e),firstStep:k.steps,lastStep:k.steps,
+      firstDeclaration:k.currentDeclaration??null,lastDeclaration:k.currentDeclaration??null});
   }
-  const r=whnfTail.records.get(id);r.count++;r.lastStep=k.steps;
+  const r=whnfTail.records.get(id);r.count++;r.lastStep=k.steps;r.lastDeclaration=k.currentDeclaration??null;
   const d=k._activeCtx?.length??0;whnfTail.ctxDepths.set(d,(whnfTail.ctxDepths.get(d)??0)+1);
   const b=Math.floor(k.steps/500000)*500000;
   whnfTail.stepBuckets.set(b,(whnfTail.stepBuckets.get(b)??0)+1);
