@@ -1,0 +1,23 @@
+name: MDA binder-aware LocalDef normalization
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/pair-binder-aware-localdef-normal.mjs'
+      - '.github/workflows/mda-pair-binder-aware-localdef-normal.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 20s node genesis/test.mjs
+      - name: Test binder-aware LocalDef normalization
+        run: timeout 660s node experiments/pair-binder-aware-localdef-normal.mjs
