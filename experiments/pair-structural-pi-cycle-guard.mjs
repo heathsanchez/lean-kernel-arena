@@ -168,7 +168,8 @@ function install(enabled){
 
   proto.equal=function(a,b,ctx=[]){
     if(!Array.isArray(a)||!Array.isArray(b))return retainedEqual.call(this,a,b,ctx);
-    const key=(this.localDefs?"L|":"N|")+ctxKey(this,ctx);\n    const progressKey=(this.localDefs?"L|":"N|")+semCtxKey(this,ctx);
+    const key=(this.localDefs?"L|":"N|")+ctxKey(this,ctx);
+    const progressKey=(this.localDefs?"L|":"N|")+semCtxKey(this,ctx);
     const s=eqSet(this,a,b);
     if(s.has(key)){stats.eqHits++;return;}
     const progress=eqProgress(this,a,b);
