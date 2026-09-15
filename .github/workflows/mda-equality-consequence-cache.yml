@@ -1,0 +1,30 @@
+name: MDA equality consequence cache
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/equality-consequence-cache.mjs'
+      - '.github/workflows/mda-equality-consequence-cache.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Test exact positive equality consequence reuse
+        run: timeout 240s node experiments/equality-consequence-cache.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: equality-consequence-cache-${{ github.sha }}
+          path: genesis/evidence/equality-consequence-cache.json
+          if-no-files-found: warn
