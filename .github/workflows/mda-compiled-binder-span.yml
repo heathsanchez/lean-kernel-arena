@@ -1,0 +1,30 @@
+name: MDA compiled binder span separator
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/compiled-binder-span-separator.mjs'
+      - '.github/workflows/mda-compiled-binder-span.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Test compiled binder-span skipping
+        run: timeout 180s node genesis/compiled-binder-span-separator.mjs
+      - name: Preserve separator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mda-compiled-binder-span-${{ github.sha }}
+          path: genesis/evidence/compiled-binder-span-separator.json
+          if-no-files-found: warn
