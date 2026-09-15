@@ -6,7 +6,10 @@ on:
       - 'genesis/lean-like-minimal-head-classes.mjs'
       - '.github/workflows/mda-lean-like-minimal-head-classes.yml'
   workflow_dispatch:
-permissions: {contents: read}
+
+permissions:
+  contents: read
+
 jobs:
   profile:
     runs-on: ubuntu-24.04
@@ -14,7 +17,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: cachix/install-nix-action@v31
-        with: {github_access_token: ${{ secrets.GITHUB_TOKEN }}}
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Reconstruct retained present
         run: timeout 30s node --stack-size=32768 genesis/test.mjs
       - name: Build complete CI Arena set
