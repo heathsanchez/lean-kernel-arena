@@ -67,8 +67,15 @@ function installBase(){
         return "d:"+objectId(this,entry.type)+":"+objectId(this,entry.value);
       return Array.isArray(entry)?"t:"+objectId(this,entry):"x:"+String(entry);
     }).join(",");
-    if(byCtx.has(key)) return byCtx.get(key);
-    const r=baseNormal.call(this,e); byCtx.set(key,r); return r;
+    const traceThis=e[0]==="var"&&e[1]===3&&ctx.length===7;
+    if(byCtx.has(key)) {
+      if(traceThis) (this.__localTrace??=[]).push({where:"normal",event:"hit",index:3,ctxlen:7,result:JSON.stringify(byCtx.get(key)).slice(0,500)});
+      return byCtx.get(key);
+    }
+    if(traceThis) (this.__localTrace??=[]).push({where:"normal",event:"miss",index:3,ctxlen:7});
+    const r=baseNormal.call(this,e);
+    if(traceThis) (this.__localTrace??=[]).push({where:"normal",event:"store",index:3,ctxlen:7,result:JSON.stringify(r).slice(0,500)});
+    byCtx.set(key,r); return r;
   };
 }
 
@@ -113,11 +120,15 @@ function installLocalDefs(){
     const ctx=this.__activeCtx??[];
     if(Array.isArray(e)&&e[0]==="var"&&e[1]<ctx.length){
       const entry=ctx[ctx.length-1-e[1]];
+      if(e[1]===3&&ctx.length===7)
+        (this.__localTrace??=[]).push({where:"whnf",index:3,ctxlen:7,kind:entry?.__localDef===true?"local-def":"binder"});
       if(entry?.__localDef===true){
         this.tick(); this.need("reduction");
-        // Keep the local-definition slot in the dynamic context while unfolding:
-        // lift the value across the let binder itself plus any inner binders.
-        return this.whnf(this.shift(entry.value,e[1]+1));
+        const lifted=this.shift(entry.value,e[1]+1);
+        if(e[1]===3&&ctx.length===7)
+          (this.__localTrace??=[]).push({where:"whnf",event:"unfold",shift:e[1]+1,lifted:JSON.stringify(lifted).slice(0,500)});
+        // Keep the local-definition slot in the dynamic context while unfolding.
+        return this.whnf(lifted);
       }
     }
     return baseWhnf.call(this,e);
@@ -129,6 +140,7 @@ function installLocalDefs(){
       catch(e) {
         if(e instanceof K.Stop && e.status===K.UNKNOWN && e.message==="conversion-frontier" &&
            this.conversionFrontier && this.conversionFrontier.context===undefined) {
+          this.conversionFrontier.local_trace = (this.__localTrace??[]).slice(-40);
           this.conversionFrontier.context = ctx.map((entry,i)=>({
             slot:i,
             from_top:ctx.length-1-i,
