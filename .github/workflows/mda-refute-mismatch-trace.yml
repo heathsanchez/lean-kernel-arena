@@ -1,0 +1,23 @@
+name: MDA refute mismatch trace
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/refute-mismatch-trace.mjs'
+      - '.github/workflows/mda-refute-mismatch-trace.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  trace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct retained present
+        run: timeout 15s node genesis/test.mjs
+      - name: Trace decisive raw mismatches
+        run: timeout 120s node experiments/refute-mismatch-trace.mjs
