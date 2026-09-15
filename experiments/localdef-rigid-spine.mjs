@@ -27,7 +27,7 @@ if(rows.length!==188)throw new Error("Arena row count changed");
 const focusRows=rows.filter(r=>r.name.endsWith("good/perf/fueled-chain.ndjson"));
 
 const proto=K.Kernel.prototype,retainedEqual=proto.equal;
-const stats={piProbe:0,piSuccess:0,localVarProbe:0,localVarRelay:0,etaRelay:0,etaExpand:0,outer:0,inner:0,success:0,fallback:0,argChecks:0,maxDepth:0};
+const stats={piProbe:0,piSuccess:0,localVarProbe:0,localVarRelay:0,etaRelay:0,etaExpand:0,subtypeProofSkip:0,outer:0,inner:0,success:0,fallback:0,argChecks:0,maxDepth:0};
 const fallbackDetails=[];
 function shape(e){
   if(!Array.isArray(e))return typeof e;
@@ -147,6 +147,19 @@ function install(enabled){
     const d=sameHead&&sa.head?.[0]==="const"?this.env.get(sa.head[1]):null;
     if(!sameHead||(depth===0&&d?.kind!=="inductive"))
       return retainedEqual.call(this,a,b,ctx);
+
+    if(depth>0 && this.caps.has("proof-irrelevance") && d?.kind==="ctor" &&
+       String(d.induct).includes("Subtype") &&
+       (d.numFields??0)===2 && sa.args.length===(d.numParams??0)+2){
+      const nP=d.numParams??0;
+      for(let i=0;i<=nP;i++){
+        if(sa.args[i]===sb.args[i])continue;
+        stats.argChecks++;
+        this.equal(sa.args[i],sb.args[i],ctx);
+      }
+      stats.subtypeProofSkip++;
+      return;
+    }
 
     const outer=depth===0;
     let snap=null;
