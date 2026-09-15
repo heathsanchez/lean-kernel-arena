@@ -26,3 +26,5 @@ jobs:
         env:
           FOCUS_BUDGET: ${{ matrix.budget }}
         run: timeout 300s node experiments/localdef-rigid-spine.mjs
+
+# rerun equality-memory composition
