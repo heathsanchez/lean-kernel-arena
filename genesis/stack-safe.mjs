@@ -8,6 +8,13 @@ const baseValidate = Kernel.prototype.validate;
 const baseWhnf = Kernel.prototype.whnf;
 const baseInfer = Kernel.prototype.infer;
 
+function stackLevelSub(kernel,u,sub) {
+  kernel.tick();
+  if(typeof u==="number") return u;
+  if(u[0]==="param") return sub.has(u[1])?sub.get(u[1]):u;
+  return [u[0],...u.slice(1).map(x=>stackLevelSub(kernel,x,sub))];
+}
+
 Kernel.prototype.validate = function(root) {
   const work=[root];
   while(work.length) {
@@ -225,76 +232,145 @@ Kernel.prototype.normal = function(root) {
   return vals.pop();
 };
 
-// Eliminate recursive execution depth on the three binder/application spines.
-// Non-spine cases remain byte-for-byte on the retained inference path.
-Kernel.prototype.infer = function(e,ctx) {
-  if(Array.isArray(e) && e[0]==="app") {
-    const args=[]; let head=e;
-    while(Array.isArray(head) && head[0]==="app") {
-      this.tick();
-      this.need("application");
-      args.push(head[2]);
-      head=head[1];
+// Universe-instantiating declaration bodies are a pure tree transform.
+// The independent separator established that replacing its recursive walker
+// with this explicit work stack changes no protected verdict.
+Kernel.prototype.instantiateDeclaration = function(ref,term) {
+  this.tick();
+  const d=this.env.get(ref[1]),ps=d.levelParams??[],args=ref[2]??[];
+  if(ps.length!==args.length) this.reject("universe-arity");
+  if(!ps.length) return term;
+  this.need("universes");
+  const sub=new Map(ps.map((p,i)=>[p,args[i]]));
+  const work=[{kind:"visit",e:term}],vals=[];
+  while(work.length) {
+    const f=work.pop();
+    if(f.kind==="build") {
+      if(f.tag==="proj") {
+        vals.push(this.make("proj",f.name,f.index,vals.pop()));
+      } else {
+        const xs=new Array(f.n);
+        for(let i=f.n-1;i>=0;i--) xs[i]=vals.pop();
+        vals.push(this.make(f.tag,...xs));
+      }
+      continue;
     }
-    args.reverse();
-    let ty=this.infer(head,ctx);
-    for(const arg of args) {
-      const f=this.whnf(ty);
-      if(f[0]!=="pi") this.reject("not-a-function");
-      this.equal(this.infer(arg,ctx),f[1],ctx);
-      ty=this.substitute(f[2],arg);
+    const e=f.e;
+    this.tick();
+    if(e[0]==="sort") {
+      vals.push(this.make("sort",stackLevelSub(this,e[1],sub)));
+    } else if(e[0]==="const") {
+      vals.push(e.length===2?e:this.make("const",e[1],e[2].map(u=>stackLevelSub(this,u,sub))));
+    } else if(e[0]==="var"||e[0]==="nat"||e[0]==="strlit") {
+      vals.push(e);
+    } else if(e[0]==="proj") {
+      work.push({kind:"build",tag:"proj",name:e[1],index:e[2]});
+      work.push({kind:"visit",e:e[3]});
+    } else {
+      work.push({kind:"build",tag:e[0],n:e.length-1});
+      for(let i=e.length-1;i>=1;i--) work.push({kind:"visit",e:e[i]});
     }
-    return ty;
   }
+  return vals.pop();
+};
 
-  if(Array.isArray(e) && e[0]==="lam") {
-    const domains=[]; let cur=e, cctx=ctx;
-    while(Array.isArray(cur) && cur[0]==="lam") {
-      this.tick();
-      this.need("binders");
-      this.sortOf(cur[1],cctx);
-      domains.push(cur[1]);
-      cctx=[...cctx,cur[1]];
-      cur=cur[2];
+// Inference is a small continuation machine for the mutually alternating
+// application/lambda/let paths. Same-tag Pi spines retain their specialized
+// loop. This removes host recursion without changing typing obligations.
+Kernel.prototype.infer = function(root,rootCtx) {
+  let e=root,ctx=rootCtx,value,returning=false;
+  const kont=[];
+
+  while(true) {
+    if(!returning) {
+      if(Array.isArray(e) && e[0]==="app") {
+        this.tick();
+        this.need("application");
+        kont.push({kind:"app-fn",arg:e[2],ctx});
+        e=e[1];
+        continue;
+      }
+
+      if(Array.isArray(e) && e[0]==="lam") {
+        this.tick();
+        this.need("binders");
+        this.sortOf(e[1],ctx);
+        kont.push({kind:"lam",domain:e[1]});
+        ctx=[...ctx,e[1]];
+        e=e[2];
+        continue;
+      }
+
+      if(Array.isArray(e) && e[0]==="let") {
+        this.tick();
+        this.need("reduction");
+        this.sortOf(e[1],ctx);
+        kont.push({kind:"let-value",type:e[1],valueTerm:e[2],body:e[3],ctx});
+        e=e[2];
+        continue;
+      }
+
+      if(Array.isArray(e) && e[0]==="pi") {
+        const levels=[]; let cur=e,cctx=ctx;
+        while(Array.isArray(cur) && cur[0]==="pi") {
+          this.tick();
+          this.need("binders");
+          const a=this.sortOf(cur[1],cctx);
+          levels.push(a);
+          cctx=[...cctx,cur[1]];
+          cur=cur[2];
+        }
+        let b=this.sortOf(cur,cctx),out=null;
+        for(let i=levels.length-1;i>=0;i--) {
+          const a=levels[i];
+          const u=(typeof a==="number"&&typeof b==="number")
+            ? (b===0?0:Math.max(a,b))
+            : ["imax",a,b];
+          out=this.make("sort",u);
+          if(i>0) b=this.whnf(out)[1];
+        }
+        value=out;
+        returning=true;
+        continue;
+      }
+
+      value=baseInfer.call(this,e,ctx);
+      returning=true;
+      continue;
     }
-    let ty=this.infer(cur,cctx);
-    for(let i=domains.length-1;i>=0;i--) ty=this.make("pi",domains[i],ty);
-    return ty;
+
+    if(!kont.length) return value;
+    const k=kont.pop();
+
+    if(k.kind==="lam") {
+      value=this.make("pi",k.domain,value);
+      continue;
+    }
+
+    if(k.kind==="app-fn") {
+      const fty=this.whnf(value);
+      if(fty[0]!=="pi") this.reject("not-a-function");
+      kont.push({kind:"app-arg",fty,arg:k.arg,ctx:k.ctx});
+      e=k.arg;
+      ctx=k.ctx;
+      returning=false;
+      continue;
+    }
+
+    if(k.kind==="app-arg") {
+      this.equal(value,k.fty[1],k.ctx);
+      value=this.substitute(k.fty[2],k.arg);
+      continue;
+    }
+
+    if(k.kind==="let-value") {
+      this.equal(value,k.type,k.ctx);
+      e=this.substitute(k.body,k.valueTerm);
+      ctx=k.ctx;
+      returning=false;
+      continue;
+    }
+
+    throw new Error("unknown inference continuation");
   }
-
-  if(Array.isArray(e) && e[0]==="pi") {
-    const levels=[]; let cur=e, cctx=ctx;
-    while(Array.isArray(cur) && cur[0]==="pi") {
-      this.tick();
-      this.need("binders");
-      const a=this.sortOf(cur[1],cctx);
-      levels.push(a);
-      cctx=[...cctx,cur[1]];
-      cur=cur[2];
-    }
-    let b=this.sortOf(cur,cctx), out=null;
-    for(let i=levels.length-1;i>=0;i--) {
-      const a=levels[i];
-      const u=(typeof a==="number"&&typeof b==="number")
-        ? (b===0?0:Math.max(a,b))
-        : ["imax",a,b];
-      out=this.make("sort",u);
-      if(i>0) b=this.whnf(out)[1];
-    }
-    return out;
-  }
-
-  if(Array.isArray(e) && e[0]==="let") {
-    let cur=e;
-    while(Array.isArray(cur) && cur[0]==="let") {
-      this.tick();
-      this.need("reduction");
-      this.sortOf(cur[1],ctx);
-      this.equal(this.infer(cur[2],ctx),cur[1],ctx);
-      cur=this.substitute(cur[3],cur[2]);
-    }
-    return this.infer(cur,ctx);
-  }
-
-  return baseInfer.call(this,e,ctx);
 };
