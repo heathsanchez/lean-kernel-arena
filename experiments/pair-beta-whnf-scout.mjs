@@ -24,7 +24,7 @@ print(json.dumps(rows))
 const focusRows=JSON.parse(execFileSync("python3",["-c",py],{input:data,maxBuffer:50000000,timeout:10000}));
 
 const proto=K.Kernel.prototype,retainedRun=proto.run,retainedEqual=proto.equal,retainedWhnf=proto.whnf;
-const stats={eqHits:0,eqStores:0,earlyPi:0,frontiers:0,projectionEligible:0,projectionSuccess:0,argChecks:0,whnfQueries:0,whnfHits:0,whnfStores:0,whnfCanonNodes:0,whnfLocalBypass:0,localWhnfQueries:0,localWhnfHits:0,localWhnfStores:0,betaQueries:0,betaEligible:0,betaSuccesses:0,betaBinders:0,betaSubstNodes:0,betaSubstHits:0,betaFallbacks:0};
+const stats={eqHits:0,eqStores:0,earlyPi:0,frontiers:0,projectionEligible:0,projectionSuccess:0,argChecks:0,whnfQueries:0,whnfHits:0,whnfStores:0,whnfCanonNodes:0,whnfLocalBypass:0,localWhnfQueries:0,localWhnfHits:0,localWhnfStores:0,natPrimitiveQueries:0,natAdd:0,natMul:0,natMod:0,betaQueries:0,betaEligible:0,betaSuccesses:0,betaBinders:0,betaSubstNodes:0,betaSubstHits:0,betaFallbacks:0};
 
 function objectId(k,x){
   k.__pairIds??=new WeakMap();k.__pairNextId??=1;
@@ -45,6 +45,50 @@ function rawSpine(e){
   args.reverse();return{head:h,args};
 }
 function sameHead(k,a,b){return a===b||(Array.isArray(a)&&Array.isArray(b)&&k.same(a,b));}
+
+function lname(...parts){
+  let n="[]";
+  for(const p of parts)n=JSON.stringify([n,"str",p]);
+  return n;
+}
+const NAT_ZERO=lname("Nat","zero"),NAT_SUCC=lname("Nat","succ");
+const NAT_ADD=lname("Nat","add"),NAT_MUL=lname("Nat","mul"),NAT_MOD=lname("Nat","mod");
+
+function closedNat(e,limit=1000000){
+  if(!Array.isArray(e))return null;
+  if(e[0]==="nat"&&Number.isSafeInteger(e[1])&&e[1]>=0)return e[1];
+  if(e[0]==="const"&&e[1]===NAT_ZERO)return 0;
+  let n=0,cur=e;
+  while(Array.isArray(cur)&&cur[0]==="app"&&Array.isArray(cur[1])&&cur[1][0]==="const"&&cur[1][1]===NAT_SUCC){
+    n++;if(n>limit)return null;cur=cur[2];
+  }
+  if(n){
+    const tail=closedNat(cur,limit-n);
+    return tail===null?null:n+tail;
+  }
+  return null;
+}
+function natWhnf(k,n){
+  if(n===0)return ["const",NAT_ZERO];
+  return k.make("app",["const",NAT_SUCC],k.make("nat",n-1));
+}
+function nativeNatPrimitive(k,e){
+  if(!Array.isArray(e)||e[0]!=="app")return null;
+  const sp=rawSpine(e);
+  if(sp.head?.[0]!=="const"||sp.args.length!==2)return null;
+  const h=sp.head[1];
+  if(h!==NAT_ADD&&h!==NAT_MUL&&h!==NAT_MOD)return null;
+  stats.natPrimitiveQueries++;
+  const a=closedNat(sp.args[0]),b=closedNat(sp.args[1]);
+  if(a===null||b===null)return null;
+  let v;
+  if(h===NAT_ADD){v=a+b;stats.natAdd++;}
+  else if(h===NAT_MUL){v=a*b;stats.natMul++;}
+  else {if(b===0)return null;v=a%b;stats.natMod++;}
+  if(!Number.isSafeInteger(v)||v<0)return null;
+  k.tick();k.need("reduction");
+  return natWhnf(k,v);
+}
 
 const WHNF_END=Symbol("whnf-end");
 function whnfEnsure(k){
@@ -143,6 +187,10 @@ function install(enabled){
     return retainedRun.apply(this,args);
   };
   proto.whnf=function(e){
+    if(Array.isArray(e)&&e[0]==="app"){
+      const nat=nativeNatPrimitive(this,e);
+      if(nat!==null)return nat;
+    }
     if(this.localDefs===true || this.__pairExternalBetaDepth || !Array.isArray(e) || e[0]!=="app")
       return structuralWhnf(this,e);
 
