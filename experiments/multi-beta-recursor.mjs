@@ -232,7 +232,9 @@ function install(enabled){
   proto.run=retainedRun;proto.whnf=retainedWhnf;
   if(!enabled)return;
   proto.whnf=function(e){
-    if(this._multiBetaDepth||!Array.isArray(e)||e[0]!=="app")
+    if(this._multiBetaDepth)
+      return iterativeRecWhnf(this,e);
+    if(!Array.isArray(e)||e[0]!=="app")
       return retainedWhnf.call(this,e);
     stats.queries++;
     const c=collect(e);
