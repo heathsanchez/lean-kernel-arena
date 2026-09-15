@@ -1,8 +1,8 @@
 // Prospective separator: for two identical raw projections, normalize once
 // and compare the resulting normal forms with a single explicit congruence
-// walk. Re-enter the retained converter only at genuine leaf/head mismatches,
-// so proof irrelevance and other retained rules keep final authority without
-// repeatedly normalizing every enclosing subtree.
+// walk. Syntactically identical atomic normal forms are discharged directly;
+// the retained converter is re-entered only at genuine mismatches, preserving
+// proof irrelevance and every other retained semantic rule.
 import {readFileSync,writeFileSync,mkdirSync} from "node:fs";
 import {execFileSync} from "node:child_process";
 import {createHash} from "node:crypto";
@@ -32,6 +32,26 @@ if(rows.length!==188) throw new Error("Arena row count changed");
 const proto=K.Kernel.prototype;
 const retainedEqual=proto.equal;
 
+function sameData(a,b) {
+  if(a===b) return true;
+  const work=[[a,b]];
+  while(work.length) {
+    const [x,y]=work.pop();
+    if(x===y) continue;
+    const xa=Array.isArray(x),ya=Array.isArray(y);
+    if(xa!==ya) return false;
+    if(!xa) return false;
+    if(x.length!==y.length) return false;
+    for(let i=0;i<x.length;i++) {
+      const p=x[i],q=y[i];
+      if(p===q) continue;
+      if(Array.isArray(p)&&Array.isArray(q)) work.push([p,q]);
+      else return false;
+    }
+  }
+  return true;
+}
+
 function compareNormalProjection(kernel,a,b,ctx) {
   const x=kernel.normal(a), y=kernel.normal(b);
   const work=[{a:x,b:y,ctx}];
@@ -56,9 +76,12 @@ function compareNormalProjection(kernel,a,b,ctx) {
         break;
 
       case "sort":
+        if(!sameData(u[1],v[1])) retainedEqual.call(kernel,u,v,c);
+        break;
+
       case "const":
-        // Universe comparison and any retained rigid rules stay authoritative.
-        retainedEqual.call(kernel,u,v,c);
+        if(u.length!==v.length || u[1]!==v[1] || !sameData(u[2],v[2]))
+          retainedEqual.call(kernel,u,v,c);
         break;
 
       case "app":
@@ -68,8 +91,6 @@ function compareNormalProjection(kernel,a,b,ctx) {
 
       case "pi":
       case "lam": {
-        // Congruence under a binder. The body context uses the left domain;
-        // the domain itself is independently required to compare equal.
         const bodyCtx=[...c,u[1]];
         work.push({a:u[2],b:v[2],ctx:bodyCtx});
         work.push({a:u[1],b:v[1],ctx:c});
@@ -85,7 +106,6 @@ function compareNormalProjection(kernel,a,b,ctx) {
         break;
 
       default:
-        // Lets or any future syntax remain entirely with the retained kernel.
         retainedEqual.call(kernel,u,v,c);
         break;
     }
@@ -123,7 +143,7 @@ function evaluate(mode,enabled) {
 }
 
 const baseline=evaluate("baseline",false);
-const candidate=evaluate("projection-normal-form-walker",true);
+const candidate=evaluate("projection-normal-form-walker-v2",true);
 install(false);
 if(baseline.wrong) throw new Error("baseline wrong");
 
@@ -149,7 +169,7 @@ const summary={arena_sha256:sha,budget,
     protectedChanged,resolved,resolvedCases,regressions,remaining},
   lawful:candidate.wrong===0&&protectedChanged===0,
   promotable:candidate.wrong===0&&protectedChanged===0&&resolved>0,
-  claim_boundary:"Same raw projection only. Normalize both once, traverse equal normal-form constructors once, and delegate every genuine mismatch to the retained converter under the exact binder context."
+  claim_boundary:"Same raw projection only. Normalize both once; traverse identical normal-form constructors once; discharge exact syntactic atoms directly; delegate only genuine mismatches to the retained converter under the exact binder context."
 };
 mkdirSync(new URL("../genesis/evidence/",import.meta.url),{recursive:true});
 writeFileSync(new URL("../genesis/evidence/projection-normal-form-walker.json",import.meta.url),JSON.stringify({summary,baseline,candidate},null,2));
