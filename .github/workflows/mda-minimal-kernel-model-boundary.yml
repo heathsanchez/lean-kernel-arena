@@ -1,0 +1,23 @@
+name: MDA minimal kernel model boundary
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/minimal-kernel-model-boundary-v1.mjs'
+      - '.github/workflows/mda-minimal-kernel-model-boundary.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  boundary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct reduced retained basis
+        run: timeout 20s node genesis/test.mjs >/dev/null
+      - name: Check raw mutual and nested model boundary
+        run: timeout 300s node experiments/minimal-kernel-model-boundary-v1.mjs
