@@ -1,4 +1,5 @@
 name: MDA stack-safe full replay
+# Current-head replay trigger: minimal semantic kernel dissolution qualification.
 on:
   push:
     branches: [mda-kernel-genesis-v1]
