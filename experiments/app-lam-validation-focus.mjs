@@ -15,7 +15,7 @@ import io,tarfile,json,sys
 data=sys.stdin.buffer.read(); row=None
 with tarfile.open(fileobj=io.BytesIO(data),mode="r:gz") as a:
   for m in a:
-    if m.isfile() and m.name.endswith("/good/perf/app-lam.ndjson"):
+    if m.isfile() and m.name.endswith("good/perf/app-lam.ndjson"):
       row={"name":m.name,"input":a.extractfile(m).read().decode("utf-8")};break
 print(json.dumps(row))
 `;
