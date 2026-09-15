@@ -1,0 +1,21 @@
+name: MDA minimal semantic kernel census
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'experiments/minimal-semantic-kernel-census-v1.mjs'
+      - '.github/workflows/mda-minimal-semantic-kernel-census.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  census:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Census inductive surface
+        run: timeout 240s node experiments/minimal-semantic-kernel-census-v1.mjs
