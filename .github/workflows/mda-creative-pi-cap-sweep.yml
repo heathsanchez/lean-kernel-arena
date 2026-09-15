@@ -1,0 +1,32 @@
+name: MDA creative Pi cap sweep
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/creative-pi-cap-sweep.mjs'
+      - '.github/workflows/mda-creative-pi-cap-sweep.yml'
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  sweep:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+        with: {github_access_token: ${{ secrets.GITHUB_TOKEN }}}
+      - name: Build creative witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test undecidability/alg-conv-trans-acc-left
+          ./lka.py build-test undecidability/alg-conv-trans-acc-right
+          ./lka.py build-test undecidability/subject-reduction-redex
+          ./lka.py build-test undecidability/alg-conv-trans-acc
+          ./lka.py build-test undecidability/subject-reduction-reduct
+      - run: timeout 120s node --stack-size=32768 genesis/creative-pi-cap-sweep.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: creative-pi-cap-sweep-${{ github.sha }}
+          path: genesis/evidence/creative-pi-cap-sweep.json
+          if-no-files-found: error
