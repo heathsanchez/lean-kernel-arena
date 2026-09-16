@@ -6,19 +6,10 @@ function ensure(k){
   k.__binderShiftMemo??=new WeakMap();
   k.__binderSubstMemo??=new WeakMap();
   k.__looseRangeMemo??=new WeakMap();
-  k.__binderStats??={shiftHits:0,shiftMisses:0,substHits:0,substMisses:0,rangeHits:0,rangeMisses:0,rangeSkips:0,supportHits:0,supportFallbacks:0};
-  k.__binderStats.supportHits??=0;
-  k.__binderStats.supportFallbacks??=0;
+  k.__binderStats??={shiftHits:0,shiftMisses:0,substHits:0,substMisses:0,rangeHits:0,rangeMisses:0,rangeSkips:0};
 }
 
 function looseRange(k,root){
-  const certified=k.__support?.get(root);
-  if(certified!==undefined){
-    k.__binderStats.supportHits++;
-    return certified;
-  }
-  k.__binderStats.supportFallbacks++;
-
   const work=[{e:root}],vals=[];
   while(work.length){
     const f=work.pop(),e=f.e;
@@ -31,13 +22,9 @@ function looseRange(k,root){
         case "pi": case "lam": r=Math.max(xs[0],Math.max(0,xs[1]-1));break;
         case "let": r=Math.max(xs[0],xs[1],Math.max(0,xs[2]-1));break;
       }
-      k.__looseRangeMemo.set(e,r);
-      if(Number.isFinite(r))k.__support?.set(e,r);
-      vals.push(r);continue;
+      k.__looseRangeMemo.set(e,r);vals.push(r);continue;
     }
     if(!Array.isArray(e)){vals.push(Number.POSITIVE_INFINITY);continue;}
-    const support=k.__support?.get(e);
-    if(support!==undefined){k.__binderStats.supportHits++;vals.push(support);continue;}
     const hit=k.__looseRangeMemo.get(e);
     if(hit!==undefined){k.__binderStats.rangeHits++;vals.push(hit);continue;}
     k.__binderStats.rangeMisses++;
@@ -53,11 +40,7 @@ function looseRange(k,root){
     if(children){
       work.push({e,build:true,n:children.length});
       for(let i=children.length-1;i>=0;i--) work.push({e:children[i]});
-    }else{
-      k.__looseRangeMemo.set(e,r);
-      if(Number.isFinite(r))k.__support?.set(e,r);
-      vals.push(r);
-    }
+    }else{k.__looseRangeMemo.set(e,r);vals.push(r);}
   }
   return vals[0];
 }
@@ -79,7 +62,7 @@ p.run=function(...args){
   this.__binderShiftMemo=new WeakMap();
   this.__binderSubstMemo=new WeakMap();
   this.__looseRangeMemo=new WeakMap();
-  this.__binderStats={shiftHits:0,shiftMisses:0,substHits:0,substMisses:0,rangeHits:0,rangeMisses:0,rangeSkips:0,supportHits:0,supportFallbacks:0};
+  this.__binderStats={shiftHits:0,shiftMisses:0,substHits:0,substMisses:0,rangeHits:0,rangeMisses:0,rangeSkips:0};
   return run0.apply(this,args);
 };
 
