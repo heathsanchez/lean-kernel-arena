@@ -35,7 +35,7 @@ jobs:
             for m in a:
               if not m.isfile(): continue
               for suffix,out in wanted.items():
-                if m.name.endswith('/good/'+suffix):
+                if m.name.endswith('good/'+suffix):
                   p=pathlib.Path(out);p.parent.mkdir(parents=True,exist_ok=True)
                   p.write_bytes(a.extractfile(m).read())
           for p in wanted.values():
