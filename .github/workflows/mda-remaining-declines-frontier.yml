@@ -8,6 +8,8 @@ on:
       - 'genesis/giant-inductive-envelope-census.mjs'
       - 'genesis/kernel-base.mjs'
       - 'genesis/nested-envelope.mjs'
+      - 'genesis/projection-congruence-recovery.mjs'
+      - 'genesis/kernel.mjs'
       - '.github/workflows/mda-remaining-declines-frontier.yml'
   workflow_dispatch:
 
