@@ -48,7 +48,7 @@ p.whnf=function(e){
           n>>=1n;if(n)b*=b;
           if(out>BigInt(Number.MAX_SAFE_INTEGER)||b>BigInt(Number.MAX_SAFE_INTEGER)*BigInt(Number.MAX_SAFE_INTEGER))break;
         }
-        if(out<=BigInt(Number.MAX_SAFE_INTEGER)){
+        if(n===0n&&out<=BigInt(Number.MAX_SAFE_INTEGER)){
           this.need("nat-literals");this.need("reduction");this.need("declarations");
           this.__natPowHits=(this.__natPowHits??0)+1;
           return ["nat",Number(out)];
@@ -58,3 +58,4 @@ p.whnf=function(e){
   }
   return whnf0.call(this,e);
 };
+
