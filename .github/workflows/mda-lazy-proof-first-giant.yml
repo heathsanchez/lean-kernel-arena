@@ -1,0 +1,44 @@
+name: MDA lazy proof first giant focus
+
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/lazy-proof-first-giant.mjs'
+      - '.github/workflows/mda-lazy-proof-first-giant.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - id: giant-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            _build/tests/init-prelude.ndjson
+            _build/tests/perf/grind-ring-5.ndjson
+            _build/tests/perf/shared-subterm.ndjson
+            _build/tests/undecidability/subject-reduction-redex.ndjson
+            _build/tests/undecidability/subject-reduction-reduct.ndjson
+          key: giant-frontier-e00d4ce4fb0fa667f632e624adbbc2e6a42704db0556aaf2f154e50f6e450aca
+      - if: steps.giant-cache.outputs.cache-hit != 'true'
+        uses: cachix/install-nix-action@v31
+      - if: steps.giant-cache.outputs.cache-hit != 'true'
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test init-prelude
+          ./lka.py build-test perf/grind-ring-5
+          ./lka.py build-test perf/shared-subterm
+          ./lka.py build-test undecidability/subject-reduction-redex
+          ./lka.py build-test undecidability/subject-reduction-reduct
+      - name: Run lazy proof-first giant separator
+        env:
+          MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
+          MATHGRAPH_RECORD_LIMIT: "250000"
+        run: node --stack-size=32768 genesis/lazy-proof-first-giant.mjs
