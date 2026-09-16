@@ -64,6 +64,8 @@ const baseline=evaluate(B),candidate=evaluate(C);
 const by=new Map(candidate.map(x=>[x.name,x]));
 const baselineWrong=baseline.filter(x=>!x.correct);
 const candidateWrong=candidate.filter(x=>!x.correct);
+const baselineDecidedWrong=baseline.filter(x=>x.status!=="UNKNOWN"&&!x.correct);
+const candidateDecidedWrong=candidate.filter(x=>x.status!=="UNKNOWN"&&!x.correct);
 const protectedChanged=[];
 for(const b of baseline){
   if(b.status==="UNKNOWN")continue;
@@ -91,8 +93,12 @@ const summary={
   baselineWrong:baselineWrong.slice(0,30),candidateWrong:candidateWrong.slice(0,30),
   protectedChanged:protectedChanged.slice(0,30),regressions:regressions.slice(0,30),
   newlyResolved,
-  lawful:baselineWrong.length===0&&candidateWrong.length===0&&protectedChanged.length===0,
-  promotable:baselineWrong.length===0&&candidateWrong.length===0&&protectedChanged.length===0,
+  baselineDecidedWrong:baselineDecidedWrong.slice(0,30),
+  candidateDecidedWrong:candidateDecidedWrong.slice(0,30),
+  lawful:baselineDecidedWrong.length===0&&candidateDecidedWrong.length===0&&
+    protectedChanged.length===0&&regressions.length===0,
+  promotable:baselineDecidedWrong.length===0&&candidateDecidedWrong.length===0&&
+    protectedChanged.length===0&&regressions.length===0,
   focusedEvidence:{
     run:"https://github.com/heathsanchez/lean-kernel-arena/actions/runs/35038406536",
     initPrelude:"2/2 recursor-type and 2/2 recursor-rule definitional conversions succeeded before later budget exhaustion",
