@@ -10,7 +10,7 @@ const CAPS=["sort","binders","application","reduction","declarations","universes
 "inductive-reduction","rule-k","unit-eta","prop-inductives","nat-literals","string-literals",
 "quotients","projections","structure-eta","rigid-conversion","opaque-declarations"];
 const input=readFileSync(new URL("../_build/tests/perf/shared-subterm.ndjson",import.meta.url),"utf8");
-const p=K.Kernel.prototype,names=["validate","shift","substitute","same","whnf","normal","proofType","equal",
+const p=K.Kernel.prototype,names=["make","validate","shift","substitute","same","whnf","normal","proofType","equal",
 "instantiateDeclaration","sortOf","infer","getApp","appN","hasConst","lowerBound","functionEtaContract",
 "isUnitLikeType","structureEtaMatches","inferProjection","instantiateForalls","splitAllForalls","deriveTypeRecursor","addSingleInductive"];
 const originals=new Map();
