@@ -1,0 +1,28 @@
+name: MDA post composite hotspot
+on:
+  push:
+    branches: [mda-post-composite-profile-v1]
+    paths:
+      - 'genesis/post-composite-hotspot.mjs'
+      - '.github/workflows/mda-post-composite-hotspot.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build shared-subterm
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-test perf/shared-subterm
+      - name: Profile post-composite residual
+        run: timeout 180s node --stack-size=32768 genesis/post-composite-hotspot.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-composite-hotspot
+          path: genesis/evidence/post-composite-hotspot.json
+          if-no-files-found: error
