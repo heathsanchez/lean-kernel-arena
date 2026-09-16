@@ -8,6 +8,7 @@ on:
       - 'genesis/native-nat-separator.mjs'
       - 'experiments/ctoridx-shape.mjs'
       - 'genesis/native-giant-budget.mjs'
+      - 'genesis/native-giant-profile.mjs'
       - '.github/workflows/mda-native-nat-giant.yml'
   workflow_dispatch:
 
@@ -31,6 +32,11 @@ jobs:
           fail-on-cache-miss: true
       - name: Inspect ctorIdx shape
         run: node experiments/ctoridx-shape.mjs
+      - name: Profile post-native giant residual
+        env:
+          MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
+          MATHGRAPH_RECORD_LIMIT: "250000"
+        run: node --stack-size=32768 genesis/native-giant-profile.mjs
       - name: Measure completion budget
         env:
           MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
