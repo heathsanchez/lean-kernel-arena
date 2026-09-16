@@ -12,5 +12,6 @@ import "./localdef-getapp-cache.mjs";
 import "./rigid-constructor-reject.mjs";
 import "./scoped-beta-spine.mjs";
 import "./recursor-gated-conversion.mjs";
+import "./projection-congruence-recovery.mjs";
 import "./closed-closure-conversion-layer.mjs";
 export * from "./kernel-semantic.mjs";
