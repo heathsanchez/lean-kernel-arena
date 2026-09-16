@@ -11,16 +11,24 @@ permissions:
 jobs:
   profile:
     runs-on: ubuntu-24.04
-    timeout-minutes: 6
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/cache/restore@v4
+      - uses: cachix/install-nix-action@v31
+      - name: Restore giant witnesses
+        id: giant-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             _build/tests/init-prelude.ndjson
             _build/tests/perf/grind-ring-5.ndjson
-          key: giant-frontier-e00d4ce4fb0fa667f632e624adbbc2e6a42704db0556aaf2f154e50f6e450aca
-          fail-on-cache-miss: true
+          key: giant-frontier-${{ hashFiles('tests/init_prelude_module.lean', 'tests/perf/grind-ring-5.lean', 'tests/perf/shared-subterm.lean') }}
+      - name: Build witnesses on cache miss
+        if: steps.giant-cache.outputs.cache-hit != 'true'
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test init-prelude
+          ./lka.py build-test perf/grind-ring-5
       - name: Profile reject
         env:
           MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
