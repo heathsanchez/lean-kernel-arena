@@ -1,0 +1,41 @@
+name: MDA compiled slot plus WHNF cache
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/compiled-slot-plus-whnf-cache.mjs'
+      - 'genesis/compiled-dynamic-slot-layer.mjs'
+      - 'genesis/exact-whnf-cache-layer.mjs'
+      - '.github/workflows/mda-compiled-slot-plus-whnf-cache.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  experiment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build focused witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test perf/shared-subterm
+          ./lka.py build-test perf/church-numerals
+          ./lka.py build-test perf/args-before-unfold
+          ./lka.py build-test perf/folded-constant-first
+          ./lka.py build-test perf/repeated-subproblem
+          ./lka.py build-test perf/discarded-argument-match
+          ./lka.py build-test undecidability/alg-conv-trans-acc-left
+          ./lka.py build-test undecidability/alg-conv-trans-acc-right
+          ./lka.py build-test undecidability/subject-reduction-redex
+          ./lka.py build-test undecidability/alg-conv-trans-acc
+          ./lka.py build-test undecidability/subject-reduction-reduct
+      - name: Test composed execution consequences
+        run: timeout 240s node --stack-size=32768 genesis/compiled-slot-plus-whnf-cache.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-slot-plus-whnf-cache-evidence
+          path: genesis/evidence/compiled-slot-plus-whnf-cache.json
+          if-no-files-found: error
