@@ -9,6 +9,7 @@ on:
       - experiments/make-zero-param-nested-parser-candidate.mjs
       - experiments/make-optparam-field-domain-candidate.mjs
       - experiments/make-recursor-type-conversion-candidate.mjs
+      - experiments/make-recursor-rule-conversion-candidate.mjs
       - .github/workflows/mda-post-nested-projection-proof-irrelevance.yml
   workflow_dispatch:
 permissions:
@@ -39,6 +40,8 @@ jobs:
         run: node experiments/make-optparam-field-domain-candidate.mjs
       - name: Permit and instrument verified recursor type conversion
         run: node experiments/make-recursor-type-conversion-candidate.mjs
+      - name: Permit and instrument verified recursor rule conversion
+        run: node experiments/make-recursor-rule-conversion-candidate.mjs
       - name: Test projection bridge beyond TSyntax
         run: timeout 300s node --stack-size=32768 experiments/post-nested-projection-proof-irrelevance.mjs
       - if: always()
