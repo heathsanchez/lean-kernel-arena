@@ -168,6 +168,7 @@ function machine(k){
     attemptOps=0;stats.lastAbort=null;
     const ca=C(a,EMPTY),cb=C(b,EMPTY);
     if(hasEq(ca,cb)){stats.eqHits++;return stats;}
+    const ctorBefore=stats.ctorPairs;
     const work=[[ca,cb]];
     for(let guard=0;work.length&&guard<200000;guard++){
       const [ca,cb]=work.pop();
@@ -195,7 +196,7 @@ function machine(k){
       }
       stats.lastAbort="unsupported-head:"+a0[0];throw ABORT;
     }
-    if(work.length||stats.ctorPairs===0){stats.lastAbort=work.length?"work-left":"no-ctor";throw ABORT;}
+    if(work.length||stats.ctorPairs===ctorBefore){stats.lastAbort=work.length?"work-left":"no-ctor";throw ABORT;}
     storeEq(ca,cb);
     return stats;
   }
@@ -216,11 +217,13 @@ p.equal=function(a,b,ctx=[]){
   const snap={steps:this.steps,budget:this.budget,frontier:this.conversionFrontier};
   const m=this.__closedMachine??=machine(this);
   const before={};
-  for(const q of ["ops","ctorPairs","whnfHits","recs","beta","eqHits","eqStores","defs","vars","apps","whnfStores","derefHits","derefStores","derefSteps","appSpineHits","appSpineStores","appSpineNodes"])before[q]=m.stats[q]??0;
+  const successKeys=["ops","ctorPairs","whnfHits","recs","beta","eqHits","eqStores"];
+  const diagnosticKeys=["defs","vars","apps","whnfStores","derefHits","derefStores","derefSteps","appSpineHits","appSpineStores","appSpineNodes"];
+  for(const q of successKeys.concat(diagnosticKeys))before[q]=m.stats[q]??0;
   try{
     const st=m.prove(a,b);
     this.__closedClosureStats.successes++;
-    for(const q of Object.keys(before))this.__closedClosureStats[q]+=(st[q]??0)-before[q];
+    for(const q of successKeys)this.__closedClosureStats[q]+=(st[q]??0)-before[q];
     return;
   }catch(err){
     if(err!==ABORT&&!(err instanceof Stop)&&!(err instanceof RangeError))throw err;
