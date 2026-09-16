@@ -14,6 +14,7 @@ const BUDGET=1_000_000;
 const tmp="/tmp/mda-recursor-conversion-replay";
 rmSync(tmp,{recursive:true,force:true});
 cpSync(new URL("./",import.meta.url),tmp,{recursive:true});
+cpSync(new URL("../tests/",import.meta.url),"/tmp/tests",{recursive:true});
 const basePath=join(tmp,"kernel-base.mjs");
 let src=readFileSync(basePath,"utf8");
 const typeOld='if(!this.same(rec.type,derived.recType)) this.reject("recursor-type:"+d.name);';
