@@ -5,7 +5,7 @@ import {Kernel,Stop} from "./kernel-base.mjs";
 // while substitutions are represented as environments instead of materialized
 // syntax. Anything outside the deliberately small envelope aborts and replays
 // the retained converter from the exact semantic snapshot.
-const p=Kernel.prototype,equal0=p.equal;
+const p=Kernel.prototype,equal0=p.equal,run0=p.run;
 const ABORT=Symbol("closure-conversion-abort");
 const EMPTY=Object.freeze([]);
 
@@ -24,10 +24,10 @@ function target(k,a,b,ctx){
   return ok.has(x)||ok.has(y);
 }
 function machine(k){
-  const termClosures=new WeakMap(),envCons=new WeakMap(),whnfCache=new WeakMap(),derefCache=new WeakMap(),appSpineCache=new WeakMap();
-  let closureNext=1;
+  const termClosures=new WeakMap(),envCons=new WeakMap(),whnfCache=new WeakMap(),derefCache=new WeakMap(),appSpineCache=new WeakMap(),eqSuccess=new WeakMap();
+  let closureNext=1,attemptOps=0;
   const stats={ops:0,beta:0,defs:0,recs:0,vars:0,apps:0,whnfHits:0,whnfStores:0,
-    ctorPairs:0,rigidPairs:0,maxEnv:0,maxArgs:0,derefHits:0,derefStores:0,derefSteps:0,appSpineHits:0,appSpineStores:0,appSpineNodes:0,lastAbort:null};
+    ctorPairs:0,rigidPairs:0,maxEnv:0,maxArgs:0,derefHits:0,derefStores:0,derefSteps:0,appSpineHits:0,appSpineStores:0,appSpineNodes:0,eqHits:0,eqStores:0,lastAbort:null};
 
   function C(term,env=EMPTY){
     if(!env.length)env=EMPTY;
@@ -44,8 +44,8 @@ function machine(k){
     e=Object.freeze([item,...parent]);by.set(item,e);return e;
   }
   function bump(){
-    k.tick();stats.ops++;
-    if(stats.ops>900000){stats.lastAbort="op-cap";throw ABORT;}
+    k.tick();stats.ops++;attemptOps++;
+    if(attemptOps>900000){stats.lastAbort="op-cap";throw ABORT;}
   }
   function sameLevels(a,b){return JSON.stringify(a??[])===JSON.stringify(b??[]);}
 
@@ -64,8 +64,8 @@ function machine(k){
         break;
       }
       if(t[1]>=env.length){stats.lastAbort="free-var";throw ABORT;}
-      k.tick();stats.ops++;stats.vars++;stats.derefSteps++;
-      if(stats.ops>900000){stats.lastAbort="op-cap";throw ABORT;}
+      k.tick();stats.ops++;attemptOps++;stats.vars++;stats.derefSteps++;
+      if(attemptOps>900000){stats.lastAbort="op-cap";throw ABORT;}
       path.push(cl);
       cl=env[t[1]];
     }
@@ -156,8 +156,19 @@ function machine(k){
     stats.lastAbort="whnf-loop";throw ABORT;
   }
 
+  function hasEq(a,b){
+    const s=eqSuccess.get(a);return s?.has(b)===true;
+  }
+  function storeEq(a,b){
+    let s=eqSuccess.get(a);if(!s){s=new WeakSet();eqSuccess.set(a,s);}s.add(b);
+    let t=eqSuccess.get(b);if(!t){t=new WeakSet();eqSuccess.set(b,t);}t.add(a);
+    stats.eqStores++;
+  }
   function prove(a,b){
-    const work=[[C(a,EMPTY),C(b,EMPTY)]];
+    attemptOps=0;stats.lastAbort=null;
+    const ca=C(a,EMPTY),cb=C(b,EMPTY);
+    if(hasEq(ca,cb)){stats.eqHits++;return stats;}
+    const work=[[ca,cb]];
     for(let guard=0;work.length&&guard<200000;guard++){
       const [ca,cb]=work.pop();
       if(ca===cb)continue;
@@ -185,29 +196,40 @@ function machine(k){
       stats.lastAbort="unsupported-head:"+a0[0];throw ABORT;
     }
     if(work.length||stats.ctorPairs===0){stats.lastAbort=work.length?"work-left":"no-ctor";throw ABORT;}
+    storeEq(ca,cb);
     return stats;
   }
   return {prove,stats};
 }
 
+p.run=function(...args){
+  this.__closedMachine=null;
+  this.__closedClosureStats={attempts:0,successes:0,aborts:0,ops:0,ctorPairs:0,whnfHits:0,recs:0,beta:0,
+    eqHits:0,eqStores:0};
+  return run0.apply(this,args);
+};
+
 p.equal=function(a,b,ctx=[]){
   if(this.localDefs===true||!target(this,a,b,ctx))return equal0.call(this,a,b,ctx);
-  this.__closedClosureStats??={attempts:0,successes:0,aborts:0,ops:0,ctorPairs:0,whnfHits:0,recs:0,beta:0};
+  this.__closedClosureStats??={attempts:0,successes:0,aborts:0,ops:0,ctorPairs:0,whnfHits:0,recs:0,beta:0,eqHits:0,eqStores:0};
   this.__closedClosureStats.attempts++;
   const snap={steps:this.steps,budget:this.budget,frontier:this.conversionFrontier};
-  const m=machine(this);
+  const m=this.__closedMachine??=machine(this);
+  const before={};
+  for(const q of ["ops","ctorPairs","whnfHits","recs","beta","eqHits","eqStores","defs","vars","apps","whnfStores","derefHits","derefStores","derefSteps","appSpineHits","appSpineStores","appSpineNodes"])before[q]=m.stats[q]??0;
   try{
     const st=m.prove(a,b);
     this.__closedClosureStats.successes++;
-    for(const q of ["ops","ctorPairs","whnfHits","recs","beta"])this.__closedClosureStats[q]+=st[q]??0;
+    for(const q of Object.keys(before))this.__closedClosureStats[q]+=(st[q]??0)-before[q];
     return;
   }catch(err){
     if(err!==ABORT&&!(err instanceof Stop)&&!(err instanceof RangeError))throw err;
     this.__closedClosureStats.aborts++;
-    this.__closedClosureStats.abortOps=(this.__closedClosureStats.abortOps??0)+(m.stats.ops??0);
+    this.__closedClosureStats.abortOps=(this.__closedClosureStats.abortOps??0)+((m.stats.ops??0)-(before.ops??0));
     for(const q of ["beta","defs","recs","vars","apps","whnfHits","whnfStores","derefHits","derefStores","derefSteps","appSpineHits","appSpineStores","appSpineNodes"]){
       const key="abort"+q[0].toUpperCase()+q.slice(1);
-      this.__closedClosureStats[key]=(this.__closedClosureStats[key]??0)+(m.stats[q]??0);
+      const b=q in before?(before[q]??0):0;
+      this.__closedClosureStats[key]=(this.__closedClosureStats[key]??0)+((m.stats[q]??0)-b);
     }
     this.__closedClosureStats.lastAbort=m.stats.lastAbort??"unknown";
     this.steps=snap.steps;this.budget=snap.budget;this.conversionFrontier=snap.frontier;
