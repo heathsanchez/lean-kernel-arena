@@ -4,6 +4,8 @@ on:
   push:
     branches: [mda-kernel-genesis-v1]
     paths:
+      - 'genesis/compiled-nat-notation-dictionary-layer.mjs'
+      - 'genesis/nat-notation-lazy-giants-only.mjs'
       - '.github/workflows/mda-nat-notation-giants-fast.yml'
   workflow_dispatch:
 
@@ -24,8 +26,8 @@ jobs:
             _build/tests/perf/grind-ring-5.ndjson
           key: giant-frontier-e00d4ce4fb0fa667f632e624adbbc2e6a42704db0556aaf2f154e50f6e450aca
           fail-on-cache-miss: true
-      - name: Run Nat notation lazy separator
+      - name: Run Nat notation lazy giants
         env:
           MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
           MATHGRAPH_RECORD_LIMIT: "250000"
-        run: node --stack-size=32768 genesis/nat-notation-lazy-giant.mjs
+        run: node --stack-size=32768 genesis/nat-notation-lazy-giants-only.mjs
