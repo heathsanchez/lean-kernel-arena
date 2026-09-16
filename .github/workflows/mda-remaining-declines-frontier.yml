@@ -1,4 +1,5 @@
 name: MDA remaining declines frontier
+# LE-prefix census rerun after canonical name fix
 
 on:
   push:
