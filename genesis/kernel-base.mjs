@@ -617,7 +617,7 @@ class Kernel {
     if(e[0]==="const") {
       this.need("declarations");
       const d=this.env.get(e[1]);
-      if(!d) this.reject("undeclared-constant");
+      if(!d) this.reject("undeclared-constant:"+e[1]);
       if(d.kind==="def") {this.need("reduction"); return this.whnf(this.instantiateDeclaration(e,d.value));}
     }
     if(e[0]==="let") {this.need("reduction");return this.whnf(this.substitute(e[3],e[2]));}
@@ -869,7 +869,7 @@ class Kernel {
         return this.shift(ctx[ctx.length-1-e[1]],e[1]+1);
       case "const":
         this.need("declarations");
-        if(!this.env.has(e[1])) this.reject("undeclared-constant");
+        if(!this.env.has(e[1])) this.reject("undeclared-constant:"+e[1]);
         return this.instantiateDeclaration(e,this.env.get(e[1]).type);
       case "nat": {
         this.need("nat-literals"); this.need("declarations");
