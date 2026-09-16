@@ -70,7 +70,7 @@ test("native closure integration delegates neutral ordinary terms unchanged",asy
   } finally { mod.installNativeClosureWhnf(false); }
 });
 
-test("native closure integration leaves local-definition WHNF on the retained path",async()=>{
+test("native closure integration leaves local-definition WHNF on the retained reentry path",async()=>{
   const mod=await integration();
   assert.ok(mod,"native closure integration layer must exist");
   mod.installNativeClosureWhnf(true);
@@ -78,6 +78,9 @@ test("native closure integration leaves local-definition WHNF on the retained pa
     const k=kernel();
     k.localDefs=true;
     k._activeCtx=[{__localDef:true,type:["sort",1],value:["pi",["sort",0],["sort",0]]}];
+    // Match the qualified retained witness: local-def resumption is a nested
+    // WHNF reentry consequence, not a promise of the top-level base evaluator.
+    k.__retainedWhnfDepth=1;
     const out=k.whnf(["var",0]);
     assert.deepEqual(out,["pi",["sort",0],["sort",0]]);
     assert.equal(k.__nativeClosureStats?.bypassLocalDefs??0,1);
