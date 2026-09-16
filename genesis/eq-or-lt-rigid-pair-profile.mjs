@@ -31,7 +31,7 @@ p.equal=function(a,b,ctx=[]){
   catch(e){
     if(e instanceof K.Stop&&e.status===K.REJECT&&
        typeof this.currentDeclaration==="string"&&this.currentDeclaration.includes("eq_or_lt_of_le")&&
-       this.__rigidReject===null){
+       true){
       this.__rigidReject={reason:e.message,step:this.steps,ctxDepth:ctx.length,ctx:ctx.slice(),a,b};
     }
     throw e;
