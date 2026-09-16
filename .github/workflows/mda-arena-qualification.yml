@@ -18,6 +18,8 @@ jobs:
         run: |
           node genesis/test.mjs
           node --test genesis/nat-pow-soundness.test.mjs
+          node --test genesis/nat-offset-defeq.test.mjs
+          node --test genesis/runtime-gate.test.mjs
       - name: Retrieve public Arena corpus
         run: |
           mkdir -p _build/tests
@@ -43,11 +45,8 @@ jobs:
           (root/'manifest.json').write_text(json.dumps(rows,indent=2))
           print(json.dumps(dict(total=len(rows),giants=[r for r in rows if r['name'] in ('init-prelude.ndjson','perf/grind-ring-5.ndjson','perf/shared-subterm.ndjson')]),indent=2))
           PY
-      - name: Run current giant diagnostic
-        env:
-          MATHGRAPH_INPUT_BYTE_LIMIT: '20000000'
-          MATHGRAPH_RECORD_LIMIT: '400000'
-        run: node --stack-size=32768 genesis/decidable-nat-composition-separator.mjs
+      - name: Require correct verdicts on every public corpus case
+        run: node genesis/qualify-corpus.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

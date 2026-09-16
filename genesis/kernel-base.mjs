@@ -807,6 +807,9 @@ class Kernel {
     if(this.same(a,b)) return;
     const x=this.normal(a),y=this.normal(b);
     if(this.same(x,y)) return;
+    // Native reduction and cached normalization may expose either Nat literals
+    // or constructors. Reapply the installed numeral rule at this boundary.
+    if(this.equalNatOffset?.(x,y,ctx)) return;
     if(x[0]==="sort" && y[0]==="sort") {
       if(typeof x[1]==="number"&&typeof y[1]==="number") this.reject("sort-mismatch");
       this.need("universes");
@@ -1239,3 +1242,4 @@ function checkExport(input,capabilities,budget=200000) {
 }
 
 export {levelsEqual,levelSucc,levelIMax,quotientType,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,StrLit,Proj,checkExport};
+

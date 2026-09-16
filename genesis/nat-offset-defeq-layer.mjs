@@ -25,15 +25,30 @@ function pred(e){
   return h?.[0]==="const"&&h[1]===SUCC&&args.length===1?args[0]:null;
 }
 
-p.equal=function(a,b,ctx=[]){
+p.equalNatOffset=function(a,b,ctx=[]){
+  if(!this.caps.has("nat-literals"))return false;
+  const na=lit(a),nb=lit(b);
+  if(na!==null&&nb!==null){
+    this.tick();
+    if(na!==nb)this.reject("nat-literal-mismatch");
+    this.__natOffsetHits=(this.__natOffsetHits??0)+1;
+    return true;
+  }
   if(zero(a)&&zero(b)){
     this.__natOffsetHits=(this.__natOffsetHits??0)+1;
-    return;
+    return true;
   }
   const pa=pred(a),pb=pred(b);
   if(pa!==null&&pb!==null){
     this.__natOffsetHits=(this.__natOffsetHits??0)+1;
-    return this.equal(pa,pb,ctx);
+    this.tick();
+    this.equal(pa,pb,ctx);
+    return true;
   }
+  return false;
+};
+
+p.equal=function(a,b,ctx=[]){
+  if(this.equalNatOffset(a,b,ctx))return;
   return eq0.call(this,a,b,ctx);
 };

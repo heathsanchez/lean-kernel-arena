@@ -47,8 +47,10 @@ test("Nat power shortcut returns only completed exact powers",()=>{
     assert.equal(k.__natPowHits,1,`${base}^${exponent} should use the shortcut`);
   }
 
-  for(const [base,exponent] of [[2,53],[2,128],[2,100001]]) {
+  for(const [base,exponent] of [[2,53],[2,256],[2,100000],[2,128],[2,100001]]) {
     const k=kernel(),expression=natPow(k,base,exponent);
+    const expected=BigInt(base)**BigInt(exponent);
+    assert(expected>BigInt(Number.MAX_SAFE_INTEGER),`${base}^${exponent} should exceed the literal shortcut`);
     assert.deepEqual(k.whnf(expression),expression,`${base}^${exponent} must fall back`);
     assert.equal(k.__natPowHits,undefined,`${base}^${exponent} must not use a partial result`);
   }
