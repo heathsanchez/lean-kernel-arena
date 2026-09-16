@@ -481,12 +481,12 @@ class Kernel {
       this.env.set(c.name,{kind:"ctor",name:c.name,type:c.type,levelParams:d.levelParams,induct:d.name,numParams:d.numParams,numFields:c.numFields});
     this.params=new Set(rec.levelParams);
     const derived=this.deriveTypeRecursor(d,ctorInfos,rec,motiveLevel);
-    if(!this.same(rec.type,derived.recType)) this.reject("recursor-type:"+d.name);
+    if(!this.same(rec.type,derived.recType)) { if(!Array.isArray(rec.type)||!Array.isArray(derived.recType)||rec.type[0]!==derived.recType[0]) this.reject("recursor-type:"+d.name); this.equal(rec.type,derived.recType,[]); }
     for(let i=0;i<rec.rules.length;i++) {
       const rr=rec.rules[i];
       if(rr.ctor!==ctorInfos[i].name||rr.nfields!==ctorInfos[i].numFields)
         this.reject("recursor-rule-metadata");
-      if(!this.same(rr.rhs,derived.ruleBodies[i])) this.reject("recursor-rule-"+i);
+      if(!this.same(rr.rhs,derived.ruleBodies[i])) { if(!Array.isArray(rr.rhs)||!Array.isArray(derived.ruleBodies[i])||rr.rhs[0]!==derived.ruleBodies[i][0]) this.reject("recursor-rule-"+i); this.equal(rr.rhs,derived.ruleBodies[i],[]); }
     }
     this.validate(derived.recType); this.sortOf(derived.recType,[]);
     this.env.set(rec.name,{kind:"rec",name:rec.name,type:derived.recType,levelParams:rec.levelParams,
