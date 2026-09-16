@@ -1,16 +1,34 @@
 import {Kernel} from "./kernel-base.mjs";
 import {leanName} from "./name-codec.mjs";
 
-const p=Kernel.prototype,whnf0=p.whnf;
+const p=Kernel.prototype,whnf0=p.whnf,instantiate0=p.instantiateDeclaration;
 const N=leanName;
 const ZERO=N("Nat","zero"), SUCC=N("Nat","succ"), ADD=N("Nat","add"), SUB=N("Nat","sub"),
   MUL=N("Nat","mul"), DIV=N("Nat","div"), MOD=N("Nat","mod"), BEQ=N("Nat","beq"), BLE=N("Nat","ble"),
   BTRUE=N("Bool","true"), BFALSE=N("Bool","false");
+const NATIVE_MARKER="__mathgraph_native_nat_primitive";
+
+const PRIMITIVES=new Map([
+  [SUCC,{arity:1,run:([a])=>natExpr(a+1n)}],
+  [ADD,{arity:2,run:([a,b])=>natExpr(a+b)}],
+  [SUB,{arity:2,run:([a,b])=>natExpr(a>=b?a-b:0n)}],
+  [MUL,{arity:2,run:([a,b])=>natExpr(a*b)}],
+  [DIV,{arity:2,run:([a,b])=>natExpr(b===0n?0n:a/b)}],
+  [MOD,{arity:2,run:([a,b])=>natExpr(b===0n?a:a%b)}],
+  [BEQ,{arity:2,run:([a,b])=>["const",a===b?BTRUE:BFALSE]}],
+  [BLE,{arity:2,run:([a,b])=>["const",a<=b?BTRUE:BFALSE]}]
+]);
 
 function rawSpine(e){
   const args=[];let h=e;
   while(Array.isArray(h)&&h[0]==="app"){args.push(h[2]);h=h[1];}
   args.reverse();return {h,args};
+}
+function primitiveName(h){
+  if(!Array.isArray(h))return null;
+  if(h[0]==="const")return h[1];
+  if(h[0]===NATIVE_MARKER)return h[1];
+  return null;
 }
 function natVal(e){
   if(!Array.isArray(e))return null;
@@ -27,37 +45,57 @@ function natVal(e){
 function natExpr(v){
   return ["nat",v<=BigInt(Number.MAX_SAFE_INTEGER)?Number(v):v.toString()];
 }
+function tryPrimitive(kernel,head,args,operandWhnf){
+  const name=primitiveName(head),spec=name===null?null:PRIMITIVES.get(name);
+  if(!spec||args.length!==spec.arity)return null;
+  const values=[];
+  for(const arg of args){
+    const v=natVal(operandWhnf(arg));
+    if(v===null)return null;
+    values.push(v);
+  }
+  kernel.need("nat-literals");
+  kernel.need("reduction");
+  kernel.__nativeNatHits=(kernel.__nativeNatHits??0)+1;
+  return spec.run(values);
+}
+
+// The stack-safe WHNF machines are private execution paths. If one of them
+// exposes a primitive only after beta/let reduction, preserve that head long
+// enough for the same retained native rule above to see its operands. The
+// marker is internal to a single WHNF call and is never returned. If the
+// operands are not reducible natural values, replay with the exact historical
+// unfolding path instead of inventing a partial result.
+p.instantiateDeclaration=function(ref,term){
+  if((this.__nativeNatBridgeDepth??0)>0 && !(this.__nativeNatBypass>0) &&
+     Array.isArray(ref)&&ref[0]==="const"&&PRIMITIVES.has(ref[1]))
+    return [NATIVE_MARKER,ref[1],ref[2]??[]];
+  return instantiate0.call(this,ref,term);
+};
 
 p.whnf=function(e){
+  if((this.__nativeNatBypass??0)>0)return whnf0.call(this,e);
+
   if(Array.isArray(e)&&e[0]==="app"){
     const {h,args}=rawSpine(e);
-    if(h?.[0]==="const"){
-      if(h[1]===SUCC&&args.length===1){
-        const wa=whnf0.call(this,args[0]),a=natVal(wa);
-        if(a!==null){
-          this.need("nat-literals"); this.need("reduction");
-          this.__nativeNatHits=(this.__nativeNatHits??0)+1;
-          return natExpr(a+1n);
-        }
-      }
-      if(args.length===2 && [ADD,SUB,MUL,DIV,MOD,BEQ,BLE].includes(h[1])){
-        // Lean's reduce_bin_nat_op / reduce_bin_nat_pred first put both
-        // operands in WHNF, then recognize Nat.zero or primitive Nat literals.
-        const wa=whnf0.call(this,args[0]),wb=whnf0.call(this,args[1]);
-        const a=natVal(wa),b=natVal(wb);
-        if(a!==null&&b!==null){
-          this.need("nat-literals"); this.need("reduction");
-          this.__nativeNatHits=(this.__nativeNatHits??0)+1;
-          if(h[1]===ADD)return natExpr(a+b);
-          if(h[1]===SUB)return natExpr(a>=b?a-b:0n);
-          if(h[1]===MUL)return natExpr(a*b);
-          if(h[1]===DIV)return natExpr(b===0n?0n:a/b);
-          if(h[1]===MOD)return natExpr(b===0n?a:a%b);
-          if(h[1]===BEQ)return ["const",a===b?BTRUE:BFALSE];
-          if(h[1]===BLE)return ["const",a<=b?BTRUE:BFALSE];
-        }
-      }
+    const direct=tryPrimitive(this,h,args,arg=>whnf0.call(this,arg));
+    if(direct!==null)return direct;
+  }
+
+  this.__nativeNatBridgeDepth=(this.__nativeNatBridgeDepth??0)+1;
+  let reduced;
+  try{reduced=whnf0.call(this,e);}
+  finally{this.__nativeNatBridgeDepth--;}
+
+  if(Array.isArray(reduced)){
+    const {h,args}=rawSpine(reduced);
+    const bridged=tryPrimitive(this,h,args,arg=>this.whnf(arg));
+    if(bridged!==null)return bridged;
+    if(h?.[0]===NATIVE_MARKER){
+      this.__nativeNatBypass=(this.__nativeNatBypass??0)+1;
+      try{return whnf0.call(this,e);}
+      finally{this.__nativeNatBypass--;}
     }
   }
-  return whnf0.call(this,e);
+  return reduced;
 };
