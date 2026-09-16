@@ -6,7 +6,7 @@ on:
     paths:
       - 'genesis/remaining-declines-frontier.mjs'
       - 'genesis/giant-inductive-envelope-census.mjs'
-      - 'genesis/kernel-base.mjs'
+      - 'genesis/kernel-base.mjs'\n      - 'genesis/nested-envelope.mjs'
       - '.github/workflows/mda-remaining-declines-frontier.yml'
   workflow_dispatch:
 
