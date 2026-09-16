@@ -1,0 +1,52 @@
+name: MDA production giant frontier
+
+on:
+  push:
+    branches: [mda-arena-qualification-v1]
+    paths:
+      - 'genesis/production-giant-frontier.mjs'
+      - '.github/workflows/mda-production-giant-frontier.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Fetch current public Arena corpus
+        run: |
+          mkdir -p _build/tests/perf
+          curl --fail --location --retry 3 https://arena.lean-lang.org/lean-arena-tests.tar.gz -o /tmp/arena.tar.gz
+          python3 - <<'PY'
+          import tarfile,pathlib
+          wanted={
+            'init-prelude.ndjson':'_build/tests/init-prelude.ndjson',
+            'perf/grind-ring-5.ndjson':'_build/tests/perf/grind-ring-5.ndjson',
+            'perf/shared-subterm.ndjson':'_build/tests/perf/shared-subterm.ndjson',
+          }
+          with tarfile.open('/tmp/arena.tar.gz','r:gz') as a:
+            for m in a:
+              if not m.isfile(): continue
+              for suffix,out in wanted.items():
+                if m.name.endswith('/good/'+suffix):
+                  p=pathlib.Path(out);p.parent.mkdir(parents=True,exist_ok=True)
+                  p.write_bytes(a.extractfile(m).read())
+          for p in wanted.values():
+            if not pathlib.Path(p).exists(): raise SystemExit('missing '+p)
+          PY
+      - name: Profile exact production giant frontier
+        run: timeout 480s node --stack-size=32768 genesis/production-giant-frontier.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-giant-frontier-${{ github.sha }}
+          path: genesis/evidence/production-giant-frontier.json
+          if-no-files-found: error
