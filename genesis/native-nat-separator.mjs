@@ -1,6 +1,7 @@
 import {readFileSync} from "node:fs";
 import * as K from "./kernel.mjs";
 import "./native-nat-reduction-layer.mjs";
+import "./nat-offset-defeq-layer.mjs";
 const CAPS=["sort","binders","application","reduction","declarations","universes","theorems",
 "proof-irrelevance","function-eta","inductive-envelope","single-inductives","reflexive-inductives",
 "inductive-reduction","rule-k","unit-eta","prop-inductives","nat-literals","string-literals",
