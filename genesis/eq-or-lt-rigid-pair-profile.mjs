@@ -44,9 +44,23 @@ for(const name of ["init-prelude","perf/grind-ring-5"]){
   let r;try{r=K.checkExport(input,CAPS,500_000);}finally{p.run=old;}
   let q=null;for(const k of seen)if(k.__rigidReject){q=k.__rigidReject;break;}
   const out={name,status:r.status,reason:r.reason,steps:r.steps??null,frontier:r.frontier_declaration??null};
-  if(q)Object.assign(out,{capturedStep:q.step,capturedReason:q.reason,ctxDepth:q.ctxDepth,
-    leftHead:rawHead(q.a),rightHead:rawHead(q.b),leftNodes:count(q.a),rightNodes:count(q.b),
-    leftBytes:JSON.stringify(q.a).length,rightBytes:JSON.stringify(q.b).length,
-    left:JSON.stringify(q.a).slice(0,7000),right:JSON.stringify(q.b).slice(0,7000)});
+  if(q){
+    const owner=seen.find(k=>k.__rigidReject===q);
+    let lw=null,rw=null,whnfError=null;
+    if(owner){
+      const oldSteps=owner.steps,oldBudget=owner.budget;
+      try{
+        owner.steps=0;owner.budget=2_000_000;
+        lw=owner.whnf(q.a);rw=owner.whnf(q.b);
+      }catch(e){whnfError=String(e?.message??e);}
+      finally{owner.steps=oldSteps;owner.budget=oldBudget;}
+    }
+    Object.assign(out,{capturedStep:q.step,capturedReason:q.reason,ctxDepth:q.ctxDepth,
+      leftHead:rawHead(q.a),rightHead:rawHead(q.b),leftNodes:count(q.a),rightNodes:count(q.b),
+      leftWhnfHead:lw?rawHead(lw):null,rightWhnfHead:rw?rawHead(rw):null,
+      leftWhnf:lw?JSON.stringify(lw).slice(0,7000):null,rightWhnf:rw?JSON.stringify(rw).slice(0,7000):null,
+      whnfError,leftBytes:JSON.stringify(q.a).length,rightBytes:JSON.stringify(q.b).length,
+      left:JSON.stringify(q.a).slice(0,7000),right:JSON.stringify(q.b).slice(0,7000)});
+  }
   console.log("EQ_OR_LT_RIGID_PAIR "+JSON.stringify(out));
 }
