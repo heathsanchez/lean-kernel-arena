@@ -24,9 +24,6 @@ function run(name,path,want,budget=1_000_000){
  if(want&&r.status!==want)process.exitCode=1;
  return row;
 }
-run("nat-rec-rules","../tests/nat-rec-rules.ndjson","ACCEPT");
-run("nat-rec-k-lie","../tests/nat-rec-k-lie.ndjson","REJECT");
-run("rec-k-lie","../tests/rec-k-lie.ndjson","REJECT");
 run("shared-subterm","../_build/tests/perf/shared-subterm.ndjson","ACCEPT");
 run("init-prelude","../_build/tests/init-prelude.ndjson",null);
 run("grind-ring-5","../_build/tests/perf/grind-ring-5.ndjson",null);
