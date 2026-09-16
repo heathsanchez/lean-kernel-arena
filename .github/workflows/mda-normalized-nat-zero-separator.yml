@@ -1,0 +1,34 @@
+name: MDA normalized Nat zero separator
+
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/normalized-nat-zero-consequence-layer.mjs'
+      - 'genesis/normalized-nat-zero-separator.mjs'
+      - '.github/workflows/mda-normalized-nat-zero-separator.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  separator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore giant witnesses
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            _build/tests/init-prelude.ndjson
+            _build/tests/perf/grind-ring-5.ndjson
+            _build/tests/perf/shared-subterm.ndjson
+          key: giant-frontier-e00d4ce4fb0fa667f632e624adbbc2e6a42704db0556aaf2f154e50f6e450aca
+          fail-on-cache-miss: true
+      - name: Run minimal normalized Nat zero consequence at 1M
+        env:
+          MATHGRAPH_INPUT_BYTE_LIMIT: '15000000'
+          MATHGRAPH_RECORD_LIMIT: '250000'
+        run: node --stack-size=32768 genesis/normalized-nat-zero-separator.mjs
