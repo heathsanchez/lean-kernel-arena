@@ -1,9 +1,9 @@
 name: MDA remaining declines frontier
-# LE-prefix census rerun after canonical name fix
+# Qualification-branch giant residual census
 
 on:
   push:
-    branches: [mda-kernel-genesis-v1]
+    branches: [mda-arena-qualification-v1]
     paths:
       - 'genesis/remaining-declines-frontier.mjs'
       - 'genesis/giant-inductive-envelope-census.mjs'
