@@ -1,5 +1,6 @@
 import {readFileSync} from "node:fs";
 import * as K from "./kernel.mjs";
+import "./verified-ctoridx-consequence-layer.mjs";
 import "./native-nat-reduction-layer.mjs";
 import "./nat-offset-defeq-layer.mjs";
 const CAPS=["sort","binders","application","reduction","declarations","universes","theorems",
@@ -31,6 +32,7 @@ for(const name of ["init-prelude","perf/grind-ring-5","perf/shared-subterm"]){
     name,status:r.status,reason:r.reason,steps:r.steps??null,constructed:r.constructed??null,
     parse_records:r.parse_records??null,frontier:r.frontier_declaration??null,
     nativeNatHits:seen.reduce((n,x)=>n+(x.__nativeNatHits??0),0),
+    ctorIdxHits:seen.reduce((n,x)=>n+(x.__ctorIdxHits??0),0),
     rejects:seen.flatMap(x=>x.__nativeRejects??[]).slice(-12),elapsed_ms:Date.now()-t0
   }));
 }
