@@ -12,10 +12,12 @@ function ensure(k){
   k.__privateEnvCons??=new WeakMap();
   k.__privateMaterialize??=new WeakMap();
   k.__privateEval??=new WeakMap();
+  k.__privateState??=new Map();
+  k.__privateClosureIds??=new WeakMap();k.__privateClosureNext??=1;
   k.__privateStats??={queries:0,targetCalls:0,closureSteps:0,beta:0,defs:0,recs:0,
     vars:0,lets:0,materialized:0,reusedClosed:0,reusedNoEnv:0,paramChecks:0,
     maxEnv:0,maxArgs:0,closureHits:0,envHits:0,materializeHits:0,
-    materializeStores:0,evalHits:0,evalStores:0};
+    materializeStores:0,evalHits:0,evalStores:0,stateHits:0,stateStores:0};
 }
 
 function C(k,term,env=EMPTY_ENV){
@@ -144,6 +146,23 @@ function sameClosure(k,a,b){
   return x!==null&&y!==null&&k.same(x,y);
 }
 
+function closureId(k,cl){
+  let id=k.__privateClosureIds.get(cl);
+  if(id!==undefined)return id;
+  id=k.__privateClosureNext++;k.__privateClosureIds.set(cl,id);return id;
+}
+function stateKey(k,cl,pending){
+  let s=String(closureId(k,cl));
+  for(const a of pending)s+=","+closureId(k,a);
+  return s;
+}
+function storeStatePath(k,path,out){
+  if(out.stuck)return;
+  const saved={head:out.head,args:Object.freeze(out.args.slice()),stuck:false};
+  for(const key of path)if(!k.__privateState.has(key)){
+    k.__privateState.set(key,saved);k.__privateStats.stateStores++;
+  }
+}
 function evalClosure(k,start,args=[],level=0){
   ensure(k);
   const cacheable=args.length===0&&Array.isArray(start.term);
@@ -159,20 +178,29 @@ function evalClosure(k,start,args=[],level=0){
 
 function evalClosureUncached(k,start,args=[],level=0){
   if(level>64)return {head:start,args,stuck:true};
-  let cl=start,pending=args.slice();
+  let cl=start,pending=args.slice(),statePath=[];
+  const finish=out=>{storeStatePath(k,statePath,out);return out;};
   for(;;){
-    ensure(k);k.tick();k.__privateStats.closureSteps++;
+    ensure(k);
+    const sk=stateKey(k,cl,pending),prior=k.__privateState.get(sk);
+    if(prior!==undefined){
+      k.__privateStats.stateHits++;
+      storeStatePath(k,statePath,prior);
+      return prior;
+    }
+    statePath.push(sk);
+    k.tick();k.__privateStats.closureSteps++;
     k.__privateStats.maxEnv=Math.max(k.__privateStats.maxEnv,cl.env.length);
     k.__privateStats.maxArgs=Math.max(k.__privateStats.maxArgs,pending.length);
     const e=cl.term,env=cl.env;
-    if(!Array.isArray(e))return {head:cl,args:pending,stuck:true};
+    if(!Array.isArray(e))return finish({head:cl,args:pending,stuck:true});
 
     if(e[0]==="app"){
       pending.unshift(C(k,e[2],env));cl=C(k,e[1],env);continue;
     }
     if(e[0]==="var"){
       if(e[1]<env.length){k.__privateStats.vars++;cl=env[e[1]];continue;}
-      return {head:cl,args:pending,stuck:false};
+      return finish({head:cl,args:pending,stuck:false});
     }
     if(e[0]==="let"){
       k.need("reduction");k.__privateStats.lets++;
@@ -183,7 +211,7 @@ function evalClosureUncached(k,start,args=[],level=0){
       cl=C(k,e[2],extend(k,pending.shift(),env));continue;
     }
     if(e[0]==="nat")
-      return {head:cl,args:pending,stuck:false};
+      return finish({head:cl,args:pending,stuck:false});
 
     if(e[0]==="proj"){
       const obj=evalClosure(k,C(k,e[3],env),[],level+1);
@@ -195,9 +223,9 @@ function evalClosureUncached(k,start,args=[],level=0){
         cl=obj.args[pos];continue;
       }
       const ordinary=materializeState(k,obj);
-      if(ordinary===null)return {head:cl,args:pending,stuck:true};
+      if(ordinary===null)return finish({head:cl,args:pending,stuck:true});
       cl=C(k,k.make("proj",e[1],e[2],ordinary),EMPTY_ENV);
-      return {head:cl,args:pending,stuck:false};
+      return finish({head:cl,args:pending,stuck:false});
     }
 
     if(e[0]==="const"){
@@ -232,9 +260,9 @@ function evalClosureUncached(k,start,args=[],level=0){
           }
         }
       }
-      return {head:cl,args:pending,stuck:false};
+      return finish({head:cl,args:pending,stuck:false});
     }
-    return {head:cl,args:pending,stuck:false};
+    return finish({head:cl,args:pending,stuck:false});
   }
 }
 
@@ -251,10 +279,12 @@ p.run=function(...args){
   this.__privateEnvCons=new WeakMap();
   this.__privateMaterialize=new WeakMap();
   this.__privateEval=new WeakMap();
+  this.__privateState=new Map();
+  this.__privateClosureIds=new WeakMap();this.__privateClosureNext=1;
   this.__privateStats={queries:0,targetCalls:0,closureSteps:0,beta:0,defs:0,recs:0,
     vars:0,lets:0,materialized:0,reusedClosed:0,reusedNoEnv:0,paramChecks:0,
     maxEnv:0,maxArgs:0,closureHits:0,envHits:0,materializeHits:0,
-    materializeStores:0,evalHits:0,evalStores:0};
+    materializeStores:0,evalHits:0,evalStores:0,stateHits:0,stateStores:0};
   this.__privateWhnfDepth=0;
   return run0.apply(this,args);
 };
