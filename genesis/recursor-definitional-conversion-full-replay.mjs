@@ -17,14 +17,16 @@ cpSync(new URL("./",import.meta.url),tmp,{recursive:true});
 const basePath=join(tmp,"kernel-base.mjs");
 let src=readFileSync(basePath,"utf8");
 const typeOld='if(!this.same(rec.type,derived.recType)) this.reject("recursor-type:"+d.name);';
-const typeNew='if(!this.same(rec.type,derived.recType)) this.equal(rec.type,derived.recType,[]);';
+const typeNew='if(!this.same(rec.type,derived.recType)) { if(!Array.isArray(rec.type)||!Array.isArray(derived.recType)||rec.type[0]!==derived.recType[0]) this.reject("recursor-type:"+d.name); this.equal(rec.type,derived.recType,[]); }';
 const ruleOld='if(!this.same(rr.rhs,derived.ruleBodies[i])) this.reject("recursor-rule-"+i);';
-const ruleNew='if(!this.same(rr.rhs,derived.ruleBodies[i])) this.equal(rr.rhs,derived.ruleBodies[i],[]);';
+const ruleNew='if(!this.same(rr.rhs,derived.ruleBodies[i])) { if(!Array.isArray(rr.rhs)||!Array.isArray(derived.ruleBodies[i])||rr.rhs[0]!==derived.ruleBodies[i][0]) this.reject("recursor-rule-"+i); this.equal(rr.rhs,derived.ruleBodies[i],[]); }';
 if(!src.includes(typeOld)||!src.includes(ruleOld))
   throw new Error("recursor conversion patch points moved");
 src=src.replace(typeOld,typeNew).replace(ruleOld,ruleNew);
 writeFileSync(basePath,src);
 const C=await import(pathToFileURL(join(tmp,"kernel.mjs")).href+"?candidate=1");
+await import(pathToFileURL(join(tmp,"test.mjs")).href+"?guarded-recursor-candidate=1");
+console.log("GUARDED_RECURSOR_GENESIS_SUITE_PASS");
 
 function walk(dir){
   const out=[];
@@ -106,7 +108,7 @@ const summary={
     initPrelude:"2/2 recursor-type and 2/2 recursor-rule definitional conversions succeeded before later budget exhaustion",
     controls:"all focused forged/protected controls preserved"
   },
-  claim_boundary:"Candidate changes only the fallback after exact structural equality fails for generated recursor types and generated recursor rule bodies: the already-retained definitional equality checker must verify the pair. No mismatch is accepted by assumption. Every previously decided protected CI Arena verdict must remain status-identical; UNKNOWN may only change when the resulting verdict matches the test expectation."
+  claim_boundary:"Candidate changes only the fallback after exact structural equality fails for generated recursor types and generated recursor rule bodies with the same outer syntax constructor: the already-retained definitional equality checker must verify the pair. Outer-shape changes retain the original immediate rejection. No mismatch is accepted by assumption. Every previously decided protected CI Arena verdict must remain status-identical; UNKNOWN may only change when the resulting verdict matches the test expectation."
 };
 mkdirSync(new URL("./evidence/",import.meta.url),{recursive:true});
 writeFileSync(new URL("./evidence/recursor-definitional-conversion-full-replay.json",import.meta.url),
