@@ -1,0 +1,21 @@
+name: MDA fueled not-function WHNF trace
+on:
+  push:
+    branches: [mda-arena-qualification-v1]
+    paths:
+      - 'experiments/fueled-not-function-whnf-trace.mjs'
+      - '.github/workflows/mda-fueled-not-function-whnf-trace.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  trace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Trace fueled not-a-function WHNF parity
+        run: timeout 420s node experiments/fueled-not-function-whnf-trace.mjs
