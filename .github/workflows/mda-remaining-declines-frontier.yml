@@ -10,6 +10,8 @@ on:
       - 'genesis/kernel-base.mjs'
       - 'genesis/structural-normal-cache-layer.mjs'
       - 'genesis/structural-normal-separator.mjs'
+      - 'genesis/native-nat-reduction-layer.mjs'
+      - 'genesis/native-nat-separator.mjs'
       - 'experiments/parserdescr-envelope.mjs'
       - 'experiments/giant-hot-decl-shapes.mjs'
       - 'genesis/nested-envelope.mjs'
@@ -113,6 +115,11 @@ jobs:
           MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
           MATHGRAPH_RECORD_LIMIT: "250000"
         run: timeout 180s node --stack-size=32768 genesis/structural-normal-separator.mjs
+      - name: Test native Nat reductions on giants
+        env:
+          MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
+          MATHGRAPH_RECORD_LIMIT: "250000"
+        run: timeout 180s node --stack-size=32768 genesis/native-nat-separator.mjs
       - name: Preserve evidence
         if: always()
         uses: actions/upload-artifact@v4
