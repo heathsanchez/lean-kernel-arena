@@ -26,7 +26,8 @@ async function evaluate(candidate){
     try{r=K.checkExport(input,CAPS,1_000_000);}finally{p.run=old;}
     const st={queries:0,targetCalls:0,closureSteps:0,beta:0,defs:0,recs:0,vars:0,lets:0,
       materialized:0,reusedClosed:0,reusedNoEnv:0,paramChecks:0,maxEnv:0,maxArgs:0,
-      closureHits:0,envHits:0,materializeHits:0,materializeStores:0,evalHits:0,evalStores:0};
+      closureHits:0,envHits:0,materializeHits:0,materializeStores:0,evalHits:0,evalStores:0,
+      stateHits:0,stateStores:0};
     if(candidate)for(const k of seen)for(const q of Object.keys(st)){
       if(q==="maxEnv"||q==="maxArgs")st[q]=Math.max(st[q],k.__privateStats?.[q]??0);
       else st[q]+=k.__privateStats?.[q]??0;
