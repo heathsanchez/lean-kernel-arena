@@ -28,40 +28,8 @@ function natExpr(v){
   return ["nat",v<=BigInt(Number.MAX_SAFE_INTEGER)?Number(v):v.toString()];
 }
 
-// Minimal compiled consequence for the demonstrated private-evaluator seam.
-// Recognize only a raw multi-beta chain whose materialized body is exactly
-// Nat.ble applied to already-compact naturals (or variables bound by that chain).
-// This performs no speculative WHNF and introduces no synthetic kernel term;
-// every non-match falls through to the historical evaluator unchanged.
-function betaExposedBle(e){
-  const captured=[];
-  let body=e;
-  while(Array.isArray(body)&&body[0]==="app"&&Array.isArray(body[1])&&body[1][0]==="lam"){
-    captured.push(body[2]);
-    body=body[1][2];
-  }
-  if(captured.length<2)return null;
-  const {h,args}=rawSpine(body);
-  if(h?.[0]!=="const"||h[1]!==BLE||args.length!==2)return null;
-  const resolve=arg=>{
-    if(Array.isArray(arg)&&arg[0]==="var"&&Number.isSafeInteger(arg[1])&&arg[1]>=0&&arg[1]<captured.length)
-      return captured[captured.length-1-arg[1]];
-    return arg;
-  };
-  const a=natVal(resolve(args[0])),b=natVal(resolve(args[1]));
-  if(a===null||b===null)return null;
-  return ["const",a<=b?BTRUE:BFALSE];
-}
-
 p.whnf=function(e){
   if(Array.isArray(e)&&e[0]==="app"){
-    const compiledBle=betaExposedBle(e);
-    if(compiledBle!==null){
-      this.need("application"); this.need("reduction"); this.need("nat-literals");
-      this.__nativeNatHits=(this.__nativeNatHits??0)+1;
-      return compiledBle;
-    }
-
     const {h,args}=rawSpine(e);
     if(h?.[0]==="const"){
       if(h[1]===SUCC&&args.length===1){
