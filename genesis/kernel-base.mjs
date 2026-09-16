@@ -1,4 +1,4 @@
-const ZERO_LEVEL=Symbol("level-constant");
+import {validateZeroParamNestedBundle} from "./nested-envelope.mjs";\n\nconst ZERO_LEVEL=Symbol("level-constant");
 
 // Exact level equality by zero/positive case splitting, then max-of-affine forms.
 // Positive parameter p is represented as q_p + 1, with q_p ranging over N.
@@ -1065,8 +1065,22 @@ function checkExport(input,capabilities,budget=200000) {
         if(!capabilities.includes("inductive-envelope")) fail("declaration-frontier:inductive");
         if(!v || !Array.isArray(v.types) || !Array.isArray(v.ctors) || !Array.isArray(v.recs))
           fail("inductive-envelope-schema");
-        // These are representation invariants of a complete Lean inductive group,
-        // not positivity/elimination/typechecking claims.
+        // Nested inductives lower to a mutually recursive recursor package that
+        // may contain more recursors than source types. Before applying the
+        // ordinary single-inductive envelope, recognize only the narrow
+        // zero-parameter nested form whose complete recursor types and rules can
+        // be reconstructed exactly from already parsed positive containers.
+        if(v.types.length===1 && Number.isSafeInteger(v.types[0]?.numNested) && v.types[0].numNested>0) {
+          const nested=validateZeroParamNestedBundle(v,{names,levels,exprs,decls});
+          if(nested.ok) {
+            for(const d of nested.declarations) decls.push(d);
+            continue;
+          }
+          if(v.recs.length!==v.types.length) reject("nested-inductive-envelope:"+nested.reason);
+        }
+
+        // These are representation invariants of an ordinary complete Lean
+        // inductive group, not positivity/elimination/typechecking claims.
         if(v.recs.length!==v.types.length) reject("inductive-recursor-count");
         const ctorNames=v.ctors.map(c=>c?.name);
         if(ctorNames.some(n=>!Number.isSafeInteger(n)) || new Set(ctorNames).size!==ctorNames.length)
