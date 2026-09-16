@@ -28,7 +28,7 @@ async function evaluate(candidate,budget=1_000_000){
     const t0=Date.now();let r;
     try{r=K.checkExport(input,CAPS,budget);}finally{p.run=old;}
     const slot={seedVisits:0,makeKnown:0,makeUnknown:0,queries:0,hits:0,dynamicNodes:0,prefixReused:0};
-    const core={splits:0,hits:0,stores:0,reentries:0};
+    const core={splits:0,hits:0,stores:0,iterations:0,manualBeta:0,blocked:0};
     if(candidate)for(const k of seen){
       for(const q of Object.keys(slot))slot[q]+=k.__slotStats?.[q]??0;
       for(const q of Object.keys(core))core[q]+=k.__recCoreStats?.[q]??0;
