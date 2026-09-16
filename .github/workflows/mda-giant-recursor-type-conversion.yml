@@ -40,7 +40,10 @@ jobs:
       - name: Permit guarded recursor rule conversion
         run: node experiments/make-recursor-rule-conversion-candidate.mjs
       - name: Run internal forged-control suite
-        run: timeout 60s node --stack-size=32768 /tmp/mathgraph-zero-nested/test.mjs
+        run: |
+          rm -rf /tmp/tests
+          cp -r tests /tmp/tests
+          timeout 60s node --stack-size=32768 /tmp/mathgraph-zero-nested/test.mjs
       - name: Test init beyond TSyntax
         run: timeout 300s node --stack-size=32768 experiments/post-nested-projection-proof-irrelevance.mjs
       - if: always()
