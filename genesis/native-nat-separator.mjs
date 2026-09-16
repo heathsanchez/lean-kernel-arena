@@ -14,10 +14,12 @@ for(const name of ["init-prelude","perf/grind-ring-5","perf/shared-subterm"]){
   p.equal=function(a,b,ctx=[]){
     try{return eq0.call(this,a,b,ctx);}
     catch(e){
-      if(e?.message==="rigid-head-mismatch"&&!this.__nativeReject){
-        this.__nativeReject={step:this.steps,ctxDepth:ctx.length,aHead:head(a),bHead:head(b),
+      if(e?.message==="rigid-head-mismatch"){
+        this.__nativeRejects??=[];
+        this.__nativeRejects.push({step:this.steps,ctxDepth:ctx.length,aHead:head(a),bHead:head(b),
           aBytes:JSON.stringify(a).length,bBytes:JSON.stringify(b).length,
-          a:JSON.stringify(a).slice(0,7000),b:JSON.stringify(b).slice(0,7000)};
+          a:JSON.stringify(a).slice(0,5000),b:JSON.stringify(b).slice(0,5000)});
+        if(this.__nativeRejects.length>12)this.__nativeRejects.shift();
       }
       throw e;
     }
@@ -29,6 +31,6 @@ for(const name of ["init-prelude","perf/grind-ring-5","perf/shared-subterm"]){
     name,status:r.status,reason:r.reason,steps:r.steps??null,constructed:r.constructed??null,
     parse_records:r.parse_records??null,frontier:r.frontier_declaration??null,
     nativeNatHits:seen.reduce((n,x)=>n+(x.__nativeNatHits??0),0),
-    reject:seen.find(x=>x.__nativeReject)?.__nativeReject??null,elapsed_ms:Date.now()-t0
+    rejects:seen.flatMap(x=>x.__nativeRejects??[]).slice(-12),elapsed_ms:Date.now()-t0
   }));
 }
