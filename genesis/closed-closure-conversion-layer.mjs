@@ -92,6 +92,7 @@ function machine(k){
     if(iteratorInfoCache.has(d))return iteratorInfoCache.get(d);
     let info=null;
     try{
+      if((d.levelParams??[]).length!==0)throw 0;
       let e=d.value;
       if(!Array.isArray(e)||e[0]!=="lam")throw 0;
       e=e[2];
@@ -101,16 +102,20 @@ function machine(k){
       const rs=rawSpine(e),rh=rs.h,rargs=rs.args;
       if(!Array.isArray(rh)||rh[0]!=="const")throw 0;
       const rd=k.env.get(rh[1]);
-      if(rd?.kind!=="rec"||rd.numParams!==0||rd.numIndices!==0||rd.numMinors!==2)throw 0;
+      if(rd?.kind!=="rec"||rd.numParams!==0||rd.numIndices!==0||rd.numMinors!==2||
+         (rd.levelParams??[]).length!==0)throw 0;
       if(rargs.length!==4)throw 0;
       const ind=k.env.get(rd.induct);
-      if(ind?.kind!=="inductive"||!Array.isArray(ind.ctors)||ind.ctors.length!==2)throw 0;
+      if(ind?.kind!=="inductive"||ind.numParams!==0||ind.numIndices!==0||
+         (ind.levelParams??[]).length!==0||!Array.isArray(ind.ctors)||ind.ctors.length!==2)throw 0;
 
       const ctors=ind.ctors.map(n=>k.env.get(n));
       const zi=ctors.findIndex(q=>q?.kind==="ctor"&&q.numFields===0);
       const si=ctors.findIndex(q=>q?.kind==="ctor"&&q.numFields===1);
       if(zi<0||si<0||zi===si)throw 0;
       const zero=ctors[zi],succ=ctors[si];
+      if((zero.levelParams??[]).length!==0||(succ.levelParams??[]).length!==0||
+         zero.numParams!==0||succ.numParams!==0)throw 0;
 
       // motive, then one minor per constructor, then major.
       const base=rargs[1+zi],step=rargs[1+si],major=rargs[3];
