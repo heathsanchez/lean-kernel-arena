@@ -39,3 +39,18 @@ test("stack-safe WHNF reentry resumes a local definition exposed after reduction
   assert.equal(out[0],"pi");
   assert.deepEqual(out,["pi",["sort",0],["sort",0]]);
 });
+
+test("stack-safe WHNF reentry reduces an application spine headed by a local definition",()=>{
+  const k=kernel();
+  k.localDefs=true;
+  k._activeCtx=[{__localDef:true,type:["sort",1],value:
+    ["lam",["sort",0],["lam",["sort",0],["pi",["sort",0],["sort",0]]]]}];
+  // Fueled-chain exposes this exact execution shape: an application whose
+  // flattened head is a local-definition variable. Recursive WHNF reduces the
+  // head first; the iterative fallback must preserve that consequence.
+  k.__retainedWhnfDepth=1;
+  const root=["app",["app",["var",0],["sort",0]],["sort",0]];
+  const out=k.whnf(root);
+  assert.equal(out[0],"pi");
+  assert.deepEqual(out,["pi",["sort",0],["sort",0]]);
+});
