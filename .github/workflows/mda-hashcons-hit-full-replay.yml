@@ -1,0 +1,30 @@
+name: MDA hashcons hit full replay
+on:
+  push:
+    branches: [mda-hashcons-full-replay-v1]
+    paths:
+      - 'genesis/hashcons-hit-full-replay.mjs'
+      - '.github/workflows/mda-hashcons-hit-full-replay.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Reconstruct retained present
+        run: timeout 30s node --stack-size=32768 genesis/test.mjs
+      - name: Build complete CI Arena set
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-test --skip-ci
+      - name: Replay baseline and hash-cons candidate
+        run: timeout 600s node --stack-size=32768 genesis/hashcons-hit-full-replay.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hashcons-hit-full-replay
+          path: genesis/evidence/hashcons-hit-full-replay.json
+          if-no-files-found: error
