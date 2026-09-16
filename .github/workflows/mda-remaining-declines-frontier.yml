@@ -19,6 +19,8 @@ on:
       - 'genesis/exact-whnf-cache-layer.mjs'
       - 'genesis/structural-whnf-cache-layer.mjs'
       - 'genesis/structural-whnf-separator.mjs'
+      - 'genesis/kernel-structural-whnf-order.mjs'
+      - 'genesis/structural-whnf-order-separator.mjs'
       - '.github/workflows/mda-remaining-declines-frontier.yml'
   workflow_dispatch:
 
@@ -76,6 +78,11 @@ jobs:
           MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
           MATHGRAPH_RECORD_LIMIT: "250000"
         run: timeout 120s node --stack-size=32768 genesis/giant-exact-whnf-separator.mjs
+      - name: Test structural WHNF below retained wrappers
+        env:
+          MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
+          MATHGRAPH_RECORD_LIMIT: "250000"
+        run: timeout 180s node --stack-size=32768 genesis/structural-whnf-order-separator.mjs
       - name: Profile exact giant conversion pair
         env:
           MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
