@@ -108,11 +108,9 @@ function evalClosure(k,start,args=[],level=0){
       k.need("reduction");k.__privateStats.beta++;cl=C(e[2],[pending.shift(),...env]);continue;
     }
     if(e[0]==="nat"){
-      k.need("nat-literals");k.need("declarations");
-      const zero=JSON.stringify([JSON.stringify(["[]","str","Nat"]),"str","zero"]);
-      const succ=JSON.stringify([JSON.stringify(["[]","str","Nat"]),"str","succ"]);
-      if(e[1]===0){cl=C(["const",zero],[]);continue;}
-      pending.unshift(C(["nat",e[1]-1],[]));cl=C(["const",succ],[]);continue;
+      // Literal expansion is left to the retained WHNF after materialization;
+      // the closure machine adds no new literal semantics.
+      return {head:cl,args:pending,stuck:false};
     }
     if(e[0]==="proj"){
       const obj=evalClosure(k,C(e[3],env),[],level+1),mh=obj.head.term,ind=k.env.get(e[1]);
