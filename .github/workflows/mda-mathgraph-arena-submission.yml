@@ -61,7 +61,7 @@ jobs:
                    rigid-type-spine.mjs lazy-delta.mjs early-proof-irrelevance.mjs consequence-cache.mjs \
                    declaration-instantiation-cache.mjs localdef-continuation.mjs localdef-getapp-cache.mjs \
                    rigid-constructor-reject.mjs scoped-beta-spine.mjs recursor-gated-conversion.mjs \
-                   kernel-semantic.mjs kernel-base.mjs; do
+                   closed-closure-conversion-layer.mjs kernel-semantic.mjs kernel-base.mjs; do
             cmp "genesis/$f" "checkers/mathgraph/$f"
           done
 
