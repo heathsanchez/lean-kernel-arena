@@ -4,8 +4,8 @@ on:
   push:
     branches: [mda-kernel-genesis-v1]
     paths:
+      - 'genesis/lazy-congruence-giant.mjs'
       - 'genesis/lazy-congruence-conversion-layer.mjs'
-      - 'genesis/lazy-congruence-separator.mjs'
       - '.github/workflows/mda-lazy-congruence-giant.yml'
   workflow_dispatch:
 
@@ -15,20 +15,27 @@ permissions:
 jobs:
   focus:
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
-      - name: Restore giant witnesses
+      - id: giant-cache
+        name: Restore giant witnesses
         uses: actions/cache/restore@v4
         with:
           path: |
             _build/tests/init-prelude.ndjson
             _build/tests/perf/grind-ring-5.ndjson
-            _build/tests/perf/shared-subterm.ndjson
           key: giant-frontier-e00d4ce4fb0fa667f632e624adbbc2e6a42704db0556aaf2f154e50f6e450aca
-          fail-on-cache-miss: true
-      - name: Run lazy congruence separator
+      - if: steps.giant-cache.outputs.cache-hit != 'true'
+        uses: cachix/install-nix-action@v31
+      - if: steps.giant-cache.outputs.cache-hit != 'true'
+        name: Rebuild giant witnesses
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test init-prelude
+          ./lka.py build-test perf/grind-ring-5
+      - name: Test lazy congruence
         env:
           MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
           MATHGRAPH_RECORD_LIMIT: "250000"
-        run: node --stack-size=32768 genesis/lazy-congruence-separator.mjs
+        run: node --stack-size=32768 genesis/lazy-congruence-giant.mjs
