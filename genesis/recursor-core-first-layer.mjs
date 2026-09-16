@@ -54,6 +54,8 @@ p.whnf=function(e){
     this.__recCoreStats.stores++;
   }
 
+  if(reduced===core)return whnf0.call(this,e);
+
   let out=reduced;
   for(const a of args.slice(total))out=this.make("app",out,a);
   this.__recCoreStats.reentries++;
