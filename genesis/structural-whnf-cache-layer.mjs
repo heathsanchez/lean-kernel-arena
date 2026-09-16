@@ -14,7 +14,7 @@ import {Kernel} from "./kernel-base.mjs";
 // is cached. Therefore every successful exact structural consequence remains
 // valid for the rest of that run.
 const p=Kernel.prototype,run0=p.run,whnf0=p.whnf;
-const MAX_KEY_BYTES=4096;
+const MAX_KEY_BYTES=65536;
 
 p.run=function(...args){
   this.__structWhnf=new Map();
