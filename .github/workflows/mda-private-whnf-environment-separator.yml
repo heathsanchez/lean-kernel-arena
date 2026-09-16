@@ -1,7 +1,7 @@
 name: MDA private WHNF environment separator
 on:
   push:
-    branches: [mda-kernel-genesis-v1]
+    branches: [mda-private-env-v2]
     paths:
       - 'genesis/private-whnf-environment-layer.mjs'
       - 'genesis/private-whnf-environment-separator.mjs'
