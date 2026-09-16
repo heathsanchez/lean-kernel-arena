@@ -1,0 +1,56 @@
+name: MDA prefix-certified hotspot profile
+
+on:
+  push:
+    branches: [mda-arena-qualification-v1]
+    paths:
+      - 'genesis/prefix-certified-current-layer.mjs'
+      - 'genesis/prefix-certified-hotspot-profile.mjs'
+      - '.github/workflows/mda-prefix-certified-hotspot-profile.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  profile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      BUDGET: 4000000
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Fetch frozen Arena targets
+        run: |
+          mkdir -p _build/tests/perf
+          curl --fail --location --retry 3 https://arena.lean-lang.org/lean-arena-tests.tar.gz -o /tmp/arena.tar.gz
+          echo 'f915a7c0e688bbdcbb117e4fbb8cbe26c1ad4388da7712dea641bc6041b3e8bc  /tmp/arena.tar.gz' | sha256sum -c -
+          python3 - <<'PY'
+          import tarfile,pathlib
+          wanted={
+            'init-prelude.ndjson':'_build/tests/init-prelude.ndjson',
+            'perf/grind-ring-5.ndjson':'_build/tests/perf/grind-ring-5.ndjson',
+            'perf/shared-subterm.ndjson':'_build/tests/perf/shared-subterm.ndjson',
+          }
+          with tarfile.open('/tmp/arena.tar.gz','r:gz') as a:
+            for m in a:
+              if not m.isfile(): continue
+              for suffix,out in wanted.items():
+                if m.name.endswith('good/'+suffix):
+                  p=pathlib.Path(out);p.parent.mkdir(parents=True,exist_ok=True)
+                  p.write_bytes(a.extractfile(m).read())
+          for p in wanted.values():
+            if not pathlib.Path(p).exists(): raise SystemExit('missing '+p)
+          PY
+      - name: Profile post-contraction hotspots
+        run: timeout 480s node --stack-size=32768 genesis/prefix-certified-hotspot-profile.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prefix-certified-hotspot-${{ github.sha }}
+          path: genesis/evidence/prefix-certified-hotspot-4000000.json
+          if-no-files-found: warn
