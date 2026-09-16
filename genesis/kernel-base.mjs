@@ -972,10 +972,18 @@ const API={Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,StrLit,Proj};
 
 function checkExport(input,capabilities,budget=200000) {
   const start=Date.now();let parsed=0,frontierInductive=null;
+  const envLimit=(name,fallback)=>{
+    const raw=typeof process!=="undefined"?process.env?.[name]:undefined;
+    if(raw===undefined||raw==="") return fallback;
+    const n=Number(raw);
+    return Number.isSafeInteger(n)&&n>0?n:fallback;
+  };
+  const inputByteLimit=envLimit("MATHGRAPH_INPUT_BYTE_LIMIT",2000000);
+  const recordLimit=envLimit("MATHGRAPH_RECORD_LIMIT",100000);
   const out=(status,reason)=>({status,reason,parse_records:parsed,elapsed_ms:Date.now()-start,
     ...(frontierInductive?{frontier_inductive:frontierInductive}:{})});
   if(!capabilities.length) return out(UNKNOWN,"empty-present");
-  if(input.length>2000000) return out(UNKNOWN,"input-budget");
+  if(input.length>inputByteLimit) return out(UNKNOWN,"input-budget");
   const names=new Map([[0,"[]"]]),levels=new Map([[0,0]]),exprs=new Map(),decls=[];
   const fail=reason=>{throw new Stop(UNKNOWN,reason);};
   const reject=reason=>{throw new Stop(REJECT,reason);};
@@ -986,7 +994,7 @@ function checkExport(input,capabilities,budget=200000) {
   try {
     for(const line of input.split(/\r?\n/)) {
       if(!line.trim()) continue;
-      if(++parsed>100000) fail("record-budget");
+      if(++parsed>recordLimit) fail("record-budget");
       const row=JSON.parse(line);
       if(!row || Array.isArray(row)||typeof row!=="object") fail("record-schema");
       const keys=Object.keys(row);
