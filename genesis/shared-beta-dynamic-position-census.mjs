@@ -38,7 +38,10 @@ p.substitute=function(root,arg,depth=0){
       const kinds=a.map(x=>{const m=mask(this,x);return m===0n?"C":(m&1n)!==0n?"D":"U";});
       if(kinds.filter(x=>x==="D").length===1&&kinds.filter(x=>x==="C").length===4){
         const pos=kinds.indexOf("D");
-        key=JSON.stringify({pos,headTag:h?.[0],dynamicTag:a[pos]?.[0],
+        key=JSON.stringify({pos,headTag:h?.[0],headName:h?.[0]==="const"?h[1]:null,
+          headKind:h?.[0]==="const"?(this.env?.get(h[1])?.kind??null):null,
+          dynamicTag:a[pos]?.[0],
+          dynamicHead:(()=>{let z=a[pos],n=0;while(n++<8&&Array.isArray(z)&&z[0]==="app")z=z[1];return Array.isArray(z)&&z[0]==="const"?z[1]:z?.[0]??null;})(),
           dynamicNodes:nodes(a[pos]),closedNodes:a.map((x,i)=>i===pos?0:nodes(x)).reduce((x,y)=>x+y,0)});
         before=this.steps??0;
       }
