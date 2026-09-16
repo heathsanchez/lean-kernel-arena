@@ -204,6 +204,7 @@ function machine(k){
 }
 
 p.run=function(...args){
+  this.__closedGlobalBudget=this.budget;
   this.__closedMachine=null;
   this.__closedClosureStats={attempts:0,successes:0,aborts:0,ops:0,ctorPairs:0,whnfHits:0,recs:0,beta:0,
     eqHits:0,eqStores:0,events:[]};
@@ -221,7 +222,10 @@ p.equal=function(a,b,ctx=[]){
   this.__closedClosureStats??={attempts:0,successes:0,aborts:0,ops:0,ctorPairs:0,whnfHits:0,recs:0,beta:0,eqHits:0,eqStores:0};
   this.__closedClosureStats.attempts++;
   const snap={steps:this.steps,budget:this.budget,frontier:this.conversionFrontier};
-  const event={step:snap.steps,decl:this.currentDeclaration??null,a:describe(a),b:describe(b)};
+  const globalBudget=this.__closedGlobalBudget??this.budget;
+  if(this.budget<globalBudget)this.budget=globalBudget;
+  const event={step:snap.steps,decl:this.currentDeclaration??null,a:describe(a),b:describe(b),
+    inheritedBudget:snap.budget,proofBudget:this.budget};
   const m=this.__closedMachine??=machine(this);
   const before={};
   const successKeys=["ops","ctorPairs","whnfHits","recs","beta","eqHits","eqStores"];
