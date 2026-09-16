@@ -17,10 +17,13 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-      - name: Restore giant witness
+      - name: Restore giant witnesses
         uses: actions/cache/restore@v4
         with:
-          path: _build/tests/perf/grind-ring-5.ndjson
+          path: |
+            _build/tests/init-prelude.ndjson
+            _build/tests/perf/grind-ring-5.ndjson
+            _build/tests/perf/shared-subterm.ndjson
           key: giant-frontier-e00d4ce4fb0fa667f632e624adbbc2e6a42704db0556aaf2f154e50f6e450aca
           fail-on-cache-miss: true
       - name: Trace Nat.zero_sub mismatch
