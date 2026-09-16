@@ -1,0 +1,11 @@
+import {readFileSync} from "node:fs";
+const data=readFileSync("_build/tests/perf/grind-ring-5.ndjson","utf8");
+const names=new Map([[0,""]]),exprs=new Map(); const nm=id=>names.get(id)??("#"+id),ex=id=>exprs.get(id);
+function head(e){let h=e,args=0;while(Array.isArray(h)&&h[0]==="app"){args++;h=h[1];}return {tag:h?.[0],name:h?.[0]==="const"?h[1]:null,args};}
+function sk(e,d=8){if(!Array.isArray(e))return e;if(d<=0)return["…",e[0]];if(e[0]==="const")return["const",e[1],e[2]??[]];if(e[0]==="var")return["v",e[1]];if(e[0]==="sort")return["sort",e[1]];if(e[0]==="app")return["app",sk(e[1],d-1),sk(e[2],d-1)];if(e[0]==="lam"||e[0]==="pi")return[e[0],sk(e[1],d-1),sk(e[2],d-1)];if(e[0]==="proj")return["proj",e[1],e[2],sk(e[3],d-1)];if(e[0]==="let")return["let",sk(e[1],d-1),sk(e[2],d-1),sk(e[3],d-1)];return[e[0]];}
+let lineNo=0;
+for(const line of data.split(/\r?\n/)){if(!line.trim())continue;lineNo++;const row=JSON.parse(line);
+ if(Number.isSafeInteger(row.in)){if(row.str&&typeof row.str.str==="string"){const p=nm(row.str.pre);names.set(row.in,p?p+"."+row.str.str:row.str.str);}else if(row.num&&Number.isSafeInteger(row.num.i)){const p=nm(row.num.pre);names.set(row.in,p?p+"."+row.num.i:String(row.num.i));}}
+ if(Number.isSafeInteger(row.ie)){let e=null,v;if((v=row.sort)!==undefined)e=["sort",v];else if((v=row.bvar)!==undefined)e=["var",v];else if((v=row.const)!==undefined)e=["const",nm(v.name),v.us??[]];else if((v=row.app)!==undefined)e=["app",ex(v.fn),ex(v.arg)];else if((v=row.lam)!==undefined)e=["lam",ex(v.type),ex(v.body)];else if((v=row.forallE)!==undefined)e=["pi",ex(v.type),ex(v.body)];else if((v=row.letE)!==undefined)e=["let",ex(v.type),ex(v.value),ex(v.body)];else if((v=row.mdata)!==undefined)e=ex(v.expr);else if((v=row.proj)!==undefined)e=["proj",nm(v.typeName),v.idx,ex(v.struct)];else if((v=row.natVal)!==undefined)e=["nat",v];else if((v=row.strVal)!==undefined)e=["strlit",v];if(e)exprs.set(row.ie,e);}
+ for(const tag of ["def","opaque","axiom","thm"]){const d=row[tag];if(!d)continue;const name=nm(d.name);if(!/\.ctorIdx$/.test(name)||!["Nat.ctorIdx","Bool.ctorIdx"].includes(name))continue;const value=d.value!==undefined?ex(d.value):null;console.log("CTORIDX_SHAPE "+JSON.stringify({lineNo,tag,name,type:sk(ex(d.type)),valueHead:value?head(value):null,value:sk(value,12)}));}
+}
