@@ -5,6 +5,7 @@ import "./verified-ctoridx-consequence-layer.mjs";
 import "./native-nat-reduction-layer.mjs";
 import "./nat-offset-defeq-layer.mjs";
 import "./exact-binder-transport-layer.mjs";
+import "./compiled-nat-notation-dictionary-layer.mjs";
 import "./lazy-congruence-conversion-layer.mjs";
 
 const CAPS=["sort","binders","application","reduction","declarations","universes","theorems",
