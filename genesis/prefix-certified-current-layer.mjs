@@ -31,7 +31,8 @@ function reset(k){
 p.run=function(...xs){reset(this);return run0.apply(this,xs);};
 p.substitute=function(root,arg,depth=0){
   if(!Array.isArray(root)||!Array.isArray(arg))return sub0.call(this,root,arg,depth);
-  ensure(this);this.__prefixCertifiedStats??=reset(this);this.__prefixCertifiedStats.queries++;
+  if(!this.__prefixCertifiedStats)reset(this);
+  ensure(this);this.__prefixCertifiedStats.queries++;
   const indep=indepMap(this,root);
   if(indep.has(depth)){
     const entry=indep.get(depth);
