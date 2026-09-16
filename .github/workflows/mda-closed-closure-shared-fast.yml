@@ -1,0 +1,23 @@
+name: MDA closed closure shared fast
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/closed-closure-shared-fast.mjs'
+      - 'genesis/closed-closure-conversion-layer.mjs'
+      - '.github/workflows/mda-closed-closure-shared-fast.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  experiment:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build shared-subterm
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-test perf/shared-subterm
+      - name: Test closure conversion directly
+        run: timeout 180s node --stack-size=32768 genesis/closed-closure-shared-fast.mjs
