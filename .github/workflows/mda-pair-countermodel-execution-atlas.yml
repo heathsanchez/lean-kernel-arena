@@ -1,7 +1,7 @@
 name: MDA pair countermodel execution atlas
 on:
   push:
-    branches: [mda-kernel-genesis-v1]
+    branches: [mda-arena-qualification-v1]
     paths:
       - 'experiments/pair-countermodel-execution-atlas.mjs'
       - '.github/workflows/mda-pair-countermodel-execution-atlas.yml'
@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
       - name: Reconstruct retained present
         run: timeout 20s node genesis/test.mjs
       - name: Localize countermodel execution cliff
