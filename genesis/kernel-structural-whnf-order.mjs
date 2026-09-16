@@ -1,0 +1,20 @@
+import "./stack-safe.mjs";
+import "./structural-cache.mjs";
+import "./structural-sharing.mjs";
+// Exact structural WHNF consequences must sit below later WHNF wrappers so
+// their captured retained fallbacks pass through the cache.
+import "./structural-whnf-cache-layer.mjs";
+import "./normal-cache.mjs";
+import "./rigid-type-spine.mjs";
+import "./lazy-delta.mjs";
+import "./early-proof-irrelevance.mjs";
+import "./consequence-cache.mjs";
+import "./declaration-instantiation-cache.mjs";
+import "./localdef-continuation.mjs";
+import "./localdef-getapp-cache.mjs";
+import "./rigid-constructor-reject.mjs";
+import "./scoped-beta-spine.mjs";
+import "./recursor-gated-conversion.mjs";
+import "./projection-congruence-recovery.mjs";
+import "./closed-closure-conversion-layer.mjs";
+export * from "./kernel-semantic.mjs";
