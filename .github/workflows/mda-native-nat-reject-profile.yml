@@ -4,6 +4,7 @@ on:
     branches: [mda-kernel-genesis-v1]
     paths:
       - 'genesis/native-nat-reject-profile.mjs'
+      - 'genesis/native-nat-reduction-layer.mjs'
       - '.github/workflows/mda-native-nat-reject-profile.yml'
   workflow_dispatch:
 permissions:
