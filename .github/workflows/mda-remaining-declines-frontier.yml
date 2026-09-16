@@ -16,6 +16,8 @@ on:
       - 'genesis/giant-le-prefix-profile.mjs'
       - 'genesis/giant-whnf-head-profile.mjs'
       - 'genesis/exact-whnf-cache-layer.mjs'
+      - 'genesis/structural-whnf-cache-layer.mjs'
+      - 'genesis/structural-whnf-separator.mjs'
       - '.github/workflows/mda-remaining-declines-frontier.yml'
   workflow_dispatch:
 
@@ -73,6 +75,11 @@ jobs:
           MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
           MATHGRAPH_RECORD_LIMIT: "250000"
         run: timeout 120s node --stack-size=32768 genesis/giant-exact-whnf-separator.mjs
+      - name: Test exact structural WHNF consequence
+        env:
+          MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
+          MATHGRAPH_RECORD_LIMIT: "250000"
+        run: timeout 180s node --stack-size=32768 genesis/structural-whnf-separator.mjs
       - name: Measure LE.le structural prefix reuse
         env:
           MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
