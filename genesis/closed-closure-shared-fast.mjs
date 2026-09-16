@@ -7,6 +7,7 @@ const p=K.Kernel.prototype,seen=[],old=p.run;p.run=function(...xs){seen.push(thi
 const t0=Date.now();let r;try{r=K.checkExport(input,CAPS,1_000_000);}finally{p.run=old;}
 const st={attempts:0,successes:0,aborts:0,ops:0,ctorPairs:0,whnfHits:0,recs:0,beta:0,abortOps:0,abortBeta:0,abortDefs:0,abortRecs:0,abortVars:0,abortApps:0,abortWhnfHits:0,abortWhnfStores:0,abortDerefHits:0,abortDerefStores:0,abortDerefSteps:0,abortAppSpineHits:0,abortAppSpineStores:0,abortAppSpineNodes:0};
 let lastAbort=null;
-for(const k of seen){for(const q of Object.keys(st))st[q]+=k.__closedClosureStats?.[q]??0;if(k.__closedClosureStats?.lastAbort)lastAbort=k.__closedClosureStats.lastAbort;}
-console.log("CLOSED_CLOSURE_SHARED_FAST "+JSON.stringify({status:r.status,reason:r.reason,steps:r.steps??null,constructed:r.constructed??null,elapsed_ms:Date.now()-t0,stats:st,lastAbort}));
+const events=[];
+for(const k of seen){for(const q of Object.keys(st))st[q]+=k.__closedClosureStats?.[q]??0;if(k.__closedClosureStats?.lastAbort)lastAbort=k.__closedClosureStats.lastAbort;events.push(...(k.__closedClosureStats?.events??[]));}
+console.log("CLOSED_CLOSURE_SHARED_FAST "+JSON.stringify({status:r.status,reason:r.reason,steps:r.steps??null,constructed:r.constructed??null,elapsed_ms:Date.now()-t0,stats:st,lastAbort,events}));
 if(r.status!=="ACCEPT")process.exit(1);
