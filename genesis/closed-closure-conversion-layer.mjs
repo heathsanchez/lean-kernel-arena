@@ -24,10 +24,10 @@ function target(k,a,b,ctx){
   return ok.has(x)||ok.has(y);
 }
 function machine(k){
-  const termClosures=new WeakMap(),envCons=new WeakMap(),whnfCache=new WeakMap(),derefCache=new WeakMap(),appSpineCache=new WeakMap(),eqSuccess=new WeakMap();
+  const termClosures=new WeakMap(),envCons=new WeakMap(),whnfCache=new WeakMap(),derefCache=new WeakMap(),appSpineCache=new WeakMap(),eqSuccess=new WeakMap(),stateWhnfCache=new Map();
   let closureNext=1,attemptOps=0;
   const stats={ops:0,beta:0,defs:0,recs:0,vars:0,apps:0,whnfHits:0,whnfStores:0,
-    ctorPairs:0,rigidPairs:0,maxEnv:0,maxArgs:0,derefHits:0,derefStores:0,derefSteps:0,appSpineHits:0,appSpineStores:0,appSpineNodes:0,eqHits:0,eqStores:0,lastAbort:null};
+    ctorPairs:0,rigidPairs:0,maxEnv:0,maxArgs:0,derefHits:0,derefStores:0,derefSteps:0,appSpineHits:0,appSpineStores:0,appSpineNodes:0,stateHits:0,stateStores:0,eqHits:0,eqStores:0,lastAbort:null};
 
   function C(term,env=EMPTY){
     if(!env.length)env=EMPTY;
@@ -88,12 +88,25 @@ function machine(k){
     return out;
   }
 
+  function stateKey(head,args){
+    let s=String(head.__id)+"|";
+    for(let i=0;i<args.length;i++)s+=(i?",":"")+String(args[i].__id);
+    return s;
+  }
+  function finishWhnf(start,out,pendingStates){
+    whnfCache.set(start,out);stats.whnfStores++;
+    for(const key of pendingStates){
+      if(!stateWhnfCache.has(key)){stateWhnfCache.set(key,out);stats.stateStores++;}
+    }
+    return out;
+  }
+
   function whnf(start,depth=0){
     if(depth>6000){stats.lastAbort="depth";throw ABORT;}
     const old=whnfCache.get(start);
     if(old!==undefined){stats.whnfHits++;return old;}
 
-    let cl=start,args=[];
+    let cl=start,args=[],pendingStates=[];
     for(let guard=0;guard<200000;guard++){
       cl=deref(cl);
       stats.maxEnv=Math.max(stats.maxEnv,cl.env.length);
@@ -122,12 +135,24 @@ function machine(k){
       if(t[0]==="proj"){stats.lastAbort="projection";throw ABORT;}
       if(t[0]==="nat"||t[0]==="strlit"||t[0]==="sort"||t[0]==="pi"||t[0]==="lam"){
         const out={head:cl,args:Object.freeze(args.slice())};
-        whnfCache.set(start,out);stats.whnfStores++;return out;
+        return finishWhnf(start,out,pendingStates);
       }
       if(t[0]!=="const"){stats.lastAbort="whnf-syntax:"+t[0];throw ABORT;}
 
       k.need("declarations");
       const d=k.env.get(t[1]);if(!d)k.reject("undeclared-constant");
+
+      if((d.kind==="def"||d.kind==="rec")&&args.length){
+        const key=stateKey(cl,args),hit=stateWhnfCache.get(key);
+        if(hit!==undefined){
+          stats.stateHits++;
+          whnfCache.set(start,hit);stats.whnfStores++;
+          return hit;
+        }
+        if(pendingStates.length===0||pendingStates[pendingStates.length-1]!==key)
+          pendingStates.push(key);
+      }
+
       if(d.kind==="def"){
         k.need("reduction");stats.defs++;
         const body=k.instantiateDeclaration(t,d.value);
@@ -151,7 +176,7 @@ function machine(k){
       }
 
       const out={head:cl,args:Object.freeze(args.slice())};
-      whnfCache.set(start,out);stats.whnfStores++;return out;
+      return finishWhnf(start,out,pendingStates);
     }
     stats.lastAbort="whnf-loop";throw ABORT;
   }
@@ -229,7 +254,7 @@ p.equal=function(a,b,ctx=[]){
   const m=this.__closedMachine??=machine(this);
   const before={};
   const successKeys=["ops","ctorPairs","whnfHits","recs","beta","eqHits","eqStores"];
-  const diagnosticKeys=["defs","vars","apps","whnfStores","derefHits","derefStores","derefSteps","appSpineHits","appSpineStores","appSpineNodes"];
+  const diagnosticKeys=["defs","vars","apps","whnfStores","derefHits","derefStores","derefSteps","appSpineHits","appSpineStores","appSpineNodes","stateHits","stateStores"];
   for(const q of successKeys.concat(diagnosticKeys))before[q]=m.stats[q]??0;
   try{
     const st=m.prove(a,b);
@@ -245,7 +270,7 @@ p.equal=function(a,b,ctx=[]){
     if(err!==ABORT&&!(err instanceof Stop)&&!(err instanceof RangeError))throw err;
     this.__closedClosureStats.aborts++;
     this.__closedClosureStats.abortOps=(this.__closedClosureStats.abortOps??0)+((m.stats.ops??0)-(before.ops??0));
-    for(const q of ["beta","defs","recs","vars","apps","whnfHits","whnfStores","derefHits","derefStores","derefSteps","appSpineHits","appSpineStores","appSpineNodes"]){
+    for(const q of ["beta","defs","recs","vars","apps","whnfHits","whnfStores","derefHits","derefStores","derefSteps","appSpineHits","appSpineStores","appSpineNodes","stateHits","stateStores"]){
       const key="abort"+q[0].toUpperCase()+q.slice(1);
       const b=q in before?(before[q]??0):0;
       this.__closedClosureStats[key]=(this.__closedClosureStats[key]??0)+((m.stats[q]??0)-b);
