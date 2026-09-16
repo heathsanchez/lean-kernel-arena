@@ -18,12 +18,12 @@ function run(name,path,want,budget=1_000_000){
  const input=readFileSync(new URL(path,import.meta.url),"utf8"),seen=[],p=K.Kernel.prototype,old=p.run;
  p.run=function(...xs){seen.push(this);return old.apply(this,xs);};let r;const t0=Date.now();
  try{r=K.checkExport(input,CAPS,budget);}finally{p.run=old;}
- const row={name,want,status:r.status,reason:r.reason,steps:r.steps??null,constructed:r.constructed??null,frontier:r.frontier_declaration??null,
+ const row={name,want,budget,status:r.status,reason:r.reason,steps:r.steps??null,constructed:r.constructed??null,frontier:r.frontier_declaration??null,
   decisionCompositionHits:seen.reduce((n,k)=>n+(k.__decisionCompositionHits??0),0),elapsed_ms:Date.now()-t0};
  console.log("DECIDABLE_NAT_COMPOSITION "+JSON.stringify(row));
  if(want&&r.status!==want)process.exitCode=1;
  return row;
 }
-run("shared-subterm","../_build/tests/perf/shared-subterm.ndjson","ACCEPT");
-run("init-prelude","../_build/tests/init-prelude.ndjson",null);
-run("grind-ring-5","../_build/tests/perf/grind-ring-5.ndjson",null);
+run("shared-subterm","../_build/tests/perf/shared-subterm.ndjson","ACCEPT",1_000_000);
+run("init-prelude","../_build/tests/init-prelude.ndjson",null,2_000_000);
+run("grind-ring-5","../_build/tests/perf/grind-ring-5.ndjson",null,2_000_000);
