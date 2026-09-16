@@ -16,7 +16,14 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: cachix/install-nix-action@v31
+      - name: Restore shared-subterm witness
+        id: shared-cache
+        uses: actions/cache@v4
+        with:
+          path: _build/tests/perf/shared-subterm.ndjson
+          key: shared-subterm-${{ hashFiles('tests/perf/shared-subterm.lean') }}
       - name: Build shared-subterm
+        if: steps.shared-cache.outputs.cache-hit != 'true'
         shell: 'nix develop -c bash -euxo pipefail {0}'
         run: ./lka.py build-test perf/shared-subterm
       - name: Test closure conversion directly
