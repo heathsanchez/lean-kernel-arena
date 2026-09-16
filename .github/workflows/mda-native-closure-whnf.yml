@@ -1,0 +1,18 @@
+name: MDA native closure WHNF
+on:
+  push:
+    branches: [mda-native-closure-whnf-v1]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  red-green:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Native closure focused test
+        run: node --test genesis/native-closure-whnf.test.mjs
