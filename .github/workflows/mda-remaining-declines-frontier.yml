@@ -10,6 +10,8 @@ on:
       - 'genesis/nested-envelope.mjs'
       - 'genesis/projection-congruence-recovery.mjs'
       - 'genesis/kernel.mjs'
+      - 'genesis/giant-exact-whnf-separator.mjs'
+      - 'genesis/exact-whnf-cache-layer.mjs'
       - '.github/workflows/mda-remaining-declines-frontier.yml'
   workflow_dispatch:
 
@@ -60,6 +62,11 @@ jobs:
           MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
           MATHGRAPH_RECORD_LIMIT: "250000"
         run: timeout 300s node --stack-size=32768 genesis/remaining-declines-frontier.mjs
+      - name: Test exact WHNF consequence on giants
+        env:
+          MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
+          MATHGRAPH_RECORD_LIMIT: "250000"
+        run: timeout 120s node --stack-size=32768 genesis/giant-exact-whnf-separator.mjs
       - name: Preserve evidence
         if: always()
         uses: actions/upload-artifact@v4
