@@ -19,7 +19,7 @@ p.run=function(...xs){
 };
 p.whnf=function(e){
   const {h,args}=spine(e);
-  if(h?.[0]==="const"&&h[1]===LE){
+  if(h?.[0]==="const"&&typeof h[1]==="string"&&h[1].includes("LE")){
     this.__lePrefix??={calls:0,byArity:new Map(),prefix2:new Set(),prefix3:new Set(),full:new Set(),bytes:{prefix2:0,prefix3:0,full:0}};
     const q=this.__lePrefix;q.calls++;q.byArity.set(args.length,(q.byArity.get(args.length)??0)+1);
     const k2=JSON.stringify([h,...args.slice(0,2)]);q.prefix2.add(k2);q.bytes.prefix2+=k2.length;
@@ -35,12 +35,13 @@ const input=readFileSync(new URL("../_build/tests/perf/grind-ring-5.ndjson",impo
 let r;
 try{r=K.checkExport(input,CAPS,1_000_000);}finally{p.run=run0;}
 const out={status:r.status,reason:r.reason,steps:r.steps??null,frontier:r.frontier_declaration??null,
-  calls:0,byArity:{},uniquePrefix2:0,uniquePrefix3:0,uniqueFull:0};
+  calls:0,byArity:{},uniquePrefix2:0,uniquePrefix3:0,uniqueFull:0,names:{}};
 const p2=new Set(),p3=new Set(),pf=new Set();
 for(const k of seen){
   const q=k.__lePrefix;if(!q)continue;
   out.calls+=q.calls;
   for(const [a,n] of q.byArity)out.byArity[a]=(out.byArity[a]??0)+n;
+  for(const x of q.full){try{const a=JSON.parse(x);const n=a?.[0]?.[1];if(typeof n==="string")out.names[n]=(out.names[n]??0)+1;}catch{}}
   for(const x of q.prefix2)p2.add(x);for(const x of q.prefix3)p3.add(x);for(const x of q.full)pf.add(x);
 }
 out.uniquePrefix2=p2.size;out.uniquePrefix3=p3.size;out.uniqueFull=pf.size;
