@@ -20,10 +20,34 @@ function spine(e){
   while(Array.isArray(h)&&h[0]==="app"){args.push(h[2]);h=h[1];}
   args.reverse();return{h,args};
 }
-function target(root){
+function freeMask(k,root){
+  if(!Array.isArray(root))return 0n;
+  k.__privateMask??=new WeakMap();
+  const old=k.__privateMask.get(root);if(old!==undefined)return old;
+  let m;
+  switch(root[0]){
+    case "sort":case "const":case "nat":case "strlit":m=0n;break;
+    case "var":m=1n<<BigInt(root[1]);break;
+    case "app":m=freeMask(k,root[1])|freeMask(k,root[2]);break;
+    case "proj":m=freeMask(k,root[3]);break;
+    case "pi":case "lam":m=freeMask(k,root[1])|(freeMask(k,root[2])>>1n);break;
+    case "let":m=freeMask(k,root[1])|freeMask(k,root[2])|(freeMask(k,root[3])>>1n);break;
+    default:return null;
+  }
+  k.__privateMask.set(root,m);return m;
+}
+function target(k,root){
   if(!Array.isArray(root))return false;
   const s=spine(root);
-  return s.args.length===5&&Array.isArray(s.h)&&s.h[0]==="const";
+  if(s.args.length!==5||!Array.isArray(s.h)||s.h[0]!=="const")return false;
+  let closed=0,uses0=0;
+  for(const a of s.args){
+    const m=freeMask(k,a);if(m===null)return false;
+    if(m===0n){closed++;continue;}
+    if((m&1n)!==0n){uses0++;continue;}
+    return false;
+  }
+  return closed===4&&uses0===1;
 }
 function support(k,e){
   if(!Array.isArray(e))return 0;
@@ -164,6 +188,7 @@ function reduceTarget(k,body,arg){
 
 p.run=function(...args){
   this.__privateSupport=new WeakMap();
+  this.__privateMask=new WeakMap();
   this.__privateStats={queries:0,targetCalls:0,closureSteps:0,beta:0,defs:0,recs:0,
     vars:0,lets:0,materialized:0,reusedClosed:0,reusedNoEnv:0,paramChecks:0,maxEnv:0,maxArgs:0};
   this.__privateWhnfDepth=0;
@@ -178,7 +203,7 @@ p.substitute=function(root,arg,depth=0){
   ensure(this);
   if(depth===0&&(this.__privateWhnfDepth??0)>0){
     this.__privateStats.queries++;
-    if(target(root)){
+    if(target(this,root)){
       this.__privateStats.targetCalls++;
       return reduceTarget(this,root,arg);
     }
