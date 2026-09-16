@@ -164,6 +164,10 @@ p.equal=function(a,b,ctx=[]){
     if(err!==ABORT&&!(err instanceof Stop)&&!(err instanceof RangeError))throw err;
     this.__closedClosureStats.aborts++;
     this.__closedClosureStats.abortOps=(this.__closedClosureStats.abortOps??0)+(m.stats.ops??0);
+    for(const q of ["beta","defs","recs","vars","apps","whnfHits","whnfStores"]){
+      const key="abort"+q[0].toUpperCase()+q.slice(1);
+      this.__closedClosureStats[key]=(this.__closedClosureStats[key]??0)+(m.stats[q]??0);
+    }
     this.__closedClosureStats.lastAbort=m.stats.lastAbort??"unknown";
     this.steps=snap.steps;this.budget=snap.budget;this.conversionFrontier=snap.frontier;
     return equal0.call(this,a,b,ctx);
