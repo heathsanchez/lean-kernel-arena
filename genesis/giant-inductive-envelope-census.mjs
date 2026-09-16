@@ -9,7 +9,7 @@ function scan(name){
   const input=readFileSync(new URL("../_build/tests/"+name+".ndjson",import.meta.url),"utf8");
   const lines=input.split(/\r?\n/);
   const names=new Map([[0,""]]);
-  const mismatches=[];
+  const mismatches=[],nested=[];
   for(let i=0;i<lines.length;i++){
     const line=lines[i];
     if(!line.trim()) continue;
@@ -52,7 +52,9 @@ function scan(name){
       }))
     };
     if(summary.recCount!==summary.typeCount) mismatches.push(summary);
+    if(summary.types.some(t=>Number.isSafeInteger(t.numNested)&&t.numNested>0)) nested.push(summary);
   }
   console.log("GIANT_INDUCTIVE_MISMATCH "+JSON.stringify({file:name,count:mismatches.length,first:mismatches.slice(0,8)}));
+  console.log("GIANT_NESTED_BUNDLES "+JSON.stringify({file:name,count:nested.length,items:nested.slice(0,16)}));
 }
 for(const t of TARGETS) scan(t);
