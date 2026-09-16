@@ -1,4 +1,6 @@
-import {validateZeroParamNestedBundle} from "./nested-envelope.mjs";\n\nconst ZERO_LEVEL=Symbol("level-constant");
+import {validateZeroParamNestedBundle} from "./nested-envelope.mjs";
+
+const ZERO_LEVEL=Symbol("level-constant");
 
 // Exact level equality by zero/positive case splitting, then max-of-affine forms.
 // Positive parameter p is represented as q_p + 1, with q_p ranging over N.
