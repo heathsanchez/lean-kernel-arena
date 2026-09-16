@@ -32,7 +32,7 @@ p.equal=function(a,b,ctx=[]){
     if(e instanceof K.Stop&&e.status===K.REJECT&&
        typeof this.currentDeclaration==="string"&&this.currentDeclaration.includes("eq_or_lt_of_le")&&
        this.__rigidReject===null){
-      this.__rigidReject={reason:e.message,step:this.steps,ctxDepth:ctx.length,a,b};
+      this.__rigidReject={reason:e.message,step:this.steps,ctxDepth:ctx.length,ctx:ctx.slice(),a,b};
     }
     throw e;
   }
@@ -46,12 +46,14 @@ for(const name of ["init-prelude","perf/grind-ring-5"]){
   const out={name,status:r.status,reason:r.reason,steps:r.steps??null,frontier:r.frontier_declaration??null};
   if(q){
     const owner=seen.find(k=>k.__rigidReject===q);
-    let lw=null,rw=null,whnfError=null;
+    let lw=null,rw=null,lt=null,rt=null,whnfError=null,inferError=null;
     if(owner){
       const oldSteps=owner.steps,oldBudget=owner.budget;
       try{
         owner.steps=0;owner.budget=2_000_000;
         lw=owner.whnf(q.a);rw=owner.whnf(q.b);
+        try{lt=owner.infer(q.a,q.ctx);rt=owner.infer(q.b,q.ctx);}
+        catch(e){inferError=String(e?.message??e);}
       }catch(e){whnfError=String(e?.message??e);}
       finally{owner.steps=oldSteps;owner.budget=oldBudget;}
     }
@@ -59,7 +61,9 @@ for(const name of ["init-prelude","perf/grind-ring-5"]){
       leftHead:rawHead(q.a),rightHead:rawHead(q.b),leftNodes:count(q.a),rightNodes:count(q.b),
       leftWhnfHead:lw?rawHead(lw):null,rightWhnfHead:rw?rawHead(rw):null,
       leftWhnf:lw?JSON.stringify(lw).slice(0,7000):null,rightWhnf:rw?JSON.stringify(rw).slice(0,7000):null,
-      whnfError,leftBytes:JSON.stringify(q.a).length,rightBytes:JSON.stringify(q.b).length,
+      leftTypeHead:lt?rawHead(lt):null,rightTypeHead:rt?rawHead(rt):null,
+      leftType:lt?JSON.stringify(lt).slice(0,7000):null,rightType:rt?JSON.stringify(rt).slice(0,7000):null,
+      whnfError,inferError,leftBytes:JSON.stringify(q.a).length,rightBytes:JSON.stringify(q.b).length,
       left:JSON.stringify(q.a).slice(0,7000),right:JSON.stringify(q.b).slice(0,7000)});
   }
   console.log("EQ_OR_LT_RIGID_PAIR "+JSON.stringify(out));
