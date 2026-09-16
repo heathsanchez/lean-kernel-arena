@@ -1,0 +1,29 @@
+name: MDA frontier declaration shapes
+
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/frontier-declaration-shape.mjs'
+      - '.github/workflows/mda-frontier-declaration-shape.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore giant witnesses
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            _build/tests/init-prelude.ndjson
+            _build/tests/perf/grind-ring-5.ndjson
+          key: giant-frontier-e00d4ce4fb0fa667f632e624adbbc2e6a42704db0556aaf2f154e50f6e450aca
+          fail-on-cache-miss: true
+      - name: Print exact frontier declaration shapes
+        run: node genesis/frontier-declaration-shape.mjs
