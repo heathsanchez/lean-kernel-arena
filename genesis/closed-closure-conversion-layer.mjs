@@ -24,10 +24,10 @@ function target(k,a,b,ctx){
   return ok.has(x)||ok.has(y);
 }
 function machine(k){
-  const termClosures=new WeakMap(),envCons=new WeakMap(),whnfCache=new WeakMap(),derefCache=new WeakMap();
+  const termClosures=new WeakMap(),envCons=new WeakMap(),whnfCache=new WeakMap(),derefCache=new WeakMap(),appSpineCache=new WeakMap();
   let closureNext=1;
   const stats={ops:0,beta:0,defs:0,recs:0,vars:0,apps:0,whnfHits:0,whnfStores:0,
-    ctorPairs:0,rigidPairs:0,maxEnv:0,maxArgs:0,derefHits:0,derefStores:0,derefSteps:0,lastAbort:null};
+    ctorPairs:0,rigidPairs:0,maxEnv:0,maxArgs:0,derefHits:0,derefStores:0,derefSteps:0,appSpineHits:0,appSpineStores:0,appSpineNodes:0,lastAbort:null};
 
   function C(term,env=EMPTY){
     if(!env.length)env=EMPTY;
@@ -73,6 +73,21 @@ function machine(k){
     return cl;
   }
 
+  function appSpine(root){
+    const old=appSpineCache.get(root);
+    if(old!==undefined){stats.appSpineHits++;return old;}
+    let h=root;
+    const rev=[];
+    while(Array.isArray(h)&&h[0]==="app"){
+      bump();
+      stats.apps++;stats.appSpineNodes++;
+      rev.push(h[2]);h=h[1];
+    }
+    const out={head:h,args:Object.freeze(rev.reverse())};
+    appSpineCache.set(root,out);stats.appSpineStores++;
+    return out;
+  }
+
   function whnf(start,depth=0){
     if(depth>6000){stats.lastAbort="depth";throw ABORT;}
     const old=whnfCache.get(start);
@@ -81,16 +96,21 @@ function machine(k){
     let cl=start,args=[];
     for(let guard=0;guard<200000;guard++){
       cl=deref(cl);
-      bump();
       stats.maxEnv=Math.max(stats.maxEnv,cl.env.length);
       stats.maxArgs=Math.max(stats.maxArgs,args.length);
       const t=cl.term,env=cl.env;
       if(!Array.isArray(t)){stats.lastAbort="non-term";throw ABORT;}
 
       if(t[0]==="app"){
-        k.need("application");stats.apps++;
-        args.unshift(C(t[2],env));cl=C(t[1],env);continue;
+        k.need("application");
+        const sp=appSpine(t),xs=new Array(sp.args.length);
+        for(let i=0;i<sp.args.length;i++)xs[i]=C(sp.args[i],env);
+        args=xs.concat(args);
+        cl=C(sp.head,env);
+        continue;
       }
+
+      bump();
       if(t[0]==="let"){
         k.need("reduction");
         cl=C(t[3],cons(C(t[2],env),env));continue;
@@ -185,7 +205,7 @@ p.equal=function(a,b,ctx=[]){
     if(err!==ABORT&&!(err instanceof Stop)&&!(err instanceof RangeError))throw err;
     this.__closedClosureStats.aborts++;
     this.__closedClosureStats.abortOps=(this.__closedClosureStats.abortOps??0)+(m.stats.ops??0);
-    for(const q of ["beta","defs","recs","vars","apps","whnfHits","whnfStores","derefHits","derefStores","derefSteps"]){
+    for(const q of ["beta","defs","recs","vars","apps","whnfHits","whnfStores","derefHits","derefStores","derefSteps","appSpineHits","appSpineStores","appSpineNodes"]){
       const key="abort"+q[0].toUpperCase()+q.slice(1);
       this.__closedClosureStats[key]=(this.__closedClosureStats[key]??0)+(m.stats[q]??0);
     }
