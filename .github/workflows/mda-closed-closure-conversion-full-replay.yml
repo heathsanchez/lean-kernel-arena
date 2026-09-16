@@ -1,0 +1,36 @@
+name: MDA closed closure conversion full replay
+
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/closed-closure-conversion-full-replay.mjs'
+      - 'genesis/closed-closure-conversion-layer.mjs'
+      - '.github/workflows/mda-closed-closure-conversion-full-replay.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Reconstruct retained present
+        run: timeout 30s node --stack-size=32768 genesis/test.mjs
+      - name: Build complete CI Arena set
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-test --skip-ci
+      - name: Replay baseline and candidate
+        run: timeout 600s node --stack-size=32768 genesis/closed-closure-conversion-full-replay.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: closed-closure-conversion-full-replay-${{ github.sha }}
+          path: genesis/evidence/closed-closure-conversion-full-replay.json
+          if-no-files-found: error
