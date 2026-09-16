@@ -1,11 +1,5 @@
 name: MDA closed closure conversion
 on:
-  push:
-    branches: [mda-kernel-genesis-v1]
-    paths:
-      - 'genesis/closed-closure-conversion-layer.mjs'
-      - 'genesis/closed-closure-conversion.mjs'
-      - '.github/workflows/mda-closed-closure-conversion.yml'
   workflow_dispatch:
 permissions:
   contents: read
