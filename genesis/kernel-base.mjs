@@ -660,7 +660,7 @@ class Kernel {
         if(rd?.kind==="rec") {
           const total=rd.numParams+1+rd.numMinors+rd.numIndices+1;
           if(rargs.length>=total) {
-            const major=this.whnf(rargs[total-1]),[mh,margs]=this.getApp(major);
+            const major=this.whnfMajor(rargs[total-1]),[mh,margs]=this.getApp(major);
             const md=mh[0]==="const"?this.env.get(mh[1]):null;
             if(md?.kind==="ctor" && md.induct===rd.induct &&
                margs.length===md.numParams+md.numFields) {
@@ -719,6 +719,34 @@ class Kernel {
       return f===e[1] ? e : this.make("app",f,e[2]);
     }
     return e;
+  }
+  unfoldTheoremHead(e,reason="delta") {
+    this.tick();
+    const [head,args]=this.getApp(e);
+    if(head[0]!=="const") return null;
+    const d=this.env.get(head[1]);
+    if(d?.kind!=="thm") return null;
+    this.need("theorems"); this.need("reduction");
+    this.__theoremUnfoldCache??=new WeakMap();
+    let body=this.__theoremUnfoldCache.get(head);
+    if(body===undefined) {
+      body=this.instantiateDeclaration(head,d.value);
+      this.__theoremUnfoldCache.set(head,body);
+    }
+    if(reason==="major") this.__theoremMajorUnfolds=(this.__theoremMajorUnfolds??0)+1;
+    else this.__theoremDeltaUnfolds=(this.__theoremDeltaUnfolds??0)+1;
+    return this.appN(body,args);
+  }
+  whnfMajor(e) {
+    this.tick();
+    let cur=e,unfolds=0;
+    while(true) {
+      const core=this.whnf(cur);
+      const unfolded=this.unfoldTheoremHead(core,"major");
+      if(unfolded===null) return core;
+      if(++unfolds>10000) this.unknown("theorem-major-unfold-budget");
+      cur=unfolded;
+    }
   }
   same(a,b) {
     this.tick();
@@ -816,6 +844,15 @@ class Kernel {
         this.equal(x[2],y[2],[...ctx,x[1]]);
         return;
       }
+    }
+    // Lean kernel delta transparency is broader than hot WHNF: theorem
+    // values may unfold when conversion is otherwise stuck. Keep this cold so
+    // ordinary reduction never eagerly expands large proof bodies.
+    const dx=this.unfoldTheoremHead(x,"delta"),dy=this.unfoldTheoremHead(y,"delta");
+    if(dx!==null || dy!==null) {
+      if(dx!==null && dy!==null) { this.equal(dx,dy,ctx); return; }
+      if(dx!==null) { this.equal(dx,y,ctx); return; }
+      this.equal(x,dy,ctx); return;
     }
     if(this.caps.has("rigid-conversion")) {
       // These normal forms have no remaining computation rule that can change
