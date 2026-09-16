@@ -11,6 +11,7 @@ on:
       - 'genesis/structural-normal-cache-layer.mjs'
       - 'genesis/structural-normal-separator.mjs'
       - 'experiments/parserdescr-envelope.mjs'
+      - 'experiments/giant-hot-decl-shapes.mjs'
       - 'genesis/nested-envelope.mjs'
       - 'genesis/projection-congruence-recovery.mjs'
       - 'genesis/kernel.mjs'
@@ -70,6 +71,8 @@ jobs:
         run: node genesis/giant-inductive-envelope-census.mjs
       - name: Inspect ParserDescr envelope
         run: node experiments/parserdescr-envelope.mjs
+      - name: Inspect giant hotspot declarations
+        run: node experiments/giant-hot-decl-shapes.mjs
       - name: Diagnose current frontier
         env:
           MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
