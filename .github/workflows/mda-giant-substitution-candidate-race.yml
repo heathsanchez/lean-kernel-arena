@@ -1,0 +1,53 @@
+name: MDA giant substitution candidate race
+on:
+  push:
+    branches: [mda-arena-qualification-v1]
+    paths:
+      - 'genesis/giant-substitution-candidate-race.mjs'
+      - '.github/workflows/mda-giant-substitution-candidate-race.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  race:
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        candidate: [baseline, exact-identity, unused, fv-mask, dynamic-slot, support-pruned]
+        budget: [1000000, 2000000, 4000000]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Restore giant witnesses
+        id: giant-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            _build/tests/init-prelude.ndjson
+            _build/tests/perf/grind-ring-5.ndjson
+            _build/tests/perf/shared-subterm.ndjson
+          key: giant-frontier-${{ hashFiles('tests/init_prelude_module.lean', 'tests/perf/grind-ring-5.lean', 'tests/perf/shared-subterm.lean') }}
+      - name: Build giant witnesses if needed
+        if: steps.giant-cache.outputs.cache-hit != 'true'
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test init-prelude
+          ./lka.py build-test perf/grind-ring-5
+          ./lka.py build-test perf/shared-subterm
+      - name: Run exact substitution candidate
+        env:
+          CANDIDATE: ${{ matrix.candidate }}
+          BUDGET: ${{ matrix.budget }}
+          MATHGRAPH_INPUT_BYTE_LIMIT: '15000000'
+          MATHGRAPH_RECORD_LIMIT: '250000'
+        run: timeout 420s node --stack-size=32768 genesis/giant-substitution-candidate-race.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: giant-substitution-${{ matrix.candidate }}-${{ matrix.budget }}-${{ github.sha }}
+          path: genesis/evidence/giant-substitution-*.json
+          if-no-files-found: warn
