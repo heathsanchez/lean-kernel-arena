@@ -105,7 +105,7 @@ function machine(k){
       if(rd?.kind!=="rec"||rd.numParams!==0||rd.numIndices!==0||rd.numMinors!==2)throw 0;
       const rus=rh[2]??[];
       if(rus.length!==(rd.levelParams??[]).length||
-         rus.some(u=>typeof u!=="number"||u!==0))throw 0;
+         rus.some(u=>!Number.isSafeInteger(u)||u<0))throw 0;
       if(rargs.length!==4)throw 0;
       const ind=k.env.get(rd.induct);
       if(ind?.kind!=="inductive"||ind.numParams!==0||ind.numIndices!==0||
