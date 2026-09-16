@@ -84,6 +84,7 @@ for(const [name,want,doRewrite,budget] of CASES){
     frontier_declaration:r.frontier_declaration??null,parse_records:r.parse_records??null,rewritten:rw.rewritten,
     projectionRecoveryAttempts:sum("__projRecoveryAttempts"),projectionRecoverySuccesses:sum("__projRecoverySuccesses"),
     recursorTypeConversionAttempts:sum("__recTypeConversionAttempts"),recursorTypeConversionSuccesses:sum("__recTypeConversionSuccesses"),
+    recursorRuleConversionAttempts:sum("__recRuleConversionAttempts"),recursorRuleConversionSuccesses:sum("__recRuleConversionSuccesses"),
     elapsed_ms:Date.now()-t0,pass};
   rows.push(row);console.log("ROW "+JSON.stringify(row));
 }
@@ -94,14 +95,21 @@ const recursorConversionExercised=(init.recursorTypeConversionAttempts??0)>0;
 const recursorConversionVerified=recursorConversionExercised&&
   init.recursorTypeConversionAttempts===init.recursorTypeConversionSuccesses&&
   init.reason!=="recursor-type";
+const recursorRuleConversionExercised=(init.recursorRuleConversionAttempts??0)>0;
+const recursorRuleConversionVerified=recursorRuleConversionExercised&&
+  init.recursorRuleConversionAttempts===init.recursorRuleConversionSuccesses&&
+  !String(init.reason??"").startsWith("recursor-rule-");
 const controlsClean=rows.slice(2).every(r=>r.pass);
 const giantsClosed=rows.slice(0,2).every(r=>r.status==="ACCEPT");
 const out={experiment:"post-nested-projection-proof-irrelevance-high-budget",
-  recursorConversionExercised,recursorConversionVerified,giantsClosed,controlsClean,
+  recursorConversionExercised,recursorConversionVerified,
+  recursorRuleConversionExercised,recursorRuleConversionVerified,
+  giantsClosed,controlsClean,
   promotable_recursor_type:recursorConversionVerified&&controlsClean,
+  promotable_recursor_rule:recursorRuleConversionVerified&&controlsClean,
   promotable_focus:giantsClosed&&controlsClean,rows,
-  claim_boundary:"Recursor declarations first retain the exact structural type check. Only when structural identity fails do they invoke the existing verified definitional converter, now instrumented with attempt/success counters. The init giant receives 1.6M ticks specifically to cross the previously observed Lean.TSyntax recursor boundary at 1,195,506 steps; grind receives 4M to distinguish later semantic failure from continued execution cost. Projection recovery remains positive congruence only after retained conversion returns UNKNOWN at conversion-frontier. All forged/protected controls stay at the original 1M budget."};
+  claim_boundary:"Recursor declarations first retain exact structural checks for both the recursor type and generated rule bodies. Only when structural identity fails does each check invoke the existing verified definitional converter, with separate attempt/success counters. The init giant receives 1.6M ticks specifically to cross the previously observed Lean.TSyntax recursor boundary at 1,195,506 steps; grind receives 4M to distinguish later semantic failure from continued execution cost. Projection recovery remains positive congruence only after retained conversion returns UNKNOWN at conversion-frontier. All forged/protected controls stay at the original 1M budget."};
 mkdirSync("genesis/evidence",{recursive:true});
 writeFileSync("genesis/evidence/post-nested-projection-proof-irrelevance.json",JSON.stringify(out,null,2)+"\n");
 console.log("POST_NESTED_PROJECTION_PROOF_IRRELEVANCE "+JSON.stringify(out));
-if(!(out.promotable_recursor_type&&out.controlsClean))process.exit(1);
+if(!(out.promotable_recursor_type&&out.promotable_recursor_rule&&out.controlsClean))process.exit(1);
