@@ -1,5 +1,4 @@
 import "./stack-safe.mjs";
-import "./whnf-reentry-trampoline-layer.mjs";
 import "./structural-cache.mjs";
 import "./structural-sharing.mjs";
 import "./normal-cache.mjs";
@@ -16,5 +15,6 @@ import "./recursor-gated-conversion.mjs";
 import "./projection-congruence-recovery.mjs";
 import "./closed-closure-conversion-layer.mjs";
 import "./nat-offset-defeq-layer.mjs";
+import "./whnf-reentry-trampoline-layer.mjs";
 export * from "./kernel-semantic.mjs";
 
