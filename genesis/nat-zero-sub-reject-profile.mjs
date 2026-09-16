@@ -16,12 +16,29 @@ import "./compiled-semantic-consequence-layer.mjs";
 const CAPS=["sort","binders","application","reduction","declarations","universes","theorems","proof-irrelevance","function-eta","inductive-envelope","single-inductives","reflexive-inductives","inductive-reduction","rule-k","unit-eta","prop-inductives","nat-literals","string-literals","quotients","projections","structure-eta","rigid-conversion","opaque-declarations"];
 function prettyName(s){try{let x=JSON.parse(s),p=[];while(Array.isArray(x)&&x.length===3){p.push(String(x[2]));x=JSON.parse(x[0]);}return p.reverse().join(".");}catch{return String(s);}}
 function head(e){let h=e,n=0;while(Array.isArray(h)&&h[0]==="app"){n++;h=h[1];}return Array.isArray(h)?{tag:h[0],name:h[0]==="const"?prettyName(h[1]):null,args:n}:{tag:typeof h,args:n};}
-function sketch(e,d=16){if(!Array.isArray(e))return e;if(d<=0)return["…",e[0]];if(["nat","var","sort","strlit"].includes(e[0]))return e;if(e[0]==="const")return["const",prettyName(e[1]),e[2]??[]];if(e[0]==="proj")return["proj",prettyName(e[1]),e[2],sketch(e[3],d-1)];return[e[0],...e.slice(1).map(x=>sketch(x,d-1))];}
-const p=K.Kernel.prototype,eq0=p.equal,run0=p.run;
+function sketch(e,d=18){if(!Array.isArray(e))return e;if(d<=0)return["…",e[0]];if(["nat","var","sort","strlit"].includes(e[0]))return e;if(e[0]==="const")return["const",prettyName(e[1]),e[2]??[]];if(e[0]==="proj")return["proj",prettyName(e[1]),e[2],sketch(e[3],d-1)];return[e[0],...e.slice(1).map(x=>sketch(x,d-1))];}
+const p=K.Kernel.prototype,eq0=p.equal,normal0=p.normal,run0=p.run;
 p.run=function(...xs){this.__zeroSub=[];return run0.apply(this,xs);};
-p.equal=function(a,b,ctx=[]){try{return eq0.call(this,a,b,ctx);}catch(e){if(e?.status==="REJECT"&&prettyName(this.currentDeclaration).endsWith("Nat.zero_sub")){
- this.__zeroSub.push({step:this.steps,reason:e.message,ctxDepth:ctx.length,aHead:head(a),bHead:head(b),a:sketch(a),b:sketch(b)});this.__zeroSub=this.__zeroSub.slice(-12);
-}throw e;}};
+p.equal=function(a,b,ctx=[]){
+ try{return eq0.call(this,a,b,ctx);}catch(e){
+  if(e?.status==="REJECT"&&prettyName(this.currentDeclaration).endsWith("Nat.zero_sub")){
+   let an=null,bn=null,normError=null;
+   const oldBudget=this.budget;
+   try{
+    // Diagnostic only: after the original checker has already rejected, give the
+    // retained normalizer room to expose the exact pair that rigid conversion saw.
+    this.budget=Math.max(oldBudget,this.steps+500000);
+    an=normal0.call(this,a);bn=normal0.call(this,b);
+   }catch(ne){normError={status:ne?.status??null,reason:ne?.message??String(ne)};}
+   finally{this.budget=oldBudget;}
+   this.__zeroSub.push({step:this.steps,reason:e.message,ctxDepth:ctx.length,
+     raw:{aHead:head(a),bHead:head(b),a:sketch(a),b:sketch(b)},
+     normalized:an&&bn?{aHead:head(an),bHead:head(bn),a:sketch(an),b:sketch(bn)}:null,
+     normError});
+   this.__zeroSub=this.__zeroSub.slice(-8);
+  }
+  throw e;
+ }};
 const result0=p.result;p.result=function(...xs){const r=result0.apply(this,xs);r.__zeroSub=this.__zeroSub??[];return r;};
 const input=readFileSync(new URL("../_build/tests/perf/grind-ring-5.ndjson",import.meta.url),"utf8");
 const r=K.checkExport(input,CAPS,2_000_000);
