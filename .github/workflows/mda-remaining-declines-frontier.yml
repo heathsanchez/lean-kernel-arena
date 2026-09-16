@@ -5,6 +5,7 @@ on:
     branches: [mda-kernel-genesis-v1]
     paths:
       - 'genesis/remaining-declines-frontier.mjs'
+      - 'genesis/kernel-base.mjs'
       - '.github/workflows/mda-remaining-declines-frontier.yml'
   workflow_dispatch:
 
@@ -30,6 +31,9 @@ jobs:
           ./lka.py build-test perf/grind-ring-5
           ./lka.py build-test perf/shared-subterm
       - name: Diagnose current frontier
+        env:
+          MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
+          MATHGRAPH_RECORD_LIMIT: "250000"
         run: timeout 300s node --stack-size=32768 genesis/remaining-declines-frontier.mjs
       - name: Preserve evidence
         if: always()
