@@ -27,7 +27,7 @@ function machine(k){
   const termClosures=new WeakMap(),envCons=new WeakMap(),whnfCache=new WeakMap();
   let closureNext=1;
   const stats={ops:0,beta:0,defs:0,recs:0,vars:0,apps:0,whnfHits:0,whnfStores:0,
-    ctorPairs:0,rigidPairs:0,maxEnv:0,maxArgs:0};
+    ctorPairs:0,rigidPairs:0,maxEnv:0,maxArgs:0,lastAbort:null};
 
   function C(term,env=EMPTY){
     if(!env.length)env=EMPTY;
@@ -45,12 +45,12 @@ function machine(k){
   }
   function bump(){
     k.tick();stats.ops++;
-    if(stats.ops>900000)throw ABORT;
+    if(stats.ops>900000){stats.lastAbort="op-cap";throw ABORT;}
   }
   function sameLevels(a,b){return JSON.stringify(a??[])===JSON.stringify(b??[]);}
 
   function whnf(start,depth=0){
-    if(depth>6000)throw ABORT;
+    if(depth>6000){stats.lastAbort="depth";throw ABORT;}
     const old=whnfCache.get(start);
     if(old!==undefined){stats.whnfHits++;return old;}
 
@@ -60,14 +60,14 @@ function machine(k){
       stats.maxEnv=Math.max(stats.maxEnv,cl.env.length);
       stats.maxArgs=Math.max(stats.maxArgs,args.length);
       const t=cl.term,env=cl.env;
-      if(!Array.isArray(t))throw ABORT;
+      if(!Array.isArray(t)){stats.lastAbort="non-term";throw ABORT;}
 
       if(t[0]==="app"){
         k.need("application");stats.apps++;
         args.unshift(C(t[2],env));cl=C(t[1],env);continue;
       }
       if(t[0]==="var"){
-        if(t[1]>=env.length)throw ABORT;
+        if(t[1]>=env.length){stats.lastAbort="free-var";throw ABORT;}
         stats.vars++;cl=env[t[1]];continue;
       }
       if(t[0]==="let"){
@@ -78,12 +78,12 @@ function machine(k){
         k.need("reduction");stats.beta++;
         cl=C(t[2],cons(args.shift(),env));continue;
       }
-      if(t[0]==="proj")throw ABORT;
+      if(t[0]==="proj"){stats.lastAbort="projection";throw ABORT;}
       if(t[0]==="nat"||t[0]==="strlit"||t[0]==="sort"||t[0]==="pi"||t[0]==="lam"){
         const out={head:cl,args:Object.freeze(args.slice())};
         whnfCache.set(start,out);stats.whnfStores++;return out;
       }
-      if(t[0]!=="const")throw ABORT;
+      if(t[0]!=="const"){stats.lastAbort="whnf-syntax:"+t[0];throw ABORT;}
 
       k.need("declarations");
       const d=k.env.get(t[1]);if(!d)k.reject("undeclared-constant");
@@ -95,12 +95,12 @@ function machine(k){
       if(d.kind==="rec"&&args.length>=d.numParams+1+d.numMinors+d.numIndices+1){
         // Deliberate separator boundary: the shared-DAG family is non-indexed
         // and parameter-free. Anything broader is left to retained semantics.
-        if(d.numParams!==0||d.numIndices!==0)throw ABORT;
+        if(d.numParams!==0||d.numIndices!==0){stats.lastAbort="param-or-indexed-rec";throw ABORT;}
         const total=1+d.numMinors+1,major=whnf(args[total-1],depth+1);
         const mh=major.head.term,md=Array.isArray(mh)&&mh[0]==="const"?k.env.get(mh[1]):null;
         if(md?.kind==="ctor"&&md.induct===d.induct&&major.args.length===md.numFields){
           const rule=d.rules.find(r=>r.ctor===md.name);
-          if(!rule)throw ABORT;
+          if(!rule){stats.lastAbort="missing-rule";throw ABORT;}
           k.need("inductive-reduction");k.need("reduction");stats.recs++;
           const rhs=k.instantiateDeclaration(t,rule.rhs);
           const prefix=args.slice(0,1+d.numMinors),extras=args.slice(total);
@@ -112,7 +112,7 @@ function machine(k){
       const out={head:cl,args:Object.freeze(args.slice())};
       whnfCache.set(start,out);stats.whnfStores++;return out;
     }
-    throw ABORT;
+    stats.lastAbort="whnf-loop";throw ABORT;
   }
 
   function prove(a,b){
@@ -124,29 +124,29 @@ function machine(k){
       if(x.head===y.head&&x.args.length===y.args.length&&x.args.every((q,i)=>q===y.args[i]))continue;
 
       const a0=x.head.term,b0=y.head.term;
-      if(!Array.isArray(a0)||!Array.isArray(b0)||a0[0]!==b0[0])throw ABORT;
+      if(!Array.isArray(a0)||!Array.isArray(b0)||a0[0]!==b0[0]){stats.lastAbort="head-tag";throw ABORT;}
 
       if(a0[0]==="const"){
-        if(a0[1]!==b0[1]||!sameLevels(a0[2],b0[2])||x.args.length!==y.args.length)throw ABORT;
+        if(a0[1]!==b0[1]||!sameLevels(a0[2],b0[2])||x.args.length!==y.args.length){stats.lastAbort="const-mismatch";throw ABORT;}
         const d=k.env.get(a0[1]);
         if(d?.kind==="ctor")stats.ctorPairs++;else stats.rigidPairs++;
         for(let i=x.args.length-1;i>=0;i--)work.push([x.args[i],y.args[i]]);
         continue;
       }
       if(a0[0]==="nat"||a0[0]==="strlit"){
-        if(a0[1]!==b0[1]||x.args.length||y.args.length)throw ABORT;
+        if(a0[1]!==b0[1]||x.args.length||y.args.length){stats.lastAbort="literal-mismatch";throw ABORT;}
         stats.rigidPairs++;continue;
       }
       if(a0[0]==="sort"){
-        if(JSON.stringify(a0[1])!==JSON.stringify(b0[1])||x.args.length||y.args.length)throw ABORT;
+        if(JSON.stringify(a0[1])!==JSON.stringify(b0[1])||x.args.length||y.args.length){stats.lastAbort="sort-mismatch";throw ABORT;}
         stats.rigidPairs++;continue;
       }
-      throw ABORT;
+      stats.lastAbort="unsupported-head:"+a0[0];throw ABORT;
     }
-    if(work.length||stats.ctorPairs===0)throw ABORT;
+    if(work.length||stats.ctorPairs===0){stats.lastAbort=work.length?"work-left":"no-ctor";throw ABORT;}
     return stats;
   }
-  return {prove};
+  return {prove,stats};
 }
 
 p.equal=function(a,b,ctx=[]){
@@ -154,14 +154,17 @@ p.equal=function(a,b,ctx=[]){
   this.__closedClosureStats??={attempts:0,successes:0,aborts:0,ops:0,ctorPairs:0,whnfHits:0,recs:0,beta:0};
   this.__closedClosureStats.attempts++;
   const snap={steps:this.steps,budget:this.budget,frontier:this.conversionFrontier};
+  const m=machine(this);
   try{
-    const st=machine(this).prove(a,b);
+    const st=m.prove(a,b);
     this.__closedClosureStats.successes++;
     for(const q of ["ops","ctorPairs","whnfHits","recs","beta"])this.__closedClosureStats[q]+=st[q]??0;
     return;
   }catch(err){
     if(err!==ABORT&&!(err instanceof Stop)&&!(err instanceof RangeError))throw err;
     this.__closedClosureStats.aborts++;
+    this.__closedClosureStats.abortOps=(this.__closedClosureStats.abortOps??0)+(m.stats.ops??0);
+    this.__closedClosureStats.lastAbort=m.stats.lastAbort??"unknown";
     this.steps=snap.steps;this.budget=snap.budget;this.conversionFrontier=snap.frontier;
     return equal0.call(this,a,b,ctx);
   }
