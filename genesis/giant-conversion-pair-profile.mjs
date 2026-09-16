@@ -60,7 +60,16 @@ for(const name of ["init-prelude","perf/grind-ring-5"]){
   p.run=function(...xs){seen.push(this);return capture.apply(this,xs);};
   const input=readFileSync(new URL("../_build/tests/"+name+".ndjson",import.meta.url),"utf8");
   let r;try{r=K.checkExport(input,CAPS,1_000_000);}finally{p.run=run0;}
-  let best=null;for(const k of seen)if(k.__largestConv&&(!best||k.__largestConv.size>best.size))best=k.__largestConv;
+  let best=null;
+  for(const k of seen){
+    const q=k.__lastExactConversionPair;
+    if(q){
+      const lb=JSON.stringify(q.left).length,rb=JSON.stringify(q.right).length;
+      const x={a:q.left,b:q.right,ctxDepth:q.ctxDepth,step:q.step,leftBytes:lb,rightBytes:rb,size:lb+rb};
+      if(!best||x.size>best.size)best=x;
+    }
+    if(k.__largestConv&&(!best||k.__largestConv.size>best.size))best=k.__largestConv;
+  }
   const out={name,status:r.status,reason:r.reason,steps:r.steps??null,frontier:r.frontier_declaration??null};
   if(best){
     Object.assign(out,{capturedStep:best.step,ctxDepth:best.ctxDepth,leftBytes:best.leftBytes,rightBytes:best.rightBytes,
