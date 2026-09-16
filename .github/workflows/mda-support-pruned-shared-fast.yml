@@ -1,0 +1,25 @@
+name: MDA support pruned shared fast
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/support-pruned-substitution-layer.mjs'
+      - 'genesis/support-pruned-shared-only.mjs'
+      - 'genesis/compiled-dynamic-slot-layer.mjs'
+      - 'genesis/recursor-core-first-layer.mjs'
+      - '.github/workflows/mda-support-pruned-shared-fast.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fast:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build shared witness
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-test perf/shared-subterm
+      - name: Test exact support pruned substitution
+        run: timeout 180s node --stack-size=32768 genesis/support-pruned-shared-only.mjs
