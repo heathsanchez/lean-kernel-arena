@@ -13,7 +13,7 @@ const C=(term,env)=>({term,env});
 function ensure(k){
   k.__privateSupport??=new WeakMap();
   k.__privateStats??={queries:0,targetCalls:0,closureSteps:0,beta:0,defs:0,recs:0,
-    vars:0,lets:0,materialized:0,reusedClosed:0,reusedNoEnv:0,paramChecks:0,maxEnv:0,maxArgs:0};
+    vars:0,lets:0,materialized:0,reusedClosed:0,reusedNoEnv:0,materializeHits:0,materializeStores:0,paramChecks:0,maxEnv:0,maxArgs:0};
 }
 function spine(e){
   const args=[];let h=e;
@@ -66,36 +66,51 @@ function support(k,e){
   }
   k.__privateSupport.set(e,n);return n;
 }
+function materializeMap(k,e,env){
+  k.__privateMaterialize??=new WeakMap();
+  let byEnv=k.__privateMaterialize.get(e);
+  if(!byEnv){byEnv=new WeakMap();k.__privateMaterialize.set(e,byEnv);}
+  let byDepth=byEnv.get(env);
+  if(!byDepth){byDepth=new Map();byEnv.set(env,byDepth);}
+  return byDepth;
+}
 function materialize(k,cl,depth=0){
   const e=cl.term,env=cl.env;ensure(k);
   if(!Array.isArray(e))return e;
   if(env.length===0){k.__privateStats.reusedNoEnv++;return e;}
   const sup=support(k,e);
   if(sup===0){k.__privateStats.reusedClosed++;return e;}
+  const cache=materializeMap(k,e,env);
+  if(cache.has(depth)){k.__privateStats.materializeHits++;return cache.get(depth);}
   k.tick();k.__privateStats.materialized++;
+  let out;
   switch(e[0]){
-    case "sort":case "const":case "nat":case "strlit":return e;
+    case "sort":case "const":case "nat":case "strlit":out=e;break;
     case "var":{
-      const i=e[1];if(i<depth)return e;
+      const i=e[1];
+      if(i<depth){out=e;break;}
       const j=i-depth;
       if(j<env.length){
-        let out=materialize(k,env[j],0);
+        out=materialize(k,env[j],0);
         if(depth!==0&&support(k,out)!==0)out=k.shift(out,depth);
-        return out;
+      }else{
+        const ni=depth+(j-env.length);out=ni===i?e:k.make("var",ni);
       }
-      const ni=depth+(j-env.length);return ni===i?e:k.make("var",ni);
+      break;
     }
     case "pi":case "lam":
-      return k.make(e[0],materialize(k,C(e[1],env),depth),materialize(k,C(e[2],env),depth+1));
+      out=k.make(e[0],materialize(k,C(e[1],env),depth),materialize(k,C(e[2],env),depth+1));break;
     case "app":
-      return k.make("app",materialize(k,C(e[1],env),depth),materialize(k,C(e[2],env),depth));
+      out=k.make("app",materialize(k,C(e[1],env),depth),materialize(k,C(e[2],env),depth));break;
     case "proj":
-      return k.make("proj",e[1],e[2],materialize(k,C(e[3],env),depth));
+      out=k.make("proj",e[1],e[2],materialize(k,C(e[3],env),depth));break;
     case "let":
-      return k.make("let",materialize(k,C(e[1],env),depth),materialize(k,C(e[2],env),depth),
-        materialize(k,C(e[3],env),depth+1));
+      out=k.make("let",materialize(k,C(e[1],env),depth),materialize(k,C(e[2],env),depth),
+        materialize(k,C(e[3],env),depth+1));break;
     default:return null;
   }
+  cache.set(depth,out);k.__privateStats.materializeStores++;
+  return out;
 }
 function materializeState(k,state){
   let out=materialize(k,state.head,0);
@@ -189,6 +204,7 @@ function reduceTarget(k,body,arg){
 p.run=function(...args){
   this.__privateSupport=new WeakMap();
   this.__privateMask=new WeakMap();
+  this.__privateMaterialize=new WeakMap();
   this.__privateStats={queries:0,targetCalls:0,closureSteps:0,beta:0,defs:0,recs:0,
     vars:0,lets:0,materialized:0,reusedClosed:0,reusedNoEnv:0,paramChecks:0,maxEnv:0,maxArgs:0};
   this.__privateWhnfDepth=0;
