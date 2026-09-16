@@ -515,7 +515,9 @@ class Kernel {
       this.need("universes");validateLevel(e[1],this.params,()=>this.tick());
     } else if(e[0]==="nat") {
       this.need("nat-literals");
-      if(!Number.isSafeInteger(e[1])||e[1]<0) this.reject("malformed-nat-literal");
+      if(!((Number.isSafeInteger(e[1])&&e[1]>=0)||
+         (typeof e[1]==="string"&&/^(0|[1-9][0-9]*)$/.test(e[1]))))
+        this.reject("malformed-nat-literal");
     } else if(e[0]==="strlit") {
       this.need("string-literals");
       if(typeof e[1]!=="string") this.reject("malformed-string-literal");
@@ -595,7 +597,9 @@ class Kernel {
     if(e[0]==="nat") {
       this.need("nat-literals");
       const zero=["const",leanName("Nat","zero")],succ=["const",leanName("Nat","succ")];
-      return e[1]===0?zero:this.make("app",succ,this.make("nat",e[1]-1));
+      if(e[1]===0||e[1]==="0") return zero;
+      const pred=typeof e[1]==="number"?e[1]-1:(BigInt(e[1])-1n).toString();
+      return this.make("app",succ,this.make("nat",pred));
     }
     if(e[0]==="proj") {
       this.need("projections");
@@ -1033,8 +1037,8 @@ function checkExport(input,capabilities,budget=200000) {
         else if(tag==="natVal"&&typeof v==="string"&&/^[0-9]+$/.test(v)) {
           if(!capabilities.includes("nat-literals")) fail("expression-frontier:natVal");
           const n=Number(v);
-          if(!Number.isSafeInteger(n)) fail("nat-literal-budget");
-          e=NatLit(n);
+          const canon=v.replace(/^0+(?=[0-9])/,"");
+          e=NatLit(Number.isSafeInteger(n)?n:canon);
         } else if(tag==="strVal") {
           if(!capabilities.includes("string-literals")) fail("expression-frontier:strVal");
           if(typeof v!=="string") reject("malformed-string-literal");
