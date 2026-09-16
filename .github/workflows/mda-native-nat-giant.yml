@@ -6,6 +6,7 @@ on:
     paths:
       - 'genesis/native-nat-reduction-layer.mjs'
       - 'genesis/native-nat-separator.mjs'
+      - 'experiments/ctoridx-shape.mjs'
       - '.github/workflows/mda-native-nat-giant.yml'
   workflow_dispatch:
 
@@ -27,6 +28,8 @@ jobs:
             _build/tests/perf/shared-subterm.ndjson
           key: giant-frontier-e00d4ce4fb0fa667f632e624adbbc2e6a42704db0556aaf2f154e50f6e450aca
           fail-on-cache-miss: true
+      - name: Inspect ctorIdx shape
+        run: node experiments/ctoridx-shape.mjs
       - name: Run native Nat separator
         env:
           MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
