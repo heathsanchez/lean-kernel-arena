@@ -32,7 +32,7 @@ p.whnf=function(e){
     const {h,args}=rawSpine(e);
     if(h?.[0]==="const"){
       if(h[1]===SUCC&&args.length===1){
-        const a=natVal(args[0]);
+        const wa=whnf0.call(this,args[0]),a=natVal(wa);
         if(a!==null){
           this.need("nat-literals"); this.need("reduction");
           this.__nativeNatHits=(this.__nativeNatHits??0)+1;
@@ -40,7 +40,10 @@ p.whnf=function(e){
         }
       }
       if(args.length===2 && [ADD,SUB,MUL,BEQ,BLE].includes(h[1])){
-        const a=natVal(args[0]),b=natVal(args[1]);
+        // Lean's reduce_bin_nat_op / reduce_bin_nat_pred first put both
+        // operands in WHNF, then recognize Nat.zero or primitive Nat literals.
+        const wa=whnf0.call(this,args[0]),wb=whnf0.call(this,args[1]);
+        const a=natVal(wa),b=natVal(wb);
         if(a!==null&&b!==null){
           this.need("nat-literals"); this.need("reduction");
           this.__nativeNatHits=(this.__nativeNatHits??0)+1;
