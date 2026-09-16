@@ -24,6 +24,13 @@ function rawSpine(e){
   while(Array.isArray(h)&&h[0]==="app"){args.push(h[2]);h=h[1];}
   args.reverse();return {h,args};
 }
+function multiBetaCount(e){
+  let n=0,cur=e;
+  while(Array.isArray(cur)&&cur[0]==="app"&&Array.isArray(cur[1])&&cur[1][0]==="lam"){
+    n++;cur=cur[1][2];
+  }
+  return n;
+}
 function primitiveName(h){
   if(!Array.isArray(h))return null;
   if(h[0]==="const")return h[1];
@@ -61,14 +68,13 @@ function tryPrimitive(kernel,head,args,operandWhnf){
 }
 
 // The retained multi-beta machine is a private execution path. If it exposes a
-// primitive only after beta/let reduction, preserve that head long enough for
-// the same retained native rule above to see its operands. The full-stack
-// recursor path already has independent literal-major rules and is deliberately
-// left unchanged. The marker is internal to one WHNF call and is never returned.
+// primitive only after compiling two or more raw beta redexes, preserve that
+// head long enough for the same retained native rule above to see its operands.
+// No marker is installed for ordinary WHNF, single beta, or full-stack paths.
 // If operands are not reducible natural values, replay the exact historical
 // unfolding path instead of inventing a partial result.
 p.instantiateDeclaration=function(ref,term){
-  if(this._fullStackSafe!==true && (this.__nativeNatBridgeDepth??0)>0 && !(this.__nativeNatBypass>0) &&
+  if((this.__nativeNatBridgeDepth??0)>0 && !(this.__nativeNatBypass>0) &&
      Array.isArray(ref)&&ref[0]==="const"&&PRIMITIVES.has(ref[1]))
     return [NATIVE_MARKER,ref[1],ref[2]??[]];
   return instantiate0.call(this,ref,term);
@@ -82,6 +88,9 @@ p.whnf=function(e){
     const direct=tryPrimitive(this,h,args,arg=>whnf0.call(this,arg));
     if(direct!==null)return direct;
   }
+
+  const bridge=this._fullStackSafe!==true && multiBetaCount(e)>=2;
+  if(!bridge)return whnf0.call(this,e);
 
   this.__nativeNatBridgeDepth=(this.__nativeNatBridgeDepth??0)+1;
   let reduced;
