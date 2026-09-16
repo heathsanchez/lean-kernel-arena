@@ -484,13 +484,20 @@ class Kernel {
     this.params=new Set(rec.levelParams);
     const derived=this.deriveTypeRecursor(d,ctorInfos,rec,motiveLevel);
     if(!this.same(rec.type,derived.recType)) { if(!Array.isArray(rec.type)||!Array.isArray(derived.recType)||rec.type[0]!==derived.recType[0]) this.reject("recursor-type:"+d.name); this.equal(rec.type,derived.recType,[]); }
+
+    // Recursive rule bodies legitimately mention the recursor being defined.
+    // Validate its independently derived type before making that name visible,
+    // then expose only the type while checking the exported rule equations.
+    // No reduction rule exists until every rule has passed.
+    this.validate(derived.recType); this.sortOf(derived.recType,[]);
+    this.env.set(rec.name,{kind:"axiom",name:rec.name,type:derived.recType,levelParams:rec.levelParams,
+      __recursorValidationPlaceholder:true});
     for(let i=0;i<rec.rules.length;i++) {
       const rr=rec.rules[i];
       if(rr.ctor!==ctorInfos[i].name||rr.nfields!==ctorInfos[i].numFields)
         this.reject("recursor-rule-metadata");
       if(!this.same(rr.rhs,derived.ruleBodies[i])) { if(!Array.isArray(rr.rhs)||!Array.isArray(derived.ruleBodies[i])||rr.rhs[0]!==derived.ruleBodies[i][0]) this.reject("recursor-rule-"+i); this.equal(rr.rhs,derived.ruleBodies[i],[]); }
     }
-    this.validate(derived.recType); this.sortOf(derived.recType,[]);
     this.env.set(rec.name,{kind:"rec",name:rec.name,type:derived.recType,levelParams:rec.levelParams,
       numParams:d.numParams,numIndices:d.numIndices,numMinors:d.ctors.length,rules:rec.rules,
       induct:d.name,k:rec.k});
