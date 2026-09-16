@@ -1029,6 +1029,9 @@ class LocalDefKernel extends Kernel {
 const API={Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,StrLit,Proj};
 
 function checkExport(input,capabilities,budget=200000) {
+  // Beyond this depth, recursive app/lambda inference risks host stack and
+  // repeated beta work; use the existing explicit continuation evaluator first.
+  const CONTINUATION_FIRST_DEPTH=512;
   const start=Date.now();let parsed=0,frontierInductive=null;
   const envLimit=(name,fallback)=>{
     const raw=typeof process!=="undefined"?process.env?.[name]:undefined;
@@ -1042,7 +1045,8 @@ function checkExport(input,capabilities,budget=200000) {
     ...(frontierInductive?{frontier_inductive:frontierInductive}:{})});
   if(!capabilities.length) return out(UNKNOWN,"empty-present");
   if(input.length>inputByteLimit) return out(UNKNOWN,"input-budget");
-  const names=new Map([[0,"[]"]]),levels=new Map([[0,0]]),exprs=new Map(),decls=[];
+  const names=new Map([[0,"[]"]]),levels=new Map([[0,0]]),exprs=new Map(),exprDepths=new Map(),decls=[];
+  let maxExpressionDepth=0;
   const fail=reason=>{throw new Stop(UNKNOWN,reason);};
   const reject=reason=>{throw new Stop(REJECT,reason);};
   const get=(m,n)=>{if(!Number.isSafeInteger(n)||n<0||!m.has(n)) fail("unresolved-reference");return m.get(n);};
@@ -1078,14 +1082,15 @@ function checkExport(input,capabilities,budget=200000) {
           put(levels,row.il,["param",get(names,v)]);
         } else fail("universe-frontier");
       } else if(refs[0]==="ie") {
-        let e;
+        let e,depth=1;
+        const childDepth=(...ids)=>1+Math.max(...ids.map(id=>get(exprDepths,id)));
         if(tag==="sort") e=S(get(levels,v));
         else if(tag==="bvar" && Number.isSafeInteger(v)&&v>=0) e=V(v);
         else if(tag==="const" && v && Array.isArray(v.us)) e=v.us.length?["const",get(names,v.name),v.us.map(u=>get(levels,u))]:["const",get(names,v.name)];
-        else if((tag==="lam"||tag==="forallE")&&v) e=[tag==="lam"?"lam":"pi",get(exprs,v.type),get(exprs,v.body)];
-        else if(tag==="app"&&v) e=App(get(exprs,v.fn),get(exprs,v.arg));
-        else if(tag==="letE"&&v&&typeof v.nondep==="boolean") e=Let(get(exprs,v.type),get(exprs,v.value),get(exprs,v.body));
-        else if(tag==="mdata"&&v) e=get(exprs,v.expr);
+        else if((tag==="lam"||tag==="forallE")&&v) {e=[tag==="lam"?"lam":"pi",get(exprs,v.type),get(exprs,v.body)];depth=childDepth(v.type,v.body);}
+        else if(tag==="app"&&v) {e=App(get(exprs,v.fn),get(exprs,v.arg));depth=childDepth(v.fn,v.arg);}
+        else if(tag==="letE"&&v&&typeof v.nondep==="boolean") {e=Let(get(exprs,v.type),get(exprs,v.value),get(exprs,v.body));depth=childDepth(v.type,v.value,v.body);}
+        else if(tag==="mdata"&&v) {e=get(exprs,v.expr);depth=get(exprDepths,v.expr);}
         else if(tag==="natVal"&&typeof v==="string"&&/^[0-9]+$/.test(v)) {
           if(!capabilities.includes("nat-literals")) fail("expression-frontier:natVal");
           const n=Number(v);
@@ -1098,9 +1103,10 @@ function checkExport(input,capabilities,budget=200000) {
         } else if(tag==="proj"&&v) {
           if(!capabilities.includes("projections")) fail("expression-frontier:proj");
           if(!Number.isSafeInteger(v.idx)||v.idx<0) reject("malformed-projection");
-          e=Proj(get(names,v.typeName),v.idx,get(exprs,v.struct));
+          e=Proj(get(names,v.typeName),v.idx,get(exprs,v.struct));depth=childDepth(v.struct);
         } else fail("expression-frontier:"+tag);
         put(exprs,row.ie,e);
+        put(exprDepths,row.ie,depth);maxExpressionDepth=Math.max(maxExpressionDepth,depth);
       } else if(tag==="quot") {
         if(!capabilities.includes("quotients")) fail("declaration-frontier:quot");
         if(!v || !quotKinds.includes(v.kind) || !Array.isArray(v.levelParams) ||
@@ -1199,6 +1205,13 @@ function checkExport(input,capabilities,budget=200000) {
     }
     if(!header) fail("missing-header");
     if(quotStage!==0 && quotStage!==quotKinds.length) reject("quotient-package-incomplete");
+    const deepContinuationFirst=maxExpressionDepth>CONTINUATION_FIRST_DEPTH;
+    let firstAttempt=null;
+    if(deepContinuationFirst) {
+      firstAttempt=new LocalDefKernel(capabilities,budget).run(S(0),S(1),decls);
+      if(firstAttempt.status!==UNKNOWN) return {...firstAttempt,execution_order:"local-def-first",
+        max_expression_depth:maxExpressionDepth,parse_records:parsed,elapsed_ms:Date.now()-start};
+    }
     const retained=new Kernel(capabilities,budget).run(S(0),S(1),decls);
     let result=retained;
     let stackAttempt=null;
@@ -1216,7 +1229,7 @@ function checkExport(input,capabilities,budget=200000) {
       }
     }
 
-    if(result.status===UNKNOWN) {
+    if(result.status===UNKNOWN && !deepContinuationFirst) {
       const local=new LocalDefKernel(capabilities,budget).run(S(0),S(1),decls);
       if(local.status!==UNKNOWN) {
         result={...local,fallback_mode:"local-def",retained_reason:retained.reason,
@@ -1231,6 +1244,11 @@ function checkExport(input,capabilities,budget=200000) {
           fallback_attempt_steps:local.steps??null};
       }
     }
+    if(deepContinuationFirst) {
+      result={...result,execution_order:"local-def-first",max_expression_depth:maxExpressionDepth,
+        first_attempt_reason:firstAttempt.reason,first_attempt_steps:firstAttempt.steps??null,
+        ...(result.status!==UNKNOWN?{fallback_mode:result.fallback_mode??"retained"}:{})};
+    }
     return {...result,parse_records:parsed,elapsed_ms:Date.now()-start};
   } catch(e) {
     if(e instanceof Stop) return out(e.status,e.message);
@@ -1242,4 +1260,3 @@ function checkExport(input,capabilities,budget=200000) {
 }
 
 export {levelsEqual,levelSucc,levelIMax,quotientType,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,StrLit,Proj,checkExport};
-

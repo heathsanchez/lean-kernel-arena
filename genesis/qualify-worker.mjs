@@ -17,6 +17,11 @@ try {
   const result=checkExport(data.toString("utf8"),config);
   console.log(JSON.stringify({status:result.status,reason:result.reason??null,
     frontier:result.frontier_declaration??null,steps:result.steps??null,
+    execution_order:result.execution_order??"retained-first",
+    max_expression_depth:result.max_expression_depth??null,
+    fallback_mode:result.fallback_mode??null,
+    first_attempt_reason:result.first_attempt_reason??null,
+    first_attempt_steps:result.first_attempt_steps??null,
     elapsed:Date.now()-started,crash:null,timeout:false,runtime_sha256}));
 } catch(error) {
   console.log(JSON.stringify({status:null,reason:null,frontier:null,steps:null,
