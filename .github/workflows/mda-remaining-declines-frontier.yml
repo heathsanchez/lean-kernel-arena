@@ -8,6 +8,8 @@ on:
       - 'genesis/remaining-declines-frontier.mjs'
       - 'genesis/giant-inductive-envelope-census.mjs'
       - 'genesis/kernel-base.mjs'
+      - 'genesis/structural-normal-cache-layer.mjs'
+      - 'genesis/structural-normal-separator.mjs'
       - 'experiments/parserdescr-envelope.mjs'
       - 'genesis/nested-envelope.mjs'
       - 'genesis/projection-congruence-recovery.mjs'
@@ -103,6 +105,11 @@ jobs:
           MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
           MATHGRAPH_RECORD_LIMIT: "250000"
         run: timeout 120s node --stack-size=32768 genesis/giant-whnf-head-profile.mjs
+      - name: Test structural normal consequence on giants
+        env:
+          MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
+          MATHGRAPH_RECORD_LIMIT: "250000"
+        run: timeout 180s node --stack-size=32768 genesis/structural-normal-separator.mjs
       - name: Preserve evidence
         if: always()
         uses: actions/upload-artifact@v4
