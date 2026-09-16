@@ -12,6 +12,7 @@ on:
       - 'genesis/projection-congruence-recovery.mjs'
       - 'genesis/kernel.mjs'
       - 'genesis/giant-exact-whnf-separator.mjs'
+      - 'genesis/giant-le-prefix-profile.mjs'
       - 'genesis/giant-whnf-head-profile.mjs'
       - 'genesis/exact-whnf-cache-layer.mjs'
       - '.github/workflows/mda-remaining-declines-frontier.yml'
@@ -71,6 +72,11 @@ jobs:
           MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
           MATHGRAPH_RECORD_LIMIT: "250000"
         run: timeout 120s node --stack-size=32768 genesis/giant-exact-whnf-separator.mjs
+      - name: Measure LE.le structural prefix reuse
+        env:
+          MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
+          MATHGRAPH_RECORD_LIMIT: "250000"
+        run: timeout 120s node --stack-size=32768 genesis/giant-le-prefix-profile.mjs
       - name: Profile giant WHNF heads
         env:
           MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
