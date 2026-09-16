@@ -47,12 +47,16 @@ for(const name of ["init-prelude","perf/grind-ring-5"]){
   const out={name,status:r.status,reason:r.reason,steps:r.steps??null,frontier:r.frontier_declaration??null};
   if(q){
     const owner=seen.find(k=>k.__rigidReject===q);
-    let lw=null,rw=null,lt=null,rt=null,whnfError=null,inferError=null;
+    let lw=null,rw=null,ln=null,rn=null,lc=null,rc=null,lt=null,rt=null,whnfError=null,inferError=null;
     if(owner){
       const oldSteps=owner.steps,oldBudget=owner.budget;
       try{
         owner.steps=0;owner.budget=2_000_000;
         lw=owner.whnf(q.a);rw=owner.whnf(q.b);
+        if(q.a?.[0]==="app"&&q.b?.[0]==="app"){
+          lc=owner.whnf(q.a[2]);rc=owner.whnf(q.b[2]);
+          ln=owner.normal(q.a[2]);rn=owner.normal(q.b[2]);
+        }
         try{lt=owner.infer(q.a,q.ctx);rt=owner.infer(q.b,q.ctx);}
         catch(e){inferError=String(e?.message??e);}
       }catch(e){whnfError=String(e?.message??e);}
@@ -62,6 +66,10 @@ for(const name of ["init-prelude","perf/grind-ring-5"]){
       leftHead:rawHead(q.a),rightHead:rawHead(q.b),leftNodes:count(q.a),rightNodes:count(q.b),
       leftWhnfHead:lw?rawHead(lw):null,rightWhnfHead:rw?rawHead(rw):null,
       leftWhnf:lw?JSON.stringify(lw).slice(0,7000):null,rightWhnf:rw?JSON.stringify(rw).slice(0,7000):null,
+      leftChildWhnfHead:lc?rawHead(lc):null,rightChildWhnfHead:rc?rawHead(rc):null,
+      leftChildWhnf:lc?JSON.stringify(lc).slice(0,7000):null,rightChildWhnf:rc?JSON.stringify(rc).slice(0,7000):null,
+      leftChildNormalHead:ln?rawHead(ln):null,rightChildNormalHead:rn?rawHead(rn):null,
+      leftChildNormal:ln?JSON.stringify(ln).slice(0,7000):null,rightChildNormal:rn?JSON.stringify(rn).slice(0,7000):null,
       leftTypeHead:lt?rawHead(lt):null,rightTypeHead:rt?rawHead(rt):null,
       leftType:lt?JSON.stringify(lt).slice(0,7000):null,rightType:rt?JSON.stringify(rt).slice(0,7000):null,
       whnfError,inferError,leftBytes:JSON.stringify(q.a).length,rightBytes:JSON.stringify(q.b).length,
