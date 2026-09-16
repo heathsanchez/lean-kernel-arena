@@ -2,6 +2,7 @@ import {checkExport as kernelCheckExport} from "./kernel.mjs";
 import "./compiled-representation-reuse-layer.mjs";
 import "./native-nat-reduction-layer.mjs";
 import "./nat-offset-defeq-layer.mjs";
+import "./support-metadata-layer.mjs";
 import "./exact-binder-transport-layer.mjs";
 import "./compiled-nat-pow-layer.mjs";
 import "./compiled-semantic-consequence-layer.mjs";
