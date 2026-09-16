@@ -1,0 +1,42 @@
+import {readFileSync} from "node:fs";
+import * as K from "./kernel.mjs";
+import "./verified-ctoridx-consequence-layer.mjs";
+import "./native-nat-reduction-layer.mjs";
+import "./nat-offset-defeq-layer.mjs";
+
+const CAPS=["sort","binders","application","reduction","declarations","universes","theorems",
+"proof-irrelevance","function-eta","inductive-envelope","single-inductives","reflexive-inductives",
+"inductive-reduction","rule-k","unit-eta","prop-inductives","nat-literals","string-literals",
+"quotients","projections","structure-eta","rigid-conversion","opaque-declarations"];
+
+const p=K.Kernel.prototype;
+const methods=["validate","shift","substitute","lowerBound","whnf","same","normal","proofType","equal",
+"instantiateDeclaration","sortOf","infer","inferProjection","getApp","make"];
+const originals=new Map();
+for(const n of methods){
+ if(typeof p[n]!=="function")continue;
+ const f=p[n];originals.set(n,f);
+ p[n]=function(...args){
+  this.__nativeProfile??={stack:[],calls:{},ticks:{}};
+  const q=this.__nativeProfile;q.calls[n]=(q.calls[n]??0)+1;q.stack.push(n);
+  try{return f.apply(this,args);}finally{q.stack.pop();}
+ };
+}
+const tick0=p.tick;
+p.tick=function(...args){
+ this.__nativeProfile??={stack:[],calls:{},ticks:{}};
+ const q=this.__nativeProfile,n=q.stack.at(-1)??"<other>";
+ q.ticks[n]=(q.ticks[n]??0)+1;
+ return tick0.apply(this,args);
+};
+const result0=p.result;
+p.result=function(...args){const r=result0.apply(this,args);r.__nativeProfile=this.__nativeProfile??null;return r;};
+
+for(const name of ["init-prelude","perf/grind-ring-5"]){
+ const input=readFileSync(new URL("../_build/tests/"+name+".ndjson",import.meta.url),"utf8");
+ const t0=Date.now(),r=K.checkExport(input,CAPS,1_000_000),q=r.__nativeProfile;
+ const top=q?Object.entries(q.ticks).sort((a,b)=>b[1]-a[1]).slice(0,16)
+  .map(([op,ticks])=>({op,ticks,calls:q.calls[op]??0,share:ticks/Math.max(1,r.steps??1)})):[];
+ console.log("NATIVE_GIANT_PROFILE "+JSON.stringify({name,status:r.status,reason:r.reason,steps:r.steps??null,
+  constructed:r.constructed??null,frontier:r.frontier_declaration??null,top,elapsed_ms:Date.now()-t0}));
+}
