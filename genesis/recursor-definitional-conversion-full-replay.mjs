@@ -86,6 +86,8 @@ const regressions=candidate.filter(c=>{
   const b=baseline.find(x=>x.name===c.name);
   return b?.status==="UNKNOWN"&&c.status!=="UNKNOWN"&&!c.correct;
 });
+const baselineWrongKey=new Set(baselineWrong.map(x=>x.name+"|"+x.status+"|"+x.reason));
+const newWrong=candidateWrong.filter(x=>!baselineWrongKey.has(x.name+"|"+x.status+"|"+x.reason));
 const summary={
   experiment:"recursor-definitional-conversion-full-protected-replay",
   budget:BUDGET,total:baseline.length,
