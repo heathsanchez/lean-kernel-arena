@@ -33,14 +33,25 @@ p.equal=function(a,b,ctx=[]){
     };
 
     let x,y;
-    try{
-      x=this.normal(a);
-      y=this.normal(b);
-    }catch(_){
-      this.steps=snap.steps;
-      this.budget=snap.budget;
-      this.conversionFrontier=snap.frontier;
-      throw original;
+    // The retained converter reaches conversion-frontier only after it has
+    // already normalized both operands exactly. Reuse that completed work
+    // instead of normalizing the same giant terms a second time.
+    const witnessed=this.__lastExactConversionPair;
+    if(witnessed && witnessed.ctxDepth===ctx.length &&
+       Array.isArray(witnessed.left) && Array.isArray(witnessed.right)) {
+      x=witnessed.left;
+      y=witnessed.right;
+      this.__projectionRecoveryWitnessHits=(this.__projectionRecoveryWitnessHits??0)+1;
+    } else {
+      try{
+        x=this.normal(a);
+        y=this.normal(b);
+      }catch(_){
+        this.steps=snap.steps;
+        this.budget=snap.budget;
+        this.conversionFrontier=snap.frontier;
+        throw original;
+      }
     }
 
     if(!Array.isArray(x)||!Array.isArray(y)||
