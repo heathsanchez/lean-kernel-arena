@@ -102,8 +102,10 @@ function machine(k){
       const rs=rawSpine(e),rh=rs.h,rargs=rs.args;
       if(!Array.isArray(rh)||rh[0]!=="const")throw 0;
       const rd=k.env.get(rh[1]);
-      if(rd?.kind!=="rec"||rd.numParams!==0||rd.numIndices!==0||rd.numMinors!==2||
-         (rd.levelParams??[]).length!==0)throw 0;
+      if(rd?.kind!=="rec"||rd.numParams!==0||rd.numIndices!==0||rd.numMinors!==2)throw 0;
+      const rus=rh[2]??[];
+      if(rus.length!==(rd.levelParams??[]).length||
+         rus.some(u=>typeof u!=="number"||u!==0))throw 0;
       if(rargs.length!==4)throw 0;
       const ind=k.env.get(rd.induct);
       if(ind?.kind!=="inductive"||ind.numParams!==0||ind.numIndices!==0||
