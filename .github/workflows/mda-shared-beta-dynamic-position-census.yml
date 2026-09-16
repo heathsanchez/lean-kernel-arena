@@ -1,0 +1,28 @@
+name: MDA shared beta dynamic position census
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/shared-beta-dynamic-position-census.mjs'
+      - '.github/workflows/mda-shared-beta-dynamic-position-census.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  census:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - name: Build shared-subterm
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: ./lka.py build-test perf/shared-subterm
+      - name: Measure dynamic argument position
+        run: timeout 180s node --stack-size=32768 genesis/shared-beta-dynamic-position-census.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shared-beta-dynamic-position-census
+          path: genesis/evidence/shared-beta-dynamic-position-census.json
+          if-no-files-found: error
