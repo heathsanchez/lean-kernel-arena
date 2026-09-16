@@ -17,19 +17,29 @@ import {Kernel} from "./kernel-base.mjs";
 //
 // LocalDefKernel also has one exact WHNF consequence not represented inside the
 // generic full-stack evaluator: a local definition can be exposed *after* a
-// beta/let/projection reduction. Resume that already-verified rule before
-// returning the iterative result; do not treat the exposed variable as rigid.
+// beta/let/projection reduction, either bare or as the head of an application
+// spine. Resume that already-verified head reduction before returning the
+// iterative result; do not treat the local-definition head as rigid.
 const p=Kernel.prototype,retainedWhnf=p.whnf,retainedInfer=p.infer;
 
 function exposedLocalDef(k,term){
-  if(k.localDefs!==true || !Array.isArray(term) || term[0]!=="var") return null;
+  if(k.localDefs!==true || !Array.isArray(term)) return null;
+  const args=[];
+  let head=term;
+  while(Array.isArray(head) && head[0]==="app"){
+    args.push(head[2]);
+    head=head[1];
+  }
+  if(!Array.isArray(head) || head[0]!=="var") return null;
   const ctx=k._activeCtx??[];
-  if(term[1]>=ctx.length) return null;
-  const entry=ctx[ctx.length-1-term[1]];
+  if(head[1]>=ctx.length) return null;
+  const entry=ctx[ctx.length-1-head[1]];
   if(entry?.__localDef!==true) return null;
   k.tick();
   k.need("reduction");
-  return k.shift(entry.value,term[1]+1);
+  let out=k.shift(entry.value,head[1]+1);
+  for(let i=args.length-1;i>=0;i--) out=k.make("app",out,args[i]);
+  return out;
 }
 
 p.infer=function(term,ctx){
