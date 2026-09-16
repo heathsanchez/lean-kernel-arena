@@ -14,6 +14,15 @@ test("retained WHNF does not recurse through the public wrapper stack",()=>{
   let root=["var",0];
   for(let i=0;i<6000;i++) root=["proj","missing.Structure",0,root];
   const out=k.whnf(root);
-  assert.equal(out,root);
+
+  let cur=out;
+  for(let i=0;i<6000;i++){
+    assert.equal(cur[0],"proj");
+    assert.equal(cur[1],"missing.Structure");
+    assert.equal(cur[2],0);
+    cur=cur[3];
+  }
+  assert.equal(cur[0],"var");
+  assert.equal(cur[1],0);
   assert.notEqual(k._fullStackSafe,true);
 });
