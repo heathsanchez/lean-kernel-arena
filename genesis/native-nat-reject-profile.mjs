@@ -1,0 +1,31 @@
+import {readFileSync} from "node:fs";
+import * as K from "./kernel.mjs";
+import "./native-nat-reduction-layer.mjs";
+
+const CAPS=["sort","binders","application","reduction","declarations","universes","theorems",
+"proof-irrelevance","function-eta","inductive-envelope","single-inductives","reflexive-inductives",
+"inductive-reduction","rule-k","unit-eta","prop-inductives","nat-literals","string-literals",
+"quotients","projections","structure-eta","rigid-conversion","opaque-declarations"];
+
+function head(e){let h=e,args=0;while(Array.isArray(h)&&h[0]==="app"){args++;h=h[1];}
+ return Array.isArray(h)?{tag:h[0],name:h[0]==="const"?h[1]:null,args}:{tag:typeof h,args};}
+const p=K.Kernel.prototype,eq0=p.equal,run0=p.run;
+p.run=function(...xs){this.__nativeRejects=[];return run0.apply(this,xs);};
+p.equal=function(a,b,ctx=[]){
+ try{return eq0.call(this,a,b,ctx);}
+ catch(e){
+   if(e?.message==="rigid-head-mismatch"&&(this.__nativeRejects?.length??0)<8){
+     this.__nativeRejects.push({step:this.steps,ctxDepth:ctx.length,
+       aHead:head(a),bHead:head(b),aBytes:JSON.stringify(a).length,bBytes:JSON.stringify(b).length,
+       a:JSON.stringify(a).slice(0,6000),b:JSON.stringify(b).slice(0,6000)});
+   }
+   throw e;
+ }
+};
+for(const name of ["init-prelude","perf/grind-ring-5"]){
+ const seen=[],capture=p.run;p.run=function(...xs){seen.push(this);return capture.apply(this,xs);};
+ const input=readFileSync(new URL("../_build/tests/"+name+".ndjson",import.meta.url),"utf8");
+ let r;try{r=K.checkExport(input,CAPS,1_000_000);}finally{p.run=run0;}
+ console.log("NATIVE_NAT_REJECT_PROFILE "+JSON.stringify({name,status:r.status,reason:r.reason,steps:r.steps??null,
+   frontier:r.frontier_declaration??null,rejects:seen.flatMap(x=>x.__nativeRejects??[]).slice(0,8)}));
+}
