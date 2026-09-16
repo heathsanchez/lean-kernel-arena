@@ -53,7 +53,8 @@ for(const name of TARGETS){
         share:ticks/Math.max(1,r.steps??budget)})):[];
     attempts.push({budget,status:r.status,reason:r.reason,steps:r.steps??null,
       constructed:r.constructed??null,parse_records:r.parse_records??null,
-      elapsed_ms:Date.now()-t,frontier_declaration:r.frontier_declaration??null,top});
+      elapsed_ms:Date.now()-t,frontier_declaration:r.frontier_declaration??null,
+      conversion_frontier:r.conversion_frontier??null,top});
     if(r.status!=="UNKNOWN")break;
     if(!["budget-exhausted","host-stack-limit"].includes(r.reason))break;
   }
