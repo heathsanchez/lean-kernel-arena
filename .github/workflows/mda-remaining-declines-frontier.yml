@@ -1,1 +1,67 @@
-name: MDA remaining declines frontier\n\non:\n  push:\n    branches: [mda-kernel-genesis-v1]\n    paths:\n      - 'genesis/remaining-declines-frontier.mjs'\n      - 'genesis/giant-inductive-envelope-census.mjs'\n      - 'genesis/kernel-base.mjs'\n      - 'genesis/nested-envelope.mjs'\n      - '.github/workflows/mda-remaining-declines-frontier.yml'\n  workflow_dispatch:\n\npermissions:\n  contents: read\n\njobs:\n  diagnose:\n    runs-on: ubuntu-24.04\n    timeout-minutes: 20\n    steps:\n      - uses: actions/checkout@v5\n      - name: Install Nix\n        uses: cachix/install-nix-action@v31\n        with:\n          github_access_token: ${{ secrets.GITHUB_TOKEN }}\n      - name: Reconstruct retained present\n        run: timeout 30s node --stack-size=32768 genesis/test.mjs\n      - name: Restore giant witnesses\n        id: giant-cache\n        uses: actions/cache/restore@v4\n        with:\n          path: |\n            _build/tests/init-prelude.ndjson\n            _build/tests/perf/grind-ring-5.ndjson\n            _build/tests/perf/shared-subterm.ndjson\n          key: giant-frontier-${{ hashFiles('tests/init_prelude_module.lean', 'tests/perf/grind-ring-5.lean', 'tests/perf/shared-subterm.lean') }}\n      - name: Build remaining decline witnesses\n        if: steps.giant-cache.outputs.cache-hit != 'true'\n        shell: 'nix develop -c bash -euxo pipefail {0}'\n        run: |\n          ./lka.py build-test init-prelude\n          ./lka.py build-test perf/grind-ring-5\n          ./lka.py build-test perf/shared-subterm\n      - name: Save giant witnesses\n        if: steps.giant-cache.outputs.cache-hit != 'true'\n        uses: actions/cache/save@v4\n        with:\n          path: |\n            _build/tests/init-prelude.ndjson\n            _build/tests/perf/grind-ring-5.ndjson\n            _build/tests/perf/shared-subterm.ndjson\n          key: giant-frontier-${{ hashFiles('tests/init_prelude_module.lean', 'tests/perf/grind-ring-5.lean', 'tests/perf/shared-subterm.lean') }}\n      - name: Census giant inductive envelope\n        run: node genesis/giant-inductive-envelope-census.mjs\n      - name: Diagnose current frontier\n        env:\n          MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"\n          MATHGRAPH_RECORD_LIMIT: "250000"\n        run: timeout 300s node --stack-size=32768 genesis/remaining-declines-frontier.mjs\n      - name: Preserve evidence\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: remaining-declines-frontier-${{ github.sha }}\n          path: genesis/evidence/remaining-declines-current-frontier.json\n          if-no-files-found: error\n
+name: MDA remaining declines frontier
+
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/remaining-declines-frontier.mjs'
+      - 'genesis/giant-inductive-envelope-census.mjs'
+      - 'genesis/kernel-base.mjs'
+      - 'genesis/nested-envelope.mjs'
+      - '.github/workflows/mda-remaining-declines-frontier.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Reconstruct retained present
+        run: timeout 30s node --stack-size=32768 genesis/test.mjs
+      - name: Restore giant witnesses
+        id: giant-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            _build/tests/init-prelude.ndjson
+            _build/tests/perf/grind-ring-5.ndjson
+            _build/tests/perf/shared-subterm.ndjson
+          key: giant-frontier-${{ hashFiles('tests/init_prelude_module.lean', 'tests/perf/grind-ring-5.lean', 'tests/perf/shared-subterm.lean') }}
+      - name: Build remaining decline witnesses
+        if: steps.giant-cache.outputs.cache-hit != 'true'
+        shell: 'nix develop -c bash -euxo pipefail {0}'
+        run: |
+          ./lka.py build-test init-prelude
+          ./lka.py build-test perf/grind-ring-5
+          ./lka.py build-test perf/shared-subterm
+      - name: Save giant witnesses
+        if: steps.giant-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            _build/tests/init-prelude.ndjson
+            _build/tests/perf/grind-ring-5.ndjson
+            _build/tests/perf/shared-subterm.ndjson
+          key: giant-frontier-${{ hashFiles('tests/init_prelude_module.lean', 'tests/perf/grind-ring-5.lean', 'tests/perf/shared-subterm.lean') }}
+      - name: Census giant inductive envelope
+        run: node genesis/giant-inductive-envelope-census.mjs
+      - name: Diagnose current frontier
+        env:
+          MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
+          MATHGRAPH_RECORD_LIMIT: "250000"
+        run: timeout 300s node --stack-size=32768 genesis/remaining-declines-frontier.mjs
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: remaining-declines-frontier-${{ github.sha }}
+          path: genesis/evidence/remaining-declines-current-frontier.json
+          if-no-files-found: error
