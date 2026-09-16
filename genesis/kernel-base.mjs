@@ -842,6 +842,11 @@ class Kernel {
     const lx=JSON.stringify(x),ly=JSON.stringify(y);
     this.conversionFrontier={ctx_depth:ctx.length,left_bytes:lx.length,right_bytes:ly.length,
       left:lx.slice(0,4000),right:ly.slice(0,4000)};
+    // Diagnostic witness only. Speculative conversion layers may roll back the
+    // public frontier, but retaining the exact pair lets isolated experiments
+    // inspect the residual that triggered fallback. It is never consulted by
+    // checking semantics.
+    this.__lastExactConversionPair={left:x,right:y,ctxDepth:ctx.length,step:this.steps};
     this.unknown("conversion-frontier");
   }
   instantiateDeclaration(ref,term) {
