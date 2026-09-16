@@ -1,4 +1,5 @@
 import "./stack-safe.mjs";
+import "./whnf-reentry-trampoline-layer.mjs";
 import "./structural-cache.mjs";
 import "./structural-sharing.mjs";
 import "./normal-cache.mjs";
