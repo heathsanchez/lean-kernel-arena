@@ -26,3 +26,16 @@ test("retained WHNF reentry is stack-safe without leaving full-stack mode enable
   assert.notEqual(k._fullStackSafe,true);
   assert.notEqual(k.__whnfReentryStackSafe,true);
 });
+
+test("stack-safe WHNF reentry resumes a local definition exposed after reduction",()=>{
+  const k=kernel();
+  k.localDefs=true;
+  k._activeCtx=[{__localDef:true,type:["sort",1],value:["pi",["sort",0],["sort",0]]}];
+  // Force the same nested-WHNF entry used by the host-stack trampoline. The
+  // iterative evaluator currently treats the exposed local-def variable as
+  // rigid; exact LocalDefKernel semantics must resume it to its Pi value.
+  k.__retainedWhnfDepth=1;
+  const out=k.whnf(["var",0]);
+  assert.equal(out[0],"pi");
+  assert.deepEqual(out,["pi",["sort",0],["sort",0]]);
+});
