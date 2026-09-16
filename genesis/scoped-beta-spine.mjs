@@ -113,6 +113,7 @@ function iterativeRecWhnf(k,root){
 
   function resumeRec(fr,major){
     const {head:rh,args:rargs,d:rd,total}=fr;
+    if(major?.[0]==="nat")major=k.natLitToConstructor(major);
     const ms=flatten(major),mh=ms.head,margs=ms.args;
     const md=mh?.[0]==="const"?k.env.get(mh[1]):null;
 
@@ -152,9 +153,7 @@ function iterativeRecWhnf(k,root){
     }
 
     if(head[0]==="nat"){
-      const lit=retainedWhnf.call(k,head);
-      state=attach(lit,args);
-      continue;
+      k.tick();k.need("nat-literals");
     }
 
     if(head[0]==="lam"){
@@ -266,3 +265,4 @@ Kernel.prototype.whnf=function(e){
     this._scopedBetaDepth=0;
   }
 };
+

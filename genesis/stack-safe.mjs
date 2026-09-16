@@ -364,6 +364,7 @@ function multiBetaSpineWhnf(kernel,root) {
 
   const resumeRec=(fr,major)=>{
     const {head:rh,args:rargs,d:rd,total}=fr;
+    if(major?.[0]==="nat")major=kernel.natLitToConstructor(major);
     const ms=flatten(major),mh=ms.head,margs=ms.args;
     const md=mh?.[0]==="const"?kernel.env.get(mh[1]):null;
 
@@ -402,10 +403,7 @@ function multiBetaSpineWhnf(kernel,root) {
     }
 
     if(head[0]==="nat") {
-      // baseWhnf performs exactly one literal reduction and cannot recurse on
-      // the literal itself.
-      state=attach(baseWhnf.call(kernel,head),args);
-      continue;
+      kernel.tick();kernel.need("nat-literals");
     }
 
     if(head[0]==="lam") {
@@ -792,3 +790,4 @@ Kernel.prototype.infer = function(e,ctx) {
 
   return baseInfer.call(this,e,ctx);
 };
+

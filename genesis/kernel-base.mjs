@@ -603,10 +603,8 @@ class Kernel {
     this.tick();
     if(e[0]==="nat") {
       this.need("nat-literals");
-      const zero=["const",leanName("Nat","zero")],succ=["const",leanName("Nat","succ")];
-      if(e[1]===0||e[1]==="0") return zero;
-      const pred=typeof e[1]==="number"?e[1]-1:(BigInt(e[1])-1n).toString();
-      return this.make("app",succ,this.make("nat",pred));
+      // Lean v4.29.1 type_checker.cpp: ExprKind::Lit is already WHNF.
+      return e;
     }
     if(e[0]==="proj") {
       this.need("projections");
@@ -737,11 +735,21 @@ class Kernel {
     else this.__theoremDeltaUnfolds=(this.__theoremDeltaUnfolds??0)+1;
     return this.appN(body,args);
   }
+  natLitToConstructor(e) {
+    this.tick();this.need("nat-literals");
+    // Lean v4.29.1 inductive.h inductive_reduce_rec exposes exactly one Nat
+    // constructor after reducing the major, leaving ordinary literals compact.
+    const zero=["const",leanName("Nat","zero")],succ=["const",leanName("Nat","succ")];
+    if(e[1]===0||e[1]==="0") return zero;
+    const pred=typeof e[1]==="number"?e[1]-1:(BigInt(e[1])-1n).toString();
+    return this.make("app",succ,this.make("nat",pred));
+  }
   whnfMajor(e) {
     this.tick();
     let cur=e,unfolds=0;
     while(true) {
       const core=this.whnf(cur);
+      if(core[0]==="nat") return this.natLitToConstructor(core);
       const unfolded=this.unfoldTheoremHead(core,"major");
       if(unfolded===null) return core;
       if(++unfolds>10000) this.unknown("theorem-major-unfold-budget");

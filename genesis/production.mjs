@@ -1,15 +1,9 @@
 import {checkExport as kernelCheckExport} from "./kernel.mjs";
 import "./compiled-representation-reuse-layer.mjs";
-import "./verified-ctoridx-consequence-layer.mjs";
 import "./native-nat-reduction-layer.mjs";
 import "./nat-offset-defeq-layer.mjs";
 import "./exact-binder-transport-layer.mjs";
-import "./compiled-le-nat-dictionary-layer.mjs";
-import "./compiled-nat-class-reduction-layer.mjs";
-import "./compiled-constant-decidable-nat-layer.mjs";
 import "./compiled-nat-pow-layer.mjs";
-import "./compiled-decidable-nat-composition-layer.mjs";
-import "./compiled-nat-isvalidchar-consequence-layer.mjs";
 import "./compiled-semantic-consequence-layer.mjs";
 
 const CAPABILITIES=Object.freeze(["sort","binders","application","reduction","declarations","universes","theorems","proof-irrelevance","function-eta","inductive-envelope","single-inductives","reflexive-inductives","inductive-reduction","rule-k","unit-eta","prop-inductives","nat-literals","string-literals","quotients","projections","structure-eta","rigid-conversion","opaque-declarations"]);

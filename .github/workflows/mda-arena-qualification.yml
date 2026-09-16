@@ -20,6 +20,7 @@ jobs:
           node --test genesis/nat-pow-soundness.test.mjs
           node --test genesis/nat-offset-defeq.test.mjs
           node --test genesis/execution-order.test.mjs
+          node --test genesis/declaration-warrant.test.mjs
           node --test genesis/runtime-gate.test.mjs
       - name: Retrieve public Arena corpus
         run: |
