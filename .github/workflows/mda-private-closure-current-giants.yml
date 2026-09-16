@@ -1,0 +1,55 @@
+name: MDA private closure current giants
+on:
+  push:
+    branches: [mda-native-closure-whnf-v1]
+    paths:
+      - 'genesis/private-whnf-current-giant-separator.mjs'
+      - 'genesis/private-whnf-environment-layer.mjs'
+      - '.github/workflows/mda-private-closure-current-giants.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  separator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        budget: [2000000, 4000000]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Retrieve public Arena corpus
+        run: |
+          mkdir -p _build/tests
+          curl --fail --location --retry 3 https://arena.lean-lang.org/lean-arena-tests.tar.gz -o /tmp/arena.tar.gz
+          sha256sum /tmp/arena.tar.gz
+          python3 - <<'PY'
+          import tarfile,pathlib
+          root=pathlib.Path('_build/tests')
+          with tarfile.open('/tmp/arena.tar.gz','r:gz') as archive:
+              for m in archive:
+                  if not m.isfile() or not m.name.endswith('.ndjson'): continue
+                  parts=pathlib.PurePosixPath(m.name).parts
+                  group=next((i for i,x in enumerate(parts) if x in ('good','bad')),None)
+                  if group is None: continue
+                  name=pathlib.PurePosixPath(*parts[group+1:])
+                  if name.is_absolute() or '..' in name.parts: raise ValueError(m.name)
+                  data=archive.extractfile(m).read()
+                  path=root/name
+                  path.parent.mkdir(parents=True,exist_ok=True)
+                  path.write_bytes(data)
+          PY
+      - name: Requalify private closure machine
+        env:
+          BUDGET: ${{ matrix.budget }}
+        run: node genesis/private-whnf-current-giant-separator.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: private-whnf-current-${{ matrix.budget }}
+          path: genesis/evidence/private-whnf-current-*.json
+          retention-days: 7
