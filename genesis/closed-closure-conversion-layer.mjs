@@ -206,15 +206,22 @@ function machine(k){
 p.run=function(...args){
   this.__closedMachine=null;
   this.__closedClosureStats={attempts:0,successes:0,aborts:0,ops:0,ctorPairs:0,whnfHits:0,recs:0,beta:0,
-    eqHits:0,eqStores:0};
+    eqHits:0,eqStores:0,events:[]};
   return run0.apply(this,args);
 };
 
 p.equal=function(a,b,ctx=[]){
   if(this.localDefs===true||!target(this,a,b,ctx))return equal0.call(this,a,b,ctx);
+  const describe=e=>{
+    const s=rawSpine(e),h=s.h;
+    return {tag:e?.[0]??typeof e,args:s.args.length,
+      head:Array.isArray(h)&&h[0]==="const"?h[1]:(h?.[0]??typeof h),
+      kind:Array.isArray(h)&&h[0]==="const"?(this.env?.get(h[1])?.kind??null):null};
+  };
   this.__closedClosureStats??={attempts:0,successes:0,aborts:0,ops:0,ctorPairs:0,whnfHits:0,recs:0,beta:0,eqHits:0,eqStores:0};
   this.__closedClosureStats.attempts++;
   const snap={steps:this.steps,budget:this.budget,frontier:this.conversionFrontier};
+  const event={step:snap.steps,decl:this.currentDeclaration??null,a:describe(a),b:describe(b)};
   const m=this.__closedMachine??=machine(this);
   const before={};
   const successKeys=["ops","ctorPairs","whnfHits","recs","beta","eqHits","eqStores"];
@@ -224,6 +231,11 @@ p.equal=function(a,b,ctx=[]){
     const st=m.prove(a,b);
     this.__closedClosureStats.successes++;
     for(const q of successKeys)this.__closedClosureStats[q]+=(st[q]??0)-before[q];
+    event.outcome="success";event.endStep=this.steps;event.delta=this.steps-snap.steps;
+    event.ops=(st.ops??0)-before.ops;event.beta=(st.beta??0)-before.beta;
+    event.recs=(st.recs??0)-before.recs;event.vars=(st.vars??0)-before.vars;
+    event.eqHits=(st.eqHits??0)-before.eqHits;
+    this.__closedClosureStats.events.push(event);
     return;
   }catch(err){
     if(err!==ABORT&&!(err instanceof Stop)&&!(err instanceof RangeError))throw err;
@@ -235,6 +247,11 @@ p.equal=function(a,b,ctx=[]){
       this.__closedClosureStats[key]=(this.__closedClosureStats[key]??0)+((m.stats[q]??0)-b);
     }
     this.__closedClosureStats.lastAbort=m.stats.lastAbort??"unknown";
+    event.outcome="abort";event.error=err===ABORT?(m.stats.lastAbort??"abort"):(err?.message??String(err));
+    event.errorStatus=err?.status??null;event.attemptSteps=this.steps-snap.steps;
+    event.ops=(m.stats.ops??0)-before.ops;event.beta=(m.stats.beta??0)-before.beta;
+    event.recs=(m.stats.recs??0)-before.recs;event.vars=(m.stats.vars??0)-before.vars;
+    this.__closedClosureStats.events.push(event);
     this.steps=snap.steps;this.budget=snap.budget;this.conversionFrontier=snap.frontier;
     return equal0.call(this,a,b,ctx);
   }
