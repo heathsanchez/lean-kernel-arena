@@ -2,9 +2,11 @@ name: MDA giant recursor type conversion
 on:
   push:
     branches:
-      - mda-kernel-genesis-v1
+      - mda-guarded-recursor-v1
     paths:
       - experiments/make-recursor-type-conversion-candidate.mjs
+      - experiments/make-recursor-rule-conversion-candidate.mjs
+      - experiments/post-nested-projection-proof-irrelevance.mjs
       - .github/workflows/mda-giant-recursor-type-conversion.yml
   workflow_dispatch:
 permissions:
@@ -33,8 +35,12 @@ jobs:
         run: node experiments/make-arbitrary-nat-candidate.mjs
       - name: Expose optParam constructor annotations
         run: node experiments/make-optparam-field-domain-candidate.mjs
-      - name: Permit verified recursor type conversion
+      - name: Permit guarded recursor type conversion
         run: node experiments/make-recursor-type-conversion-candidate.mjs
+      - name: Permit guarded recursor rule conversion
+        run: node experiments/make-recursor-rule-conversion-candidate.mjs
+      - name: Run internal forged-control suite
+        run: timeout 60s node --stack-size=32768 /tmp/mathgraph-zero-nested/test.mjs
       - name: Test init beyond TSyntax
         run: timeout 300s node --stack-size=32768 experiments/post-nested-projection-proof-irrelevance.mjs
       - if: always()
