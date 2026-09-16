@@ -1,0 +1,34 @@
+name: MDA exact binder transport giant focus
+
+on:
+  push:
+    branches: [mda-kernel-genesis-v1]
+    paths:
+      - 'genesis/exact-binder-transport-layer.mjs'
+      - 'genesis/exact-binder-transport-separator.mjs'
+      - '.github/workflows/mda-exact-binder-transport-giant.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore giant witnesses
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            _build/tests/init-prelude.ndjson
+            _build/tests/perf/grind-ring-5.ndjson
+            _build/tests/perf/shared-subterm.ndjson
+          key: giant-frontier-e00d4ce4fb0fa667f632e624adbbc2e6a42704db0556aaf2f154e50f6e450aca
+          fail-on-cache-miss: true
+      - name: Run exact binder transport separator
+        env:
+          MATHGRAPH_INPUT_BYTE_LIMIT: "15000000"
+          MATHGRAPH_RECORD_LIMIT: "250000"
+        run: node --stack-size=32768 genesis/exact-binder-transport-separator.mjs
