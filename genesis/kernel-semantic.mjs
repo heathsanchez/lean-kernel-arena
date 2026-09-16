@@ -1,4 +1,5 @@
 import * as Base from "./kernel-base.mjs";
+import {appendName,ROOT as ROOT_NAME} from "./name-codec.mjs";
 
 const {
   levelsEqual,levelSucc,levelIMax,quotientType,Stop,Kernel,
@@ -7,7 +8,7 @@ const {
 
 function unresolvedPropProjectionObstruction(input) {
   try {
-    const names=new Map([[0,"[]"]]),levels=new Map([[0,0]]),exprs=new Map();
+    const names=new Map([[0,ROOT_NAME]]),levels=new Map([[0,0]]),exprs=new Map();
     const declTypes=new Map(),forbidden=new Set(),tainted=new Set();
     let header=false,parsed=0,unresolved=false;
     const get=(m,n)=>m.has(n)?m.get(n):null;
@@ -39,10 +40,10 @@ function unresolvedPropProjectionObstruction(input) {
         if(names.has(row.in)) return null;
         if(tag==="str"&&v&&typeof v.str==="string") {
           const pre=get(names,v.pre); if(pre===null) return null;
-          names.set(row.in,JSON.stringify([pre,"str",v.str]));
+          names.set(row.in,appendName(pre,"str",v.str));
         } else if(tag==="num"&&v&&Number.isSafeInteger(v.i)&&v.i>=0) {
           const pre=get(names,v.pre); if(pre===null) return null;
-          names.set(row.in,JSON.stringify([pre,"num",v.i]));
+          names.set(row.in,appendName(pre,"num",v.i));
         } else return null;
         continue;
       }

@@ -6,7 +6,8 @@ import "./native-nat-reduction-layer.mjs";
 import "./nat-offset-defeq-layer.mjs";
 import "./compiled-nat-pow-layer.mjs";
 
-const name=(...xs)=>xs.reduce((pre,s)=>JSON.stringify([pre,"str",s]),"[]");
+import {leanName} from "./name-codec.mjs";
+const name=leanName;
 const C=(...xs)=>["const",name(...xs)], nat=C("Nat"), zero=C("Nat","zero");
 const succ=x=>["app",C("Nat","succ"),x];
 const caps=["sort","binders","application","reduction","declarations","universes",

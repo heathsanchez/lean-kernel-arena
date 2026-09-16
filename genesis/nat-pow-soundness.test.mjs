@@ -5,7 +5,8 @@ import test from "node:test";
 import {Kernel,Stop,checkExport} from "./kernel.mjs";
 import "./compiled-nat-pow-layer.mjs";
 
-const name=(...parts)=>parts.reduce((prefix,part)=>JSON.stringify([prefix,"str",part]),"[]");
+import {leanName} from "./name-codec.mjs";
+const name=leanName;
 const constant=(...parts)=>["const",name(...parts)];
 const pi=(domain,body)=>["pi",domain,body];
 const POW=name("Nat","pow"), ZERO=name("Nat","zero");

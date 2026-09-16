@@ -1,10 +1,11 @@
 import {Kernel} from "./kernel-base.mjs";
+import {leanName} from "./name-codec.mjs";
 
 // Lean v4.29.1 type_checker::is_def_eq_offset compatibility.
 // Primitive Nat literals are definitionally compared with Nat.zero/Nat.succ
 // without expanding the entire literal into a successor chain.
 const p=Kernel.prototype,eq0=p.equal;
-const N=(...xs)=>xs.reduce((pre,s)=>JSON.stringify([pre,"str",s]),"[]");
+const N=leanName;
 const ZERO=N("Nat","zero"),SUCC=N("Nat","succ");
 
 function lit(e){

@@ -1,0 +1,13 @@
+# Task 2: One runtime and honest corpus gate
+
+Working directory: /workspace/scratch/feacdaa61cc5/kernel-work. Task is authorized under the existing Arena plan. Do not create subagents, remote writes, PRs, or amend/rewrite commits. Commit only explicit task files after tests.
+
+Create genesis/production.mjs as one deterministic import stack matching genesis/decidable-nat-composition-separator.mjs: kernel, compiled representation, verified ctoridx, native Nat, Nat offset, binder transport, LE Nat, Nat class, constant decision, fixed Nat power, decidable Nat composition, isValidChar, semantic consequence. Export CAPABILITIES and checkExport (same semantic core), avoid second duplicated capability list.
+
+Change checkers/mathgraph/main.mjs to import the production runtime through ../../genesis/production.mjs; preserve Arena 0/1/2 exit contract and file argument. Do not remove old files yet. Entry still bounded until streaming task. Add a standalone corpus runner genesis/qualify-corpus.mjs and worker if necessary, operating on _build/tests/manifest.json with rows {name,expected,bytes,sha256}. Inspect manifest schema before use. Run each case in a fresh process so prototype/global caches don't leak; capture status, reason, frontier, steps, elapsed, crash, timeout. Child timeout 60 sec; configurable semantic budget default 2000000; input cap 20000000 and record cap 400000 sufficient for public subset. Write report to genesis/evidence/qualification.json with every row and explicit totals wrong, unknown, errors, correct. Nonzero exit for any wrong, decline, or error when all rows require verdicts; can have --diagnostic mode for collecting report without gating, but default strict and never label diagnostic PASS.
+
+Test first using actual packaged entry and minimal good/bad exports from local tests/generated tiny NDJSON. Verify good=>0, bad=>1, unsupported=>2, and same results as production checkExport. Test report aggregation with real child processes and tiny local corpus, require wrong/unknown results fail strict gate, empty manifest fails, unsafe paths fail. No independent semantics in gate. Keep filenames/expected outcomes out of kernel semantics. Don't claim full Arena qualification from tiny corpus.
+
+Do not alter .github/workflows/mda-arena-qualification.yml: parent owns this. Return filenames and command so parent wires CI.
+
+Report red/green tests and limitations to /workspace/scratch/feacdaa61cc5/task2-report.md. Avoid running node --test with no explicit paths: genesis/test.mjs performs its own artifact writes. Use explicit regression filenames. Parent fetching witnesses concurrently; don't overwrite _build/tests.

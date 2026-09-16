@@ -1,7 +1,8 @@
 import {Kernel} from "./kernel-base.mjs";
+import {leanName} from "./name-codec.mjs";
 
 const p=Kernel.prototype,whnf0=p.whnf;
-const N=(...xs)=>xs.reduce((pre,s)=>JSON.stringify([pre,"str",s]),"[]");
+const N=leanName;
 const ZERO=N("Nat","zero"), SUCC=N("Nat","succ"), ADD=N("Nat","add"), SUB=N("Nat","sub"),
   MUL=N("Nat","mul"), DIV=N("Nat","div"), MOD=N("Nat","mod"), BEQ=N("Nat","beq"), BLE=N("Nat","ble"),
   BTRUE=N("Bool","true"), BFALSE=N("Bool","false");

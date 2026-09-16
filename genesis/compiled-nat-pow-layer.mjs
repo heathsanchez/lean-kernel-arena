@@ -1,7 +1,8 @@
 import {Kernel} from "./kernel-base.mjs";
+import {leanName} from "./name-codec.mjs";
 
 const p=Kernel.prototype,whnf0=p.whnf;
-const N=(...xs)=>xs.reduce((pre,s)=>JSON.stringify([pre,"str",s]),"[]");
+const N=leanName;
 const POW=N("Nat","pow"), ZERO=N("Nat","zero");
 // Lean's kernel reduce_pow guard in type_checker.cpp bounds exponents at 1 << 24.
 const EXPONENT_LIMIT=1n<<24n, OUTPUT_BIT_LIMIT=4096;

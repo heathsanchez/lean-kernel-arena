@@ -1,4 +1,5 @@
 import {validateZeroParamNestedBundle} from "./nested-envelope.mjs";
+import {appendName,leanName,ROOT as ROOT_NAME} from "./name-codec.mjs";
 
 const ZERO_LEVEL=Symbol("level-constant");
 
@@ -84,7 +85,6 @@ const App = (f,a) => ["app",f,a], Let = (a,v,b) => ["let",a,v,b];
 const NatLit = n => ["nat",n];
 const StrLit = s => ["strlit",s];
 const Proj = (n,i,e) => ["proj",n,i,e];
-const leanName = (...parts) => parts.reduce((pre,s)=>JSON.stringify([pre,"str",s]),"[]");
 function quotientType(kind,lps) {
   const expected={type:1,ctor:1,lift:2,ind:1}[kind];
   if(expected===undefined||!Array.isArray(lps)||lps.length!==expected) return null;
@@ -451,7 +451,7 @@ class Kernel {
        !Array.isArray(rec.all)||rec.all.length!==1||rec.all[0]!==d.name||
        !Array.isArray(rec.rules)||rec.rules.length!==d.ctors.length)
       this.reject("recursor-metadata");
-    const expectedRecName=JSON.stringify([d.name,"str","rec"]);
+    const expectedRecName=appendName(d.name,"str","rec");
     if(rec.name!==expectedRecName) this.reject("recursor-name");
 
     const expectedK=isProp && d.ctors.length===1 && ctorInfos[0]?.numFields===0;
@@ -599,6 +599,22 @@ class Kernel {
     if(e[0]!=="lam"||e[2]?.[0]!=="app"||e[2]?.[2]?.[0]!=="var"||e[2][2][1]!==0) return null;
     return this.lowerBound(e[2][1],0);
   }
+  quotientMajorIndex(head,args) {
+    if(!this.caps.has("quotients")||head?.[0]!=="const") return null;
+    const d=this.env.get(head[1]);
+    if(d?.kind!=="quot") return null;
+    if(d.quotKind==="lift"&&args.length>=6) return 5;
+    if(d.quotKind==="ind"&&args.length>=5) return 4;
+    return null;
+  }
+  quotientRhs(head,args,major) {
+    const majorIndex=this.quotientMajorIndex(head,args);
+    if(majorIndex===null) return null;
+    const [mh,margs]=this.getApp(major),md=mh[0]==="const"?this.env.get(mh[1]):null;
+    if(md?.kind!=="quot"||md.quotKind!=="ctor"||margs.length!==3||
+       !this.same(margs[0],args[0])||!this.same(margs[1],args[1])) return null;
+    return {head:args[3],args:[margs[2],...args.slice(majorIndex+1)]};
+  }
   whnf(e) {
     this.tick();
     if(e[0]==="nat") {
@@ -630,26 +646,10 @@ class Kernel {
       this.need("application");
       if(this.caps.has("quotients")) {
         const [qh,qargs]=this.getApp(e);
-        if(qh[0]==="const") {
-          const qd=this.env.get(qh[1]);
-          if(qd?.kind==="quot" && qd.quotKind==="lift" && qargs.length>=6) {
-            const major=this.whnf(qargs[5]),[mh,margs]=this.getApp(major),md=mh[0]==="const"?this.env.get(mh[1]):null;
-            if(md?.kind==="quot" && md.quotKind==="ctor" && margs.length===3 &&
-               this.same(margs[0],qargs[0]) && this.same(margs[1],qargs[1])) {
-              let out=this.make("app",qargs[3],margs[2]);
-              for(const extra of qargs.slice(6)) out=this.make("app",out,extra);
-              return this.whnf(out);
-            }
-          }
-          if(qd?.kind==="quot" && qd.quotKind==="ind" && qargs.length>=5) {
-            const major=this.whnf(qargs[4]),[mh,margs]=this.getApp(major),md=mh[0]==="const"?this.env.get(mh[1]):null;
-            if(md?.kind==="quot" && md.quotKind==="ctor" && margs.length===3 &&
-               this.same(margs[0],qargs[0]) && this.same(margs[1],qargs[1])) {
-              let out=this.make("app",qargs[3],margs[2]);
-              for(const extra of qargs.slice(5)) out=this.make("app",out,extra);
-              return this.whnf(out);
-            }
-          }
+        const majorIndex=this.quotientMajorIndex(qh,qargs);
+        if(majorIndex!==null) {
+          const rhs=this.quotientRhs(qh,qargs,this.whnf(qargs[majorIndex]));
+          if(rhs!==null) return this.whnf(this.appN(rhs.head,rhs.args));
         }
       }
       const [rh,rargs]=this.getApp(e);
@@ -676,39 +676,8 @@ class Kernel {
                 }
               }
             }
-            if(this.caps.has("rule-k") && rd.k===true && rd.rules.length===1) {
-              const ind=this.env.get(rd.induct),ctor=ind?.ctors?.length===1?this.env.get(ind.ctors[0]):null;
-              if(ind?.kind==="inductive" && ctor?.kind==="ctor" && ctor.numFields===0) {
-                const prefixLen=rd.numParams+1+rd.numMinors;
-                const idxArgs=rargs.slice(prefixLen,prefixLen+rd.numIndices);
-                const recUs=rh[2]??[],ctorUs=ctor.levelParams?.length?recUs.slice(-ctor.levelParams.length):[];
-                let ct=this.instantiateDeclaration(
-                  ctorUs.length?["const",ctor.name,ctorUs]:["const",ctor.name],ctor.type);
-                ct=this.instantiateForalls(ct,rargs.slice(0,rd.numParams));
-                const [resHead,resArgs]=this.getApp(this.whnf(ct));
-                const derivedIdx=resHead[0]==="const"&&resHead[1]===rd.induct
-                  ?resArgs.slice(rd.numParams,rd.numParams+rd.numIndices):null;
-                if(derivedIdx && derivedIdx.length===idxArgs.length &&
-                   derivedIdx.every((x,i)=>this.same(this.normal(x),this.normal(idxArgs[i])))) {
-                  this.need("inductive-reduction"); this.need("reduction");
-                  const rule=rd.rules[0];
-                  let rhs=this.instantiateDeclaration(rh,rule.rhs);
-                  rhs=this.appN(rhs,rargs.slice(0,prefixLen));
-                  for(const extra of rargs.slice(total)) rhs=this.make("app",rhs,extra);
-                  return this.whnf(rhs);
-                }
-              }
-            }
-            if(this.caps.has("unit-eta") && rd.numIndices===0 && rd.rules.length===1 &&
-               this.isUnitLikeName(rd.induct)) {
-              this.need("inductive-reduction"); this.need("reduction");
-              const rule=rd.rules[0];
-              let rhs=this.instantiateDeclaration(rh,rule.rhs);
-              const prefix=rargs.slice(0,rd.numParams+1+rd.numMinors);
-              rhs=this.appN(rhs,prefix);
-              for(const extra of rargs.slice(total)) rhs=this.make("app",rhs,extra);
-              return this.whnf(rhs);
-            }
+            const neutralRhs=this.recursorRhsWithoutConstructor(rh,rargs,rd,total);
+            if(neutralRhs!==null) return this.whnf(neutralRhs);
           }
         }
       }
@@ -734,6 +703,44 @@ class Kernel {
     if(reason==="major") this.__theoremMajorUnfolds=(this.__theoremMajorUnfolds??0)+1;
     else this.__theoremDeltaUnfolds=(this.__theoremDeltaUnfolds??0)+1;
     return this.appN(body,args);
+  }
+  // Shared retained K/unit-eta rules for a major that did not expose a
+  // constructor. Return the exact RHS; each evaluator owns its continuation.
+  recursorRhsWithoutConstructor(rh,rargs,rd,total) {
+    if(this.caps.has("rule-k") && rd.k===true && rd.rules.length===1) {
+      const ind=this.env.get(rd.induct),ctor=ind?.ctors?.length===1?this.env.get(ind.ctors[0]):null;
+      if(ind?.kind==="inductive" && ctor?.kind==="ctor" && ctor.numFields===0) {
+        const prefixLen=rd.numParams+1+rd.numMinors;
+        const idxArgs=rargs.slice(prefixLen,prefixLen+rd.numIndices);
+        const recUs=rh[2]??[],ctorUs=ctor.levelParams?.length?recUs.slice(-ctor.levelParams.length):[];
+        let ct=this.instantiateDeclaration(
+          ctorUs.length?["const",ctor.name,ctorUs]:["const",ctor.name],ctor.type);
+        ct=this.instantiateForalls(ct,rargs.slice(0,rd.numParams));
+        const [resHead,resArgs]=this.getApp(this.whnf(ct));
+        const derivedIdx=resHead[0]==="const"&&resHead[1]===rd.induct
+          ?resArgs.slice(rd.numParams,rd.numParams+rd.numIndices):null;
+        if(derivedIdx && derivedIdx.length===idxArgs.length &&
+           derivedIdx.every((x,i)=>this.same(this.normal(x),this.normal(idxArgs[i])))) {
+          this.need("inductive-reduction"); this.need("reduction");
+          const rule=rd.rules[0];
+          let rhs=this.instantiateDeclaration(rh,rule.rhs);
+          rhs=this.appN(rhs,rargs.slice(0,prefixLen));
+          for(const extra of rargs.slice(total)) rhs=this.make("app",rhs,extra);
+          return rhs;
+        }
+      }
+    }
+    if(this.caps.has("unit-eta") && rd.numIndices===0 && rd.rules.length===1 &&
+       this.isUnitLikeName(rd.induct)) {
+      this.need("inductive-reduction"); this.need("reduction");
+      const rule=rd.rules[0];
+      let rhs=this.instantiateDeclaration(rh,rule.rhs);
+      const prefix=rargs.slice(0,rd.numParams+1+rd.numMinors);
+      rhs=this.appN(rhs,prefix);
+      for(const extra of rargs.slice(total)) rhs=this.make("app",rhs,extra);
+      return rhs;
+    }
+    return null;
   }
   natLitToConstructor(e) {
     this.tick();this.need("nat-literals");
@@ -1053,7 +1060,7 @@ function checkExport(input,capabilities,budget=200000) {
     ...(frontierInductive?{frontier_inductive:frontierInductive}:{})});
   if(!capabilities.length) return out(UNKNOWN,"empty-present");
   if(input.length>inputByteLimit) return out(UNKNOWN,"input-budget");
-  const names=new Map([[0,"[]"]]),levels=new Map([[0,0]]),exprs=new Map(),exprDepths=new Map(),decls=[];
+  const names=new Map([[0,ROOT_NAME]]),levels=new Map([[0,0]]),exprs=new Map(),exprDepths=new Map(),decls=[];
   let maxExpressionDepth=0;
   const fail=reason=>{throw new Stop(UNKNOWN,reason);};
   const reject=reason=>{throw new Stop(REJECT,reason);};
@@ -1077,8 +1084,8 @@ function checkExport(input,capabilities,budget=200000) {
       if(tags.length!==1 || refs.length>1) fail("record-schema");
       const tag=tags[0],v=row[tag];
       if(refs[0]==="in") {
-        if(tag==="str" && v && typeof v.str==="string") put(names,row.in,JSON.stringify([get(names,v.pre),"str",v.str]));
-        else if(tag==="num" && v && Number.isSafeInteger(v.i)&&v.i>=0) put(names,row.in,JSON.stringify([get(names,v.pre),"num",v.i]));
+        if(tag==="str" && v && typeof v.str==="string") put(names,row.in,appendName(get(names,v.pre),"str",v.str));
+        else if(tag==="num" && v && Number.isSafeInteger(v.i)&&v.i>=0) put(names,row.in,appendName(get(names,v.pre),"num",v.i));
         else fail("name-frontier");
       } else if(refs[0]==="il") {
         if(tag==="succ") put(levels,row.il,levelSucc(get(levels,v)));

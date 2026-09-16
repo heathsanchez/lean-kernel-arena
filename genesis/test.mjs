@@ -2,6 +2,7 @@ import {writeFileSync,appendFileSync,mkdirSync,readFileSync} from "node:fs";
 import {spawnSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
 import {levelsEqual,quotientType,Stop,Kernel,ACCEPT,REJECT,UNKNOWN,S,V,Pi,Lam,App,Let,NatLit,StrLit,Proj,checkExport} from "./kernel.mjs";
+import {appendName,leanName} from "./name-codec.mjs";
 
 function growthSuite() {
   const C=(name,term,type,expected=ACCEPT,declarations=[])=>({name,term,type,expected,declarations});
@@ -322,7 +323,7 @@ function runRigidConversionTests(base,emit=()=>{}) {
 
 
 function runUnitEtaTests(base,emit=()=>{}) {
-  const caps=[...base,"unit-eta"],U="UnitLike",Mk="UnitLike.mk",R=JSON.stringify(["UnitLike","str","rec"]),u="uu";
+  const caps=[...base,"unit-eta"],U="UnitLike",Mk="UnitLike.mk",R=appendName("UnitLike","str","rec"),u="uu";
   const I=["const",U],C=["const",Mk],motive=Pi(I,S(["param",u])),minor=App(V(0),C);
   const recType=Pi(motive,Pi(minor,Pi(I,App(V(2),V(0)))));
   const rule=Lam(motive,Lam(minor,V(0)));
@@ -491,7 +492,7 @@ function runEnumInductiveTests(base,emit=()=>{}) {
 
 
 function runSingleInductiveTests(base,emit=()=>{}) {
-  const caps=[...base,"single-inductives"],n="Ntest",z="Ntest.zero",s="Ntest.succ",rn=JSON.stringify([n,"str","rec"]),u="u";
+  const caps=[...base,"single-inductives"],n="Ntest",z="Ntest.zero",s="Ntest.succ",rn=appendName(n,"str","rec"),u="u";
   const I=["const",n],Z=["const",z],Succ=["const",s],Rec=["const",rn,[["param",u]]];
   const motive=Pi(I,S(["param",u]));
   const zeroMinor=App(V(0),Z);
@@ -596,7 +597,7 @@ function runRuleKTests(base,emit=()=>{}) {
 
 
 function runPropInductiveTests(base,emit=()=>{}) {
-  const caps=[...base,"prop-inductives"],n="PTrue",c="PTrue.intro",rn=JSON.stringify([n,"str","rec"]),u="pu";
+  const caps=[...base,"prop-inductives"],n="PTrue",c="PTrue.intro",rn=appendName(n,"str","rec"),u="pu";
   const I=["const",n],C=["const",c],motive=Pi(I,S(["param",u])),minor=App(V(0),C);
   const recType=Pi(motive,Pi(minor,Pi(I,App(V(2),V(0)))));
   const rule=Lam(motive,Lam(minor,V(0)));
@@ -612,7 +613,7 @@ function runPropInductiveTests(base,emit=()=>{}) {
   const accepted=new Kernel(caps).run(S(0),S(1),[good]);
   assert(accepted.status===ACCEPT,"singleton Prop inductive was rejected: "+JSON.stringify(accepted));
 
-  const A="PropData",Bad="BadProp",Mk="BadProp.mk",BadRec=JSON.stringify([Bad,"str","rec"]);
+  const A="PropData",Bad="BadProp",Mk="BadProp.mk",BadRec=appendName(Bad,"str","rec");
   const badI=["const",Bad],bad={
     kind:"inductive",name:Bad,levelParams:[],type:S(0),numParams:0,numIndices:0,numNested:0,
     isRec:false,isUnsafe:false,isReflexive:false,all:[Bad],ctorNames:[Mk],
@@ -626,7 +627,7 @@ function runPropInductiveTests(base,emit=()=>{}) {
   assert(guarded.status===REJECT&&guarded.reason==="recursor-universe-parameters",
     "data-carrying Prop incorrectly gained large elimination: "+JSON.stringify(guarded));
 
-  const U="polyU",Vv="polyV",MB="PolyBool",Tt="PolyBool.tt",Ff="PolyBool.ff",MR=JSON.stringify([MB,"str","rec"]);
+  const U="polyU",Vv="polyV",MB="PolyBool",Tt="PolyBool.tt",Ff="PolyBool.ff",MR=appendName(MB,"str","rec");
   const MI=["const",MB,[["param",U]]],poly={
     kind:"inductive",name:MB,levelParams:[U],type:S(["param",U]),numParams:0,numIndices:0,numNested:0,
     isRec:false,isUnsafe:false,isReflexive:false,all:[MB],ctorNames:[Tt,Ff],
@@ -650,7 +651,7 @@ function runPropInductiveTests(base,emit=()=>{}) {
 
 function runNatLiteralTests(base,emit=()=>{}) {
   const caps=[...base,"nat-literals"];
-  const name=(...parts)=>parts.reduce((pre,s)=>JSON.stringify([pre,"str",s]),"[]");
+  const name=leanName;
   const N=name("Nat"),Z=name("Nat","zero"),Su=name("Nat","succ");
   const Nat=["const",N];
   const decls=[
@@ -672,7 +673,7 @@ function runNatLiteralTests(base,emit=()=>{}) {
 
 
 function runStringLiteralTests(base,emit=()=>{}) {
-  const caps=[...base,"string-literals"],N=JSON.stringify(["[]","str","String"]);
+  const caps=[...base,"string-literals"],N=leanName("String");
   const decls=[{kind:"axiom",name:N,levelParams:[],type:S(1)}];
   const before=new Kernel(base).run(StrLit("hello"),["const",N],decls);
   assert(before.status===UNKNOWN&&before.reason==="missing:string-literals",
@@ -703,10 +704,8 @@ function runStringLiteralTests(base,emit=()=>{}) {
 
 function runQuotientTests(base,emit=()=>{}) {
   const caps=[...base,"quotients"],u="qu",v="qv";
-  const names={type:JSON.stringify(["[]","str","Quot"]),
-    ctor:JSON.stringify([JSON.stringify(["[]","str","Quot"]),"str","mk"]),
-    lift:JSON.stringify([JSON.stringify(["[]","str","Quot"]),"str","lift"]),
-    ind:JSON.stringify([JSON.stringify(["[]","str","Quot"]),"str","ind"])};
+  const names={type:leanName("Quot"),ctor:leanName("Quot","mk"),
+    lift:leanName("Quot","lift"),ind:leanName("Quot","ind")};
   const decls=["type","ctor","lift","ind"].map(kind=>({
     kind:"quot",quotKind:kind,name:names[kind],
     levelParams:kind==="lift"?[u,v]:[u],type:quotientType(kind,kind==="lift"?[u,v]:[u])
@@ -734,7 +733,7 @@ function runQuotientTests(base,emit=()=>{}) {
 
 
 function runProjectionTests(base,emit=()=>{}) {
-  const caps=[...base,"projections"],A="ProjA",a="projA",B="Box",mk="Box.mk",rn=JSON.stringify([B,"str","rec"]),u="u";
+  const caps=[...base,"projections"],A="ProjA",a="projA",B="Box",mk="Box.mk",rn=appendName(B,"str","rec"),u="u";
   const AT=["const",A],av=["const",a],I=["const",B],Mk=["const",mk],Rec=["const",rn,[["param",u]]];
   const motive=Pi(I,S(["param",u]));
   const minor=Pi(AT,App(V(1),App(Mk,V(0))));
@@ -809,7 +808,7 @@ function runStructureEtaTests(base,emit=()=>{}) {
     {kind:"inductive",name:B,levelParams:[],type:S(1),numParams:0,numIndices:0,numNested:0,
       isRec:false,isUnsafe:false,isReflexive:false,all:[B],ctorNames:[Mk],
       ctors:[{name:Mk,levelParams:[],type:Pi(AT,I),induct:B,cidx:0,numParams:0,numFields:1,isUnsafe:false}],
-      rec:{name:JSON.stringify([B,"str","rec"]),levelParams:["su"],type:Pi(Pi(I,S(["param","su"])),
+      rec:{name:appendName(B,"str","rec"),levelParams:["su"],type:Pi(Pi(I,S(["param","su"])),
         Pi(Pi(AT,App(V(1),App(M,V(0)))),Pi(I,App(V(2),V(0))))),all:[B],
         numParams:0,numIndices:0,numMotives:1,numMinors:1,k:false,isUnsafe:false,
         rules:[{ctor:Mk,nfields:1,rhs:Lam(Pi(I,S(["param","su"])),

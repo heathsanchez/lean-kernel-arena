@@ -1,4 +1,5 @@
 import {readFileSync} from "node:fs";
+import {displayName} from "./name-codec.mjs";
 import * as K from "./kernel.mjs";
 import "./compiled-representation-reuse-layer.mjs";
 import "./verified-ctoridx-consequence-layer.mjs";
@@ -13,7 +14,7 @@ import "./compiled-nat-isvalidchar-consequence-layer.mjs";
 import "./compiled-semantic-consequence-layer.mjs";
 
 const CAPS=["sort","binders","application","reduction","declarations","universes","theorems","proof-irrelevance","function-eta","inductive-envelope","single-inductives","reflexive-inductives","inductive-reduction","rule-k","unit-eta","prop-inductives","nat-literals","string-literals","quotients","projections","structure-eta","rigid-conversion","opaque-declarations"];
-function prettyName(s){try{let x=JSON.parse(s),p=[];while(Array.isArray(x)&&x.length===3){p.push(String(x[2]));x=JSON.parse(x[0]);}return p.reverse().join(".");}catch{return String(s);}}
+const prettyName=displayName;
 function head(e){let h=e,n=0;while(Array.isArray(h)&&h[0]==="app"){n++;h=h[1];}return Array.isArray(h)?{tag:h[0],name:h[0]==="const"?prettyName(h[1]):null,args:n}:{tag:typeof h,args:n};}
 function sketch(e,d=10){if(!Array.isArray(e))return e;if(d<=0)return["…",e[0]];if(["nat","var","sort","strlit"].includes(e[0]))return e;if(e[0]==="const")return["const",prettyName(e[1]),e[2]??[]];if(e[0]==="proj")return["proj",prettyName(e[1]),e[2],sketch(e[3],d-1)];return[e[0],...e.slice(1).map(x=>sketch(x,d-1))];}
 const p=K.Kernel.prototype,eq0=p.equal,run0=p.run;

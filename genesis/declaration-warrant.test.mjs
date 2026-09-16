@@ -4,7 +4,8 @@ import {readFileSync} from "node:fs";
 import {Kernel} from "./kernel-base.mjs";
 import {checkExport,CAPABILITIES} from "./production.mjs";
 
-const name=(...parts)=>parts.reduce((prefix,part)=>JSON.stringify([prefix,"str",part]),"[]");
+import {leanName} from "./name-codec.mjs";
+const name=leanName;
 const nat=["const",name("Nat")];
 const pi=(a,b)=>["pi",a,b];
 const appN=(head,args)=>args.reduce((fn,arg)=>["app",fn,arg],head);

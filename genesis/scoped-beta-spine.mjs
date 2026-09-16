@@ -114,6 +114,15 @@ function iterativeRecWhnf(k,root){
   function resumeRec(fr,major){
     const {head:rh,args:rargs,d:rd,total}=fr;
     if(major?.[0]==="nat")major=k.natLitToConstructor(major);
+    else {
+      const unfolded=k.unfoldTheoremHead(major,"major");
+      if(unfolded!==null){
+        const unfolds=(fr.majorUnfolds??0)+1;
+        if(unfolds>10000)k.unknown("theorem-major-unfold-budget");
+        frames.push({...fr,majorUnfolds:unfolds});
+        return {state:attach(unfolded,[])};
+      }
+    }
     const ms=flatten(major),mh=ms.head,margs=ms.args;
     const md=mh?.[0]==="const"?k.env.get(mh[1]):null;
 
@@ -135,6 +144,8 @@ function iterativeRecWhnf(k,root){
       }
     }
 
+    const neutralRhs=k.recursorRhsWithoutConstructor(rh,rargs,rd,total);
+    if(neutralRhs!==null)return {state:attach(neutralRhs,[])};
     return {value:rebuild(rh,rargs)};
   }
 
@@ -190,6 +201,12 @@ function iterativeRecWhnf(k,root){
           continue;
         }
       }
+      const quotientMajor=k.quotientMajorIndex(head,args);
+      if(quotientMajor!==null){
+        frames.push({kind:"quot",head,args});
+        state=flatten(args[quotientMajor]);
+        continue;
+      }
     }
 
     let result=rebuild(head,args);
@@ -211,6 +228,17 @@ function iterativeRecWhnf(k,root){
           ? k.make("proj",fr.name,fr.index,fr.object)
           : k.make("proj",fr.name,fr.index,result);
         result=rebuild(p,fr.args);
+        continue;
+      }
+
+      if(fr.kind==="quot"){
+        const rhs=k.quotientRhs(fr.head,fr.args,result);
+        if(rhs!==null){
+          state=attach(rhs.head,rhs.args);
+          result=null;
+          break;
+        }
+        result=rebuild(fr.head,fr.args);
         continue;
       }
 
@@ -265,4 +293,3 @@ Kernel.prototype.whnf=function(e){
     this._scopedBetaDepth=0;
   }
 };
-
