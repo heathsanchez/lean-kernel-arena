@@ -24,10 +24,10 @@ function target(k,a,b,ctx){
   return ok.has(x)||ok.has(y);
 }
 function machine(k){
-  const termClosures=new WeakMap(),envCons=new WeakMap(),whnfCache=new WeakMap(),derefCache=new WeakMap(),appSpineCache=new WeakMap(),eqSuccess=new WeakMap(),stateWhnfCache=new Map();
+  const termClosures=new WeakMap(),envCons=new WeakMap(),whnfCache=new WeakMap(),derefCache=new WeakMap(),appSpineCache=new WeakMap(),eqSuccess=new WeakMap(),stateWhnfCache=new Map(),iteratorInfoCache=new WeakMap(),iteratorCanonical=new Map();
   let closureNext=1,attemptOps=0;
   const stats={ops:0,beta:0,defs:0,recs:0,vars:0,apps:0,whnfHits:0,whnfStores:0,
-    ctorPairs:0,rigidPairs:0,maxEnv:0,maxArgs:0,derefHits:0,derefStores:0,derefSteps:0,appSpineHits:0,appSpineStores:0,appSpineNodes:0,stateHits:0,stateStores:0,eqHits:0,eqStores:0,lastAbort:null};
+    ctorPairs:0,rigidPairs:0,maxEnv:0,maxArgs:0,derefHits:0,derefStores:0,derefSteps:0,appSpineHits:0,appSpineStores:0,appSpineNodes:0,stateHits:0,stateStores:0,iteratorHits:0,iteratorStores:0,iteratorChecks:0,eqHits:0,eqStores:0,lastAbort:null};
 
   function C(term,env=EMPTY){
     if(!env.length)env=EMPTY;
@@ -88,6 +88,85 @@ function machine(k){
     return out;
   }
 
+  function iteratorInfo(d){
+    if(iteratorInfoCache.has(d))return iteratorInfoCache.get(d);
+    let info=null;
+    try{
+      let e=d.value;
+      if(!Array.isArray(e)||e[0]!=="lam")throw 0;
+      e=e[2];
+      if(!Array.isArray(e)||e[0]!=="lam")throw 0;
+      e=e[2];
+
+      const rs=rawSpine(e),rh=rs.h,rargs=rs.args;
+      if(!Array.isArray(rh)||rh[0]!=="const")throw 0;
+      const rd=k.env.get(rh[1]);
+      if(rd?.kind!=="rec"||rd.numParams!==0||rd.numIndices!==0||rd.numMinors!==2)throw 0;
+      if(rargs.length!==4)throw 0;
+      const ind=k.env.get(rd.induct);
+      if(ind?.kind!=="inductive"||!Array.isArray(ind.ctors)||ind.ctors.length!==2)throw 0;
+
+      const ctors=ind.ctors.map(n=>k.env.get(n));
+      const zi=ctors.findIndex(q=>q?.kind==="ctor"&&q.numFields===0);
+      const si=ctors.findIndex(q=>q?.kind==="ctor"&&q.numFields===1);
+      if(zi<0||si<0||zi===si)throw 0;
+      const zero=ctors[zi],succ=ctors[si];
+
+      // motive, then one minor per constructor, then major.
+      const base=rargs[1+zi],step=rargs[1+si],major=rargs[3];
+      if(!Array.isArray(base)||base[0]!=="var"||base[1]!==0)throw 0;
+      if(!Array.isArray(major)||major[0]!=="var"||major[1]!==1)throw 0;
+
+      // Recursive unary constructor minor: fun _ ih => Succ ih.
+      if(!Array.isArray(step)||step[0]!=="lam")throw 0;
+      let sb=step[2];
+      if(!Array.isArray(sb)||sb[0]!=="lam")throw 0;
+      sb=sb[2];
+      const ss=rawSpine(sb);
+      if(!Array.isArray(ss.h)||ss.h[0]!=="const"||ss.h[1]!==succ.name||
+         ss.args.length!==1||!Array.isArray(ss.args[0])||ss.args[0][0]!=="var"||ss.args[0][1]!==0)
+        throw 0;
+
+      info={defName:d.name,induct:ind.name,zero:zero.name,succ:succ.name};
+    }catch(_){info=null;}
+    iteratorInfoCache.set(d,info);
+    return info;
+  }
+
+  function constView(v,name,arity){
+    const t=v?.head?.term;
+    return Array.isArray(t)&&t[0]==="const"&&t[1]===name&&v.args.length===arity;
+  }
+
+  function canonicalSet(info){
+    let s=iteratorCanonical.get(info.defName);
+    if(!s){s=new WeakSet();iteratorCanonical.set(info.defName,s);}
+    return s;
+  }
+
+  function certifyCanonical(info,a,depth=0){
+    const done=canonicalSet(info);
+    if(done.has(a)){stats.iteratorHits++;return;}
+    if(depth>6000){stats.lastAbort="iterator-depth";throw ABORT;}
+    stats.iteratorChecks++;
+    const v=whnf(a,depth+1);
+    if(constView(v,info.zero,0)){
+      done.add(a);stats.iteratorStores++;return;
+    }
+    if(constView(v,info.succ,1)){
+      certifyCanonical(info,v.args[0],depth+1);
+      done.add(a);stats.iteratorStores++;return;
+    }
+    stats.lastAbort="iterator-major-not-canonical";throw ABORT;
+  }
+
+  function isSuccZero(info,b,depth){
+    const v=whnf(b,depth+1);
+    if(!constView(v,info.succ,1))return false;
+    const z=whnf(v.args[0],depth+1);
+    return constView(z,info.zero,0);
+  }
+
   function stateKey(head,args){
     let s=String(head.__id)+"|";
     for(let i=0;i<args.length;i++)s+=(i?",":"")+String(args[i].__id);
@@ -141,6 +220,21 @@ function machine(k){
 
       k.need("declarations");
       const d=k.env.get(t[1]);if(!d)k.reject("undeclared-constant");
+
+      // Verified unary iterator consequence. For a structurally certified
+      // iterator f a b = rec b (fun _ ih => Succ ih) a, and a concrete major
+      // proven canonical constructor-by-constructor, f a (Succ Zero) has WHNF
+      // Succ a. No opaque/stuck major is assumed canonical.
+      if(d.kind==="def"&&args.length===2){
+        const info=iteratorInfo(d);
+        if(info!==null&&isSuccZero(info,args[1],depth)){
+          certifyCanonical(info,args[0],depth);
+          const succHead=C(["const",info.succ],EMPTY);
+          const out={head:succHead,args:Object.freeze([args[0]])};
+          stats.iteratorHits++;
+          return finishWhnf(start,out,pendingStates);
+        }
+      }
 
       if((d.kind==="def"||d.kind==="rec")&&args.length){
         const key=stateKey(cl,args),hit=stateWhnfCache.get(key);
@@ -254,7 +348,7 @@ p.equal=function(a,b,ctx=[]){
   const m=this.__closedMachine??=machine(this);
   const before={};
   const successKeys=["ops","ctorPairs","whnfHits","recs","beta","eqHits","eqStores"];
-  const diagnosticKeys=["defs","vars","apps","whnfStores","derefHits","derefStores","derefSteps","appSpineHits","appSpineStores","appSpineNodes","stateHits","stateStores"];
+  const diagnosticKeys=["defs","vars","apps","whnfStores","derefHits","derefStores","derefSteps","appSpineHits","appSpineStores","appSpineNodes","stateHits","stateStores","iteratorHits","iteratorStores","iteratorChecks"];
   for(const q of successKeys.concat(diagnosticKeys))before[q]=m.stats[q]??0;
   try{
     const st=m.prove(a,b);
@@ -270,7 +364,7 @@ p.equal=function(a,b,ctx=[]){
     if(err!==ABORT&&!(err instanceof Stop)&&!(err instanceof RangeError))throw err;
     this.__closedClosureStats.aborts++;
     this.__closedClosureStats.abortOps=(this.__closedClosureStats.abortOps??0)+((m.stats.ops??0)-(before.ops??0));
-    for(const q of ["beta","defs","recs","vars","apps","whnfHits","whnfStores","derefHits","derefStores","derefSteps","appSpineHits","appSpineStores","appSpineNodes","stateHits","stateStores"]){
+    for(const q of ["beta","defs","recs","vars","apps","whnfHits","whnfStores","derefHits","derefStores","derefSteps","appSpineHits","appSpineStores","appSpineNodes","stateHits","stateStores","iteratorHits","iteratorStores","iteratorChecks"]){
       const key="abort"+q[0].toUpperCase()+q.slice(1);
       const b=q in before?(before[q]??0):0;
       this.__closedClosureStats[key]=(this.__closedClosureStats[key]??0)+((m.stats[q]??0)-b);
