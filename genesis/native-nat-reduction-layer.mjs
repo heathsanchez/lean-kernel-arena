@@ -60,14 +60,15 @@ function tryPrimitive(kernel,head,args,operandWhnf){
   return spec.run(values);
 }
 
-// The stack-safe WHNF machines are private execution paths. If one of them
-// exposes a primitive only after beta/let reduction, preserve that head long
-// enough for the same retained native rule above to see its operands. The
-// marker is internal to a single WHNF call and is never returned. If the
-// operands are not reducible natural values, replay with the exact historical
+// The retained multi-beta machine is a private execution path. If it exposes a
+// primitive only after beta/let reduction, preserve that head long enough for
+// the same retained native rule above to see its operands. The full-stack
+// recursor path already has independent literal-major rules and is deliberately
+// left unchanged. The marker is internal to one WHNF call and is never returned.
+// If operands are not reducible natural values, replay the exact historical
 // unfolding path instead of inventing a partial result.
 p.instantiateDeclaration=function(ref,term){
-  if((this.__nativeNatBridgeDepth??0)>0 && !(this.__nativeNatBypass>0) &&
+  if(this._fullStackSafe!==true && (this.__nativeNatBridgeDepth??0)>0 && !(this.__nativeNatBypass>0) &&
      Array.isArray(ref)&&ref[0]==="const"&&PRIMITIVES.has(ref[1]))
     return [NATIVE_MARKER,ref[1],ref[2]??[]];
   return instantiate0.call(this,ref,term);
