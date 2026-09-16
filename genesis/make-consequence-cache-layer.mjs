@@ -13,18 +13,17 @@ function ensure(k){
   k.__makeIds??=new WeakMap();k.__makeNextId??=1;
   k.__makeConsequenceStats??={hits:0,stores:0};
 }
-function id(k,x){
-  if(x!==null&&(typeof x==="object"||typeof x==="function")){
-    let n=k.__makeIds.get(x);
-    if(n===undefined){n=k.__makeNextId++;k.__makeIds.set(x,n);}
-    return "o"+n;
-  }
-  return typeof x+":"+String(x);
+function objectId(k,x){
+  let n=k.__makeIds.get(x);
+  if(n===undefined){n=k.__makeNextId++;k.__makeIds.set(x,n);}
+  return n;
 }
 function key(k,xs){
-  let s="";
-  for(let i=0;i<xs.length;i++)s+=(i?"|":"")+id(k,xs[i]);
-  return s;
+  return JSON.stringify(xs.map(x=>
+    x!==null&&(typeof x==="object"||typeof x==="function")
+      ?["object",objectId(k,x)]
+      :[typeof x,x]
+  ));
 }
 p.run=function(...args){
   this.__makeConsequence=new Map();this.__makeIds=new WeakMap();this.__makeNextId=1;
