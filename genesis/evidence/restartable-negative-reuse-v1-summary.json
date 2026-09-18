@@ -1,0 +1,60 @@
+{
+  "schema": "lean-restartable-negative-reuse-v1-summary",
+  "qualification": "PASS_DIAGNOSTIC_REUSE_NONREGRESSION",
+  "qualified_run_id": 35406929514,
+  "qualified_head_sha": "74fb78667a425f1fcee604a9b39c843632e2c682",
+  "exact_parent_sha": "994dfa6312063856252e812908556b748ad3fd83",
+  "artifact": {
+    "id": 10572986183,
+    "name": "lean-restartable-negative-reuse-v1",
+    "digest": "sha256:2e3e51f43a9090dfe70f2e9240b8449fd7861512e8e98d2dbb38085a0b168bca",
+    "size_bytes": 3878745
+  },
+  "source_runs": [
+    34947988952,
+    34954606635,
+    34955629029,
+    34957192405,
+    34957498769,
+    34958581529,
+    34959355285,
+    34962163790
+  ],
+  "compiled_bank_digest": "d0487d01d999179b04d6bfcdb606dfd301df8feb292619f7b825c9dcc6bb5e20",
+  "source_memory_digest": "50162447ee679ee87eb607ecf9a00abea35e6d15a157e4d0dd14eba459117f94",
+  "routing": {
+    "candidate_count": 11,
+    "cold_verifier_calls": 11,
+    "warm_verifier_calls": 3,
+    "restart_verifier_calls": 3,
+    "sham_verifier_calls": 11,
+    "ablation_verifier_calls": 11,
+    "changed_signature_verifier_calls": 11,
+    "exact_negative_routes_skipped": 8,
+    "saved_verifier_calls": 8,
+    "verifier_call_reduction_fraction": 0.7272727272727273
+  },
+  "matched_current_public_corpus": {
+    "cases": 189,
+    "candidate": {
+      "correct": 182,
+      "unknown": 7,
+      "wrong": 0,
+      "errors": 0
+    },
+    "parent": {
+      "correct": 182,
+      "unknown": 7,
+      "wrong": 0,
+      "errors": 0
+    },
+    "exact_case_status_reason_parity": true
+  },
+  "strict_arena_closure": {
+    "qualified": false,
+    "remaining_unknown": 7,
+    "note": "The exact parent is also strict-RED with the same seven UNKNOWNs; this capability does not claim to close them."
+  },
+  "trusted_boundary": "diagnostic-routing-only; never changes ACCEPT/REJECT semantics",
+  "claim_boundary": "Exact-signature restartable negative-routing reuse only. Source falsifier runs were rechecked green; restart reproduces warm; sham, changed signature, and ablation restore cold; candidate and exact parent match case-by-case on the same current public Arena corpus. This is not strict Arena closure or an Arena performance win."
+}
