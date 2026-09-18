@@ -1,0 +1,78 @@
+name: Lean restartable negative reuse V1
+on:
+  push:
+    branches: [mda-restartable-negative-reuse-v1]
+    paths:
+      - 'genesis/restartable-negative-reuse-v1.mjs'
+      - 'genesis/restartable-negative-reuse-v1.test.mjs'
+      - '.github/workflows/mda-restartable-negative-reuse-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify all source evidence runs are still green
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for run in 34954606635 34947988952 34957192405 34955629029 34957498769 34958581529 34959355285 34962163790; do
+            conclusion="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run}" --jq '.conclusion')"
+            test "$conclusion" = "success"
+            echo "SOURCE_RUN_OK=${run}"
+          done
+      - name: Run negative-memory unit contracts
+        run: node --test genesis/restartable-negative-reuse-v1.test.mjs
+      - name: Emit restartable negative-reuse evidence
+        run: |
+          mkdir -p /tmp/lean-negative-reuse-v1
+          LEAN_NEGATIVE_REUSE_RESULT=/tmp/lean-negative-reuse-v1/result.json           LEAN_NEGATIVE_REUSE_BANK=/tmp/lean-negative-reuse-v1/bank.json           node genesis/restartable-negative-reuse-v1.mjs | tee /tmp/lean-negative-reuse-v1/stdout.txt
+          grep -q PASS_LEAN_RESTARTABLE_NEGATIVE_REUSE_V1 /tmp/lean-negative-reuse-v1/stdout.txt
+          sha256sum /tmp/lean-negative-reuse-v1/result.json /tmp/lean-negative-reuse-v1/bank.json
+      - name: Protect core and arithmetic regressions
+        run: |
+          node genesis/test.mjs
+          node --test genesis/*.test.mjs
+      - name: Retrieve public Arena corpus
+        run: |
+          mkdir -p _build/tests
+          curl --fail --location --retry 3 https://arena.lean-lang.org/lean-arena-tests.tar.gz -o /tmp/arena.tar.gz
+          python3 - <<'PY'
+          import tarfile,pathlib,json,hashlib
+          root=pathlib.Path('_build/tests')
+          rows=[]
+          with tarfile.open('/tmp/arena.tar.gz','r:gz') as archive:
+              for m in archive:
+                  if not m.isfile() or not m.name.endswith('.ndjson'): continue
+                  parts=pathlib.PurePosixPath(m.name).parts
+                  group=next((i for i,x in enumerate(parts) if x in ('good','bad')),None)
+                  if group is None: continue
+                  name=pathlib.PurePosixPath(*parts[group+1:])
+                  if name.is_absolute() or '..' in name.parts: raise ValueError(m.name)
+                  data=archive.extractfile(m).read()
+                  path=root/name
+                  path.parent.mkdir(parents=True,exist_ok=True)
+                  path.write_bytes(data)
+                  rows.append(dict(name=str(name),expected='ACCEPT' if parts[group]=='good' else 'REJECT',bytes=len(data),sha256=hashlib.sha256(data).hexdigest()))
+          (root/'manifest.json').write_text(json.dumps(rows,indent=2))
+          print('ARENA_CASES='+str(len(rows)))
+          PY
+      - name: Require correct verdicts on every public corpus case
+        run: node genesis/qualify-corpus.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lean-restartable-negative-reuse-v1
+          path: |
+            /tmp/lean-negative-reuse-v1/
+            _build/tests/
+            genesis/evidence/
+          if-no-files-found: error
