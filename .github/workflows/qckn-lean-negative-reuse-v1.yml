@@ -1,0 +1,60 @@
+name: QCKN Lean Negative Reuse V1
+
+on:
+  push:
+    branches:
+      - qckn-lean-negative-reuse-v1
+    paths:
+      - "genesis/evidence/kernel-realitygraph-memory-v1.json"
+      - "genesis/qckn-lean-negative-reuse-v1.py"
+      - ".github/workflows/qckn-lean-negative-reuse-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic-negative-reuse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify pinned diagnostic-memory identity
+        run: |
+          test "$(git hash-object genesis/evidence/kernel-realitygraph-memory-v1.json)" = "da9538a11494f24412254d0ffe9d63f3638e4475"
+
+      - name: Run restartable negative-evidence qualification
+        run: |
+          mkdir -p /tmp/qckn-lean-negative-reuse-v1
+          python genesis/qckn-lean-negative-reuse-v1.py \
+            --out /tmp/qckn-lean-negative-reuse-v1
+
+      - name: Gate exact routing result
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path("/tmp/qckn-lean-negative-reuse-v1")
+          r=json.loads((root/"evidence.json").read_text())
+          assert r["verdict"]=="PASS"
+          assert all(r["gates"].values())
+          assert r["trusted_boundary"]=="diagnostic-routing-only; never changes ACCEPT/REJECT semantics"
+          assert r["cold"]["diagnostic_verifier_calls"]==24
+          assert r["warm"]["diagnostic_verifier_calls"]==8
+          assert r["restart"]["diagnostic_verifier_calls_after_restart"]==0
+          assert r["ablation"]["diagnostic_verifier_calls"]==24
+          assert r["changed_scope_control"]["blocked"] is False
+          print("PASS_QCKN_LEAN_NEGATIVE_REUSE_V1")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qckn-lean-negative-reuse-v1
+          path: /tmp/qckn-lean-negative-reuse-v1/
+          if-no-files-found: error
