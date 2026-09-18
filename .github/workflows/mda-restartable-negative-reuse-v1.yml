@@ -65,8 +65,32 @@ jobs:
           (root/'manifest.json').write_text(json.dumps(rows,indent=2))
           print('ARENA_CASES='+str(len(rows)))
           PY
-      - name: Require correct verdicts on every public corpus case
-        run: node genesis/qualify-corpus.mjs
+      - name: Checkout exact parent for matched non-regression
+        uses: actions/checkout@v5
+        with:
+          ref: 994dfa6312063856252e812908556b748ad3fd83
+          path: parent-worktree
+      - name: Match parent verdict behavior on the same current corpus
+        run: |
+          set -euo pipefail
+          node genesis/qualify-corpus.mjs             --diagnostic             --manifest "$PWD/_build/tests/manifest.json"             --output /tmp/candidate-corpus.json
+          node parent-worktree/genesis/qualify-corpus.mjs             --diagnostic             --manifest "$PWD/_build/tests/manifest.json"             --output /tmp/parent-corpus.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          a=json.loads(Path('/tmp/candidate-corpus.json').read_text())
+          b=json.loads(Path('/tmp/parent-corpus.json').read_text())
+          assert a['totals']['wrong']==0 and a['totals']['errors']==0
+          assert b['totals']['wrong']==0 and b['totals']['errors']==0
+          assert a['totals']==b['totals'], (a['totals'],b['totals'])
+          ar=[(r['name'],r['expected'],r['status'],r.get('reason')) for r in a['rows']]
+          br=[(r['name'],r['expected'],r['status'],r.get('reason')) for r in b['rows']]
+          assert ar==br
+          print('MATCHED_PARENT_CORPUS_TOTALS='+json.dumps(a['totals'],sort_keys=True))
+          print('PASS_LEAN_NEGATIVE_REUSE_CORPUS_NONREGRESSION')
+          PY
+          cp /tmp/candidate-corpus.json /tmp/lean-negative-reuse-v1/candidate-corpus.json
+          cp /tmp/parent-corpus.json /tmp/lean-negative-reuse-v1/parent-corpus.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
