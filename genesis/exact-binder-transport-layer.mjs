@@ -7,7 +7,7 @@ function ensure(k){
   k.__binderSubstMemo??=new WeakMap();
   k.__looseRangeMemo??=new WeakMap();
   k.__binderStats??={shiftHits:0,shiftMisses:0,substHits:0,substMisses:0,rangeHits:0,rangeMisses:0,rangeSkips:0};
-  k.__substKeyDiag??={total:0,newExpression:0,newArgument:0,newDepth:0,exactRepeat:0,seen:new WeakMap(),argFamilySampled:0,argFamilies:new Map(),argProvenance:new Map()};
+  k.__substKeyDiag??={total:0,newExpression:0,newArgument:0,newDepth:0,exactRepeat:0,seen:new WeakMap(),argFamilySampled:0,argFamilies:new Map(),argProvenance:new Map(),substituteFanoutSampled:0,fanoutExprIds:new WeakMap(),fanoutArgIds:new WeakMap(),fanoutNextExprId:1,fanoutNextArgId:1,fanoutExprCounts:new Map(),fanoutArgCounts:new Map()};
 }
 
 function looseRange(k,root){
@@ -64,11 +64,22 @@ p.run=function(...args){
   this.__binderSubstMemo=new WeakMap();
   this.__looseRangeMemo=new WeakMap();
   this.__binderStats={shiftHits:0,shiftMisses:0,substHits:0,substMisses:0,rangeHits:0,rangeMisses:0,rangeSkips:0};
-  this.__substKeyDiag={total:0,newExpression:0,newArgument:0,newDepth:0,exactRepeat:0,seen:new WeakMap(),argFamilySampled:0,argFamilies:new Map(),argProvenance:new Map()};
+  this.__substKeyDiag={total:0,newExpression:0,newArgument:0,newDepth:0,exactRepeat:0,seen:new WeakMap(),argFamilySampled:0,argFamilies:new Map(),argProvenance:new Map(),substituteFanoutSampled:0,fanoutExprIds:new WeakMap(),fanoutArgIds:new WeakMap(),fanoutNextExprId:1,fanoutNextArgId:1,fanoutExprCounts:new Map(),fanoutArgCounts:new Map()};
   return run0.apply(this,args);
 };
 
 const ARG_FAMILY_SAMPLE_LIMIT=100_000;
+const SUBSTITUTE_FANOUT_SAMPLE_LIMIT=100_000;
+
+function localWeakId(map,obj,nextName,q){
+  let id=map.get(obj);
+  if(id!==undefined)return id;
+  id=q[nextName]++;
+  map.set(obj,id);
+  return id;
+}
+
+
 
 function appFamily(e){
   const args=[];let h=e;
@@ -136,6 +147,13 @@ function transport(k,root,operand,start,substitution){
             q.argFamilies.set(family,(q.argFamilies.get(family)??0)+1);
             const provenance=k.__termProvenance?.get(operand)??"source-or-untracked";
             q.argProvenance.set(provenance,(q.argProvenance.get(provenance)??0)+1);
+            if(provenance==="substitute"&&q.substituteFanoutSampled<SUBSTITUTE_FANOUT_SAMPLE_LIMIT){
+              q.substituteFanoutSampled++;
+              const exprId=localWeakId(q.fanoutExprIds,e,"fanoutNextExprId",q);
+              const argId=localWeakId(q.fanoutArgIds,operand,"fanoutNextArgId",q);
+              q.fanoutExprCounts.set(exprId,(q.fanoutExprCounts.get(exprId)??0)+1);
+              q.fanoutArgCounts.set(argId,(q.fanoutArgCounts.get(argId)??0)+1);
+            }
           }
           depths=new Set([d]);
           byArg.set(operand,depths);
