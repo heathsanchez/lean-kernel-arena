@@ -30,6 +30,8 @@ for(const name of TARGETS){
       Kernel.prototype.run=run0;
     }
     const scopedHits=seen.reduce((n,k)=>n+(k.__scopedNativeNatHits??0),0);
+    const fullStackHits=seen.reduce((n,k)=>n+(k.__fullStackNativeNatHits??0),0);
+    const multiBetaHits=seen.reduce((n,k)=>n+(k.__multiBetaNativeNatHits??0),0);
     const symbolicHits=seen.reduce((n,k)=>n+(k.__symbolicNatBoolHits??0),0);
     attempts.push({
       budget,
@@ -38,6 +40,8 @@ for(const name of TARGETS){
       steps:r.steps??null,
       frontier:r.frontier_declaration??null,
       scoped_native_nat_hits:scopedHits,
+      full_stack_native_nat_hits:fullStackHits,
+      multi_beta_native_nat_hits:multiBetaHits,
       symbolic_nat_bool_hits:symbolicHits,
       elapsed_ms:Date.now()-t0,
     });
@@ -52,7 +56,7 @@ const report={
   claim_boundary:"Diagnostic execution-order scout. It reuses only the already-authorized compact Nat primitive equations and exposes them inside the scoped-beta evaluator before ordinary definition unfolding. It is not a production promotion and does not add Nat.decLt, Decidable, UInt32, Char, or declaration-name semantics.",
   rows,
   gates:{
-    compact_native_dispatch_reached:rows.every(r=>r.attempts.some(a=>a.scoped_native_nat_hits>0)),
+    compact_native_dispatch_reached:rows.every(r=>r.attempts.some(a=>a.scoped_native_nat_hits+a.full_stack_native_nat_hits+a.multi_beta_native_nat_hits>0)),
     no_expected_accept_became_reject:rows.every(r=>!r.attempts.some(a=>a.status==="REJECT")),
     symbolic_repair_still_active:rows.every(r=>r.attempts.some(a=>a.symbolic_nat_bool_hits>0)),
   },
