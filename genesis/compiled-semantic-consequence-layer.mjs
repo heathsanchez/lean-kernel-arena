@@ -1,4 +1,5 @@
-import {Kernel} from "./kernel-base.mjs";\nimport {leanName} from "./name-codec.mjs";
+import {Kernel} from "./kernel-base.mjs";
+import {leanName} from "./name-codec.mjs";
 
 const p=Kernel.prototype;
 const N=leanName;
