@@ -15,6 +15,7 @@ const TARGETS=[
   "perf/magma-list-deep-n36.ndjson",
 ];
 const BUDGET=4_000_000;
+Error.stackTraceLimit=80;
 
 function label(n){
   if(typeof n!=="string") return String(n);
@@ -100,7 +101,7 @@ p.equal=function(a,b,ctx=[]){
           right_spine_arity:sb.args.length,
           left_json:JSON.stringify(a).slice(0,6000),
           right_json:JSON.stringify(b).slice(0,6000),
-          error_stack:String(e?.stack??"").split("\n").slice(0,24),
+          error_stack:String(e?.stack??"").split("\n").slice(0,80),
         });
       }
     }
