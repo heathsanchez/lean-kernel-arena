@@ -137,6 +137,9 @@ for(const name of TARGETS){
     retained:{status:result.status,reason:result.reason,steps:result.steps??null},
     withoutRigid:{status:withoutRigid.status,reason:withoutRigid.reason,steps:withoutRigid.steps??null},
     deepest:merged[0]??null,
+    outermost:merged.at(-1)??null,
+    firstFrames:merged.slice(0,5),
+    lastFrames:merged.slice(-5),
     rigidFrameCount:merged.length,
   }));
 }
