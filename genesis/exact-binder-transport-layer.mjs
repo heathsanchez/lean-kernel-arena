@@ -7,6 +7,7 @@ function ensure(k){
   k.__binderSubstMemo??=new WeakMap();
   k.__looseRangeMemo??=new WeakMap();
   k.__binderStats??={shiftHits:0,shiftMisses:0,substHits:0,substMisses:0,rangeHits:0,rangeMisses:0,rangeSkips:0};
+  k.__substKeyDiag??={total:0,newExpression:0,newArgument:0,newDepth:0,exactRepeat:0,seen:new WeakMap()};
 }
 
 function looseRange(k,root){
@@ -63,6 +64,7 @@ p.run=function(...args){
   this.__binderSubstMemo=new WeakMap();
   this.__looseRangeMemo=new WeakMap();
   this.__binderStats={shiftHits:0,shiftMisses:0,substHits:0,substMisses:0,rangeHits:0,rangeMisses:0,rangeSkips:0};
+  this.__substKeyDiag={total:0,newExpression:0,newArgument:0,newDepth:0,exactRepeat:0,seen:new WeakMap()};
   return run0.apply(this,args);
 };
 
@@ -83,6 +85,30 @@ function transport(k,root,operand,start,substitution){
     }
     const cache=substitution?substMap(k,e,operand):shiftMap(k,e);
     const key=substitution?d:operand+":"+d;
+    if(substitution){
+      ensure(k);
+      const q=k.__substKeyDiag;
+      q.total++;
+      let byArg=q.seen.get(e);
+      if(!byArg){
+        q.newExpression++;
+        byArg=new WeakMap();
+        q.seen.set(e,byArg);
+        byArg.set(operand,new Set([d]));
+      }else{
+        let depths=byArg.get(operand);
+        if(!depths){
+          q.newArgument++;
+          depths=new Set([d]);
+          byArg.set(operand,depths);
+        }else if(!depths.has(d)){
+          q.newDepth++;
+          depths.add(d);
+        }else{
+          q.exactRepeat++;
+        }
+      }
+    }
     if(cache.has(key)){k.__binderStats[prefix+"Hits"]++;vals.push(cache.get(key));continue;}
     if(looseRange(k,e)<=d){
       k.__binderStats.rangeSkips++;cache.set(key,e);vals.push(e);continue;
