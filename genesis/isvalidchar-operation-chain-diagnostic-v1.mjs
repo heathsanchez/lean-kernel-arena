@@ -116,7 +116,8 @@ Kernel.prototype.run=function(...args){
   this.__semanticRepairFirstRigid=null;
   this.__semanticRepairLastRigid=null;
   this.__semanticRepairHits=0;
-  this.__postSemanticTicks={};\n  this.__profileMethodEdges={};
+  this.__postSemanticTicks={};
+  this.__profileMethodEdges={};
   return retainedRun.apply(this,args);
 };
 
