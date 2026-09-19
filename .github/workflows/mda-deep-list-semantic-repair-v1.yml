@@ -51,7 +51,7 @@ jobs:
           PY
       - name: Diagnose deep-list rigid mismatch
         run: |
-          node genesis/deep-list-rigid-diagnostic-v1.mjs | tee /tmp/deep-list-rigid-diagnostic-v1.log
+          node --stack-size=32768 genesis/deep-list-rigid-diagnostic-v1.mjs | tee /tmp/deep-list-rigid-diagnostic-v1.log
           grep -q PASS_DEEP_LIST_RIGID_DIAGNOSTIC_V1 /tmp/deep-list-rigid-diagnostic-v1.log
       - uses: actions/upload-artifact@v4
         if: always()
