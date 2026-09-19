@@ -9,7 +9,10 @@ const ZERO=N("Nat","zero"),SUCC=N("Nat","succ");
 const BLE=N("Nat","ble"),BEQ=N("Nat","beq");
 const LAND=N("Nat","land"),SHIFTR=N("Nat","shiftRight");
 const OFNAT=N("OfNat","ofNat"),INST_OF_NAT=N("instOfNatNat");
-const NAT=N("Nat"),BTRUE=N("Bool","true"),BFALSE=N("Bool","false");\nconst PROFILE_DECL=N("Nat","succ_le_succ");\nconst LE_LE=N("LE","le"),INST_LE_NAT=N("instLENat");\nconst SAMPLE_LIMIT=100_000;
+const NAT=N("Nat"),BTRUE=N("Bool","true"),BFALSE=N("Bool","false");
+const PROFILE_DECL=N("Nat","succ_le_succ");
+const LE_LE=N("LE","le"),INST_LE_NAT=N("instLENat");
+const SAMPLE_LIMIT=100_000;
 const TARGETS=[
   "perf/magma-list-deep-n21.ndjson",
   "perf/magma-list-deep-n36.ndjson",
@@ -143,7 +146,9 @@ Kernel.prototype.equal=function(a,b,ctx=[]){
   }
 };
 
-const semanticRepairWhnf=Kernel.prototype.whnf;\nlet globalCaseSampleCount=0;\n
+const semanticRepairWhnf=Kernel.prototype.whnf;
+let globalCaseSampleCount=0;
+
 function isConst(e,name){
   return Array.isArray(e)&&e[0]==="const"&&e[1]===name;
 }
@@ -176,7 +181,9 @@ Kernel.prototype.whnf=function(e){
   const q=this.__leTransition;
   if(target&&q)q.targetCalls++;
   const out=semanticRepairWhnf.call(this,e);
-  if(target&&q&&globalCaseSampleCount<SAMPLE_LIMIT){\n    globalCaseSampleCount++;\n    q.sampled++;
+  if(target&&q&&globalCaseSampleCount<SAMPLE_LIMIT){
+    globalCaseSampleCount++;
+    q.sampled++;
     const key=JSON.stringify([shape(e),shape(out)]);
     q.transitions.set(key,(q.transitions.get(key)??0)+1);
     const h=headSignature(out);
@@ -187,7 +194,9 @@ Kernel.prototype.whnf=function(e){
 
 
 const rows=[];
-for(const name of TARGETS){\n  globalCaseSampleCount=0;\n  const input=readFileSync(resolve("_build/tests",name),"utf8");
+for(const name of TARGETS){
+  globalCaseSampleCount=0;
+  const input=readFileSync(resolve("_build/tests",name),"utf8");
   const seen=[];
   const captureRun=Kernel.prototype.run;
   Kernel.prototype.run=function(...xs){
