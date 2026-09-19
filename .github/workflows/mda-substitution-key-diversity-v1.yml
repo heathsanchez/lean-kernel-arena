@@ -1,0 +1,87 @@
+name: Substitution key diversity V1
+
+on:
+  push:
+    branches: [mda-substitution-key-diversity-v1]
+    paths:
+      - 'genesis/exact-binder-transport-layer.mjs'
+      - 'genesis/substitution-key-diversity-v1.mjs'
+      - '.github/workflows/mda-substitution-key-diversity-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Protect core regressions
+        run: |
+          node genesis/test.mjs
+          node --test genesis/*.test.mjs
+
+      - name: Retrieve current public Arena corpus
+        run: |
+          mkdir -p _build/tests
+          curl --fail --location --retry 3 https://arena.lean-lang.org/lean-arena-tests.tar.gz -o /tmp/arena.tar.gz
+          python3 - <<'PY'
+          import tarfile,pathlib
+          root=pathlib.Path('_build/tests')
+          with tarfile.open('/tmp/arena.tar.gz','r:gz') as archive:
+              for m in archive:
+                  if not m.isfile() or not m.name.endswith('.ndjson'): continue
+                  parts=pathlib.PurePosixPath(m.name).parts
+                  group=next((i for i,x in enumerate(parts) if x in ('good','bad')),None)
+                  if group is None: continue
+                  name=pathlib.PurePosixPath(*parts[group+1:])
+                  if name.is_absolute() or '..' in name.parts: raise ValueError(m.name)
+                  data=archive.extractfile(m).read()
+                  path=root/name
+                  path.parent.mkdir(parents=True,exist_ok=True)
+                  path.write_bytes(data)
+          PY
+
+      - name: Run substitution key-diversity diagnostic
+        run: |
+          node --stack-size=32768 genesis/substitution-key-diversity-v1.mjs             | tee /tmp/substitution-key-diversity-v1.log
+          grep -q PASS_SUBSTITUTION_KEY_DIVERSITY_V1             /tmp/substitution-key-diversity-v1.log
+
+      - name: Gate key-diversity evidence
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('genesis/evidence/substitution-key-diversity-v1.json'))
+          assert r['schema']=='substitution-key-diversity-v1'
+          assert all(r['gates'].values()),r['gates']
+          assert r['precommit']['realitygraph_commit']=='6606524bb42dca43c45e376c356624680836d9f8'
+          assert r['classification'] in {
+              'expression-identity-dominant',
+              'argument-identity-dominant',
+              'binder-depth-dominant',
+              'mixed-dimension'
+          }
+          print('PASS_SUBSTITUTION_KEY_DIVERSITY_V1')
+          print('CLASSIFICATION='+r['classification'])
+          for row in r['rows']:
+              print(row['name'],{
+                  'partition':row['substitution_key_partition'],
+                  'fractions':row['substitution_key_partition_fractions'],
+                  'binder_stats':row['binder_stats'],
+              })
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: substitution-key-diversity-v1
+          path: |
+            genesis/evidence/substitution-key-diversity-v1.json
+            /tmp/substitution-key-diversity-v1.log
+          if-no-files-found: error
