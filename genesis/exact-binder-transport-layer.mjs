@@ -7,7 +7,7 @@ function ensure(k){
   k.__binderSubstMemo??=new WeakMap();
   k.__looseRangeMemo??=new WeakMap();
   k.__binderStats??={shiftHits:0,shiftMisses:0,substHits:0,substMisses:0,rangeHits:0,rangeMisses:0,rangeSkips:0};
-  k.__substKeyDiag??={total:0,newExpression:0,newArgument:0,newDepth:0,exactRepeat:0,seen:new WeakMap()};
+  k.__substKeyDiag??={total:0,newExpression:0,newArgument:0,newDepth:0,exactRepeat:0,seen:new WeakMap(),argFamilySampled:0,argFamilies:new Map()};
 }
 
 function looseRange(k,root){
@@ -64,9 +64,40 @@ p.run=function(...args){
   this.__binderSubstMemo=new WeakMap();
   this.__looseRangeMemo=new WeakMap();
   this.__binderStats={shiftHits:0,shiftMisses:0,substHits:0,substMisses:0,rangeHits:0,rangeMisses:0,rangeSkips:0};
-  this.__substKeyDiag={total:0,newExpression:0,newArgument:0,newDepth:0,exactRepeat:0,seen:new WeakMap()};
+  this.__substKeyDiag={total:0,newExpression:0,newArgument:0,newDepth:0,exactRepeat:0,seen:new WeakMap(),argFamilySampled:0,argFamilies:new Map()};
   return run0.apply(this,args);
 };
+
+const ARG_FAMILY_SAMPLE_LIMIT=100_000;
+
+function appFamily(e){
+  const args=[];let h=e;
+  while(Array.isArray(h)&&h[0]==="app"){args.push(h[2]);h=h[1];}
+  args.reverse();
+  let head;
+  if(Array.isArray(h)&&h[0]==="const")head=["const",h[1]];
+  else if(Array.isArray(h))head=[h[0]];
+  else head=[typeof h];
+  const argTags=args.map(x=>Array.isArray(x)?x[0]:typeof x);
+  return ["app",head,args.length,argTags];
+}
+function argFamily(e){
+  if(!Array.isArray(e))return [typeof e];
+  switch(e[0]){
+    case "app": return appFamily(e);
+    case "const": return ["const",e[1]];
+    case "var": return ["var"];
+    case "nat": return ["nat"];
+    case "strlit": return ["strlit"];
+    case "pi": case "lam":
+      return [e[0],Array.isArray(e[1])?e[1][0]:typeof e[1],Array.isArray(e[2])?e[2][0]:typeof e[2]];
+    case "let":
+      return ["let",...e.slice(1).map(x=>Array.isArray(x)?x[0]:typeof x)];
+    case "proj":
+      return ["proj",String(e[1]),String(e[2]),Array.isArray(e[3])?e[3][0]:typeof e[3]];
+    default: return [String(e[0]??"<unknown>")];
+  }
+}
 
 // Explicit traversal retains the exact cache keys and closed-subtree skips
 // without reintroducing host recursion above the stack-safe kernel transforms.
@@ -99,6 +130,11 @@ function transport(k,root,operand,start,substitution){
         let depths=byArg.get(operand);
         if(!depths){
           q.newArgument++;
+          if(q.argFamilySampled<ARG_FAMILY_SAMPLE_LIMIT){
+            q.argFamilySampled++;
+            const family=JSON.stringify(argFamily(operand));
+            q.argFamilies.set(family,(q.argFamilies.get(family)??0)+1);
+          }
           depths=new Set([d]);
           byArg.set(operand,depths);
         }else if(!depths.has(d)){
