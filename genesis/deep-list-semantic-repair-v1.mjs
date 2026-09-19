@@ -69,6 +69,7 @@ Kernel.prototype.whnf=function(e){
 
 Kernel.prototype.run=function(...args){
   this.__semanticRepairFirstRigid=null;
+  this.__semanticRepairLastRigid=null;
   this.__semanticRepairHits=0;
   return retainedRun.apply(this,args);
 };
@@ -77,16 +78,17 @@ Kernel.prototype.equal=function(a,b,ctx=[]){
   try{
     return retainedEqual.call(this,a,b,ctx);
   }catch(e){
-    if(e instanceof Stop && e.status===REJECT && e.message==="rigid-head-mismatch" &&
-       this.__semanticRepairFirstRigid===null){
-      this.__semanticRepairFirstRigid={
+    if(e instanceof Stop && e.status===REJECT && e.message==="rigid-head-mismatch"){
+      const row={
         step:this.steps,
         declaration:String(this.currentDeclaration),
         ctx_depth:ctx.length,
-        left:JSON.stringify(a).slice(0,6000),
-        right:JSON.stringify(b).slice(0,6000),
+        left:JSON.stringify(a).slice(0,12000),
+        right:JSON.stringify(b).slice(0,12000),
         stack:String(e.stack??"").split("\n").slice(0,80),
       };
+      if(this.__semanticRepairFirstRigid===null)this.__semanticRepairFirstRigid=row;
+      this.__semanticRepairLastRigid=row;
     }
     throw e;
   }
@@ -111,18 +113,21 @@ for(const name of TARGETS){
       Kernel.prototype.run=captureRun;
     }
     const firstRigid=seen.map(k=>k.__semanticRepairFirstRigid).find(Boolean)??null;
+    const lastRigid=[...seen].reverse().map(k=>k.__semanticRepairLastRigid).find(Boolean)??null;
     const symbolicHits=seen.reduce((n,k)=>n+(k.__symbolicNatBoolHits??0),0);
     attempts.push({
       budget,status:r.status,reason:r.reason??null,steps:r.steps??null,
       frontier:r.frontier_declaration??null,
       symbolic_nat_bool_hits:symbolicHits,
       first_rigid:firstRigid,
+      last_rigid:lastRigid,
     });
     console.log("DEEP_LIST_SEMANTIC_REPAIR_ATTEMPT "+JSON.stringify({
       name,budget,status:r.status,reason:r.reason??null,steps:r.steps??null,
       frontier:r.frontier_declaration??null,
       symbolicHits,
       firstRigid,
+      lastRigid,
     }));
     if(r.status==="ACCEPT"||r.status==="REJECT")break;
   }
