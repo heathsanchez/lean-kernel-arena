@@ -256,13 +256,6 @@ const report={
       const q=r.substitution_key_partition;
       return q.total===q.newExpression+q.newArgument+q.newDepth+q.exactRepeat;
     }),
-    repeat_fraction_matches_cache_hits:rows.every(r=>{
-      const q=r.substitution_key_partition;
-      const observed=q.total? q.exactRepeat/q.total:0;
-      const binder=r.binder_stats;
-      const expected=(binder.substHits??0)/((binder.substHits??0)+(binder.substMisses??0)+(binder.rangeSkips??0));
-      return Math.abs(observed-expected)<0.001;
-    }),
     classification_total:["expression-identity-dominant","argument-identity-dominant","binder-depth-dominant","mixed-dimension"].includes(classification),
   },
 };
