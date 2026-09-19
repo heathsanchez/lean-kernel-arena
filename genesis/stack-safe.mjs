@@ -660,7 +660,7 @@ function continuationInfer(root,rootCtx) {
         this.tick();
         this.need("binders");
         this.sortOf(e[1],ctx);
-        kont.push({kind:"lam",domain:e[1]});
+        kont.push({kind:"lam",domain:e[1],ctx});
         ctx=[...ctx,e[1]];
         e=e[2];
         continue;
@@ -709,6 +709,7 @@ function continuationInfer(root,rootCtx) {
 
     if(k.kind==="lam") {
       value=this.make("pi",k.domain,value);
+      ctx=k.ctx;
       continue;
     }
 
