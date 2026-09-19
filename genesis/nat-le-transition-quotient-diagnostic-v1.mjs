@@ -143,8 +143,7 @@ Kernel.prototype.equal=function(a,b,ctx=[]){
   }
 };
 
-const semanticRepairWhnf=Kernel.prototype.whnf;
-
+const semanticRepairWhnf=Kernel.prototype.whnf;\nlet globalCaseSampleCount=0;\n
 function isConst(e,name){
   return Array.isArray(e)&&e[0]==="const"&&e[1]===name;
 }
@@ -177,8 +176,7 @@ Kernel.prototype.whnf=function(e){
   const q=this.__leTransition;
   if(target&&q)q.targetCalls++;
   const out=semanticRepairWhnf.call(this,e);
-  if(target&&q&&q.sampled<SAMPLE_LIMIT){
-    q.sampled++;
+  if(target&&q&&globalCaseSampleCount<SAMPLE_LIMIT){\n    globalCaseSampleCount++;\n    q.sampled++;
     const key=JSON.stringify([shape(e),shape(out)]);
     q.transitions.set(key,(q.transitions.get(key)??0)+1);
     const h=headSignature(out);
@@ -189,8 +187,7 @@ Kernel.prototype.whnf=function(e){
 
 
 const rows=[];
-for(const name of TARGETS){
-  const input=readFileSync(resolve("_build/tests",name),"utf8");
+for(const name of TARGETS){\n  globalCaseSampleCount=0;\n  const input=readFileSync(resolve("_build/tests",name),"utf8");
   const seen=[];
   const captureRun=Kernel.prototype.run;
   Kernel.prototype.run=function(...xs){
@@ -289,7 +286,7 @@ const report={
     no_wrong_reject:rows.every(r=>r.status!=="REJECT"),
     both_unknown_at_4m:rows.every(r=>r.status==="UNKNOWN"&&r.steps===4000001),
     both_observe_target_transitions:rows.every(r=>r.target_calls>10000&&r.sampled>10000),
-    sample_bound_respected:rows.every(r=>r.sampled<=SAMPLE_LIMIT*2),
+    sample_bound_respected:rows.every(r=>r.sampled<=SAMPLE_LIMIT),
     classification_total:["quotient-and-direct-transition-candidate","quotient-candidate-only","no-candidate"].includes(classification),
   },
 };
