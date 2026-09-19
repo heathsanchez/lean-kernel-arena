@@ -80,7 +80,7 @@ Kernel.prototype.whnf=function(e){
     const {h,args}=spine(e);
     if(h?.[0]==="const"&&(h[2]??[]).length===0&&args.length===2&&
        (h[1]===LAND||h[1]===SHIFTR)){
-      const wa=retainedWhnf.call(this,args[0]),wb=retainedWhnf.call(this,args[1]);
+      const wa=this.whnf(args[0]),wb=this.whnf(args[1]);
       const a=natVal(wa)??natVal(args[0]),b=natVal(wb)??natVal(args[1]);
       if(a!==null&&b!==null&&a>=0n&&b>=0n){
         this.tick();this.need("reduction");this.need("declarations");
@@ -91,7 +91,8 @@ Kernel.prototype.whnf=function(e){
     }
     if(h?.[0]==="const"&&(h[2]??[]).length===0&&args.length===2&&
        (h[1]===BLE||h[1]===BEQ)){
-      const a=natCtor(args[0]),b=natCtor(args[1]);
+      const wa=this.whnf(args[0]),wb=this.whnf(args[1]);
+      const a=natCtor(wa),b=natCtor(wb);
       if(a&&b){
         this.tick();this.need("reduction");this.need("declarations");
         this.__symbolicNatBoolHits=(this.__symbolicNatBoolHits??0)+1;
