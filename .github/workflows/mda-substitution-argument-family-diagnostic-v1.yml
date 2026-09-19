@@ -1,0 +1,87 @@
+name: Substitution argument family diagnostic V1
+
+on:
+  push:
+    branches: [mda-substitution-argument-family-diagnostic-v1]
+    paths:
+      - 'genesis/exact-binder-transport-layer.mjs'
+      - 'genesis/substitution-argument-family-diagnostic-v1.mjs'
+      - '.github/workflows/mda-substitution-argument-family-diagnostic-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Protect core regressions
+        run: |
+          node genesis/test.mjs
+          node --test genesis/*.test.mjs
+
+      - name: Retrieve current public Arena corpus
+        run: |
+          mkdir -p _build/tests
+          curl --fail --location --retry 3 https://arena.lean-lang.org/lean-arena-tests.tar.gz -o /tmp/arena.tar.gz
+          python3 - <<'PY'
+          import tarfile,pathlib
+          root=pathlib.Path('_build/tests')
+          with tarfile.open('/tmp/arena.tar.gz','r:gz') as archive:
+              for m in archive:
+                  if not m.isfile() or not m.name.endswith('.ndjson'): continue
+                  parts=pathlib.PurePosixPath(m.name).parts
+                  group=next((i for i,x in enumerate(parts) if x in ('good','bad')),None)
+                  if group is None: continue
+                  name=pathlib.PurePosixPath(*parts[group+1:])
+                  if name.is_absolute() or '..' in name.parts: raise ValueError(m.name)
+                  data=archive.extractfile(m).read()
+                  path=root/name
+                  path.parent.mkdir(parents=True,exist_ok=True)
+                  path.write_bytes(data)
+          PY
+
+      - name: Run substitution argument-family diagnostic
+        run: |
+          node --stack-size=32768 genesis/substitution-argument-family-diagnostic-v1.mjs             | tee /tmp/substitution-argument-family-diagnostic-v1.log
+          grep -q PASS_SUBSTITUTION_ARGUMENT_FAMILY_DIAGNOSTIC_V1             /tmp/substitution-argument-family-diagnostic-v1.log
+
+      - name: Gate family evidence
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('genesis/evidence/substitution-argument-family-diagnostic-v1.json'))
+          assert r['schema']=='substitution-argument-family-diagnostic-v1'
+          assert all(r['gates'].values()),r['gates']
+          assert r['precommit']['realitygraph_commit']=='25cb163784828bb8fab9cde181282342b3c9bb00'
+          assert r['classification'] in {
+              'small-stable-family',
+              'stable-heavy-tail',
+              'distributed-arguments'
+          }
+          print('PASS_SUBSTITUTION_ARGUMENT_FAMILY_DIAGNOSTIC_V1')
+          print('CLASSIFICATION='+r['classification'])
+          for row in r['rows']:
+              print(row['name'],{
+                  'sampled':row['argument_family_sampled'],
+                  'classes':row['argument_family_class_count'],
+                  'top8_coverage':row['argument_family_top8_coverage'],
+                  'top_families':row['argument_family_top'][:8],
+              })
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: substitution-argument-family-diagnostic-v1
+          path: |
+            genesis/evidence/substitution-argument-family-diagnostic-v1.json
+            /tmp/substitution-argument-family-diagnostic-v1.log
+          if-no-files-found: error
