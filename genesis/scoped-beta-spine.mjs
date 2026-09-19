@@ -1,4 +1,5 @@
 import { Kernel } from "./kernel-base.mjs";
+import {tryCompactNatPrimitive} from "./nat-primitive-compact-scout-v1.mjs";
 
 // Retained execution consequence from the lawful scoped beta-spine separator.
 //
@@ -184,6 +185,13 @@ function iterativeRecWhnf(k,root){
 
     if(head[0]==="const"){
       k.tick();k.need("declarations");
+      const native=tryCompactNatPrimitive(head,args);
+      if(native!==null){
+        k.need("nat-literals");k.need("reduction");
+        k.__scopedNativeNatHits=(k.__scopedNativeNatHits??0)+1;
+        state=attach(native,[]);
+        continue;
+      }
       const d=k.env.get(head[1]);
       if(!d) k.reject("undeclared-constant");
 
