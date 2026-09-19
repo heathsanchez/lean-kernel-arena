@@ -1,0 +1,84 @@
+name: Substitute make shape quotient diagnostic V1
+
+on:
+  push:
+    branches: [mda-substitute-make-shape-quotient-diagnostic-v1]
+    paths:
+      - 'genesis/substitute-make-shape-quotient-diagnostic-v1.mjs'
+      - '.github/workflows/mda-substitute-make-shape-quotient-diagnostic-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Protect core regressions
+        run: |
+          node genesis/test.mjs
+          node --test genesis/*.test.mjs
+
+      - name: Retrieve current public Arena corpus
+        run: |
+          mkdir -p _build/tests
+          curl --fail --location --retry 3 https://arena.lean-lang.org/lean-arena-tests.tar.gz -o /tmp/arena.tar.gz
+          python3 - <<'PY'
+          import tarfile,pathlib
+          root=pathlib.Path('_build/tests')
+          with tarfile.open('/tmp/arena.tar.gz','r:gz') as archive:
+              for m in archive:
+                  if not m.isfile() or not m.name.endswith('.ndjson'): continue
+                  parts=pathlib.PurePosixPath(m.name).parts
+                  group=next((i for i,x in enumerate(parts) if x in ('good','bad')),None)
+                  if group is None: continue
+                  name=pathlib.PurePosixPath(*parts[group+1:])
+                  if name.is_absolute() or '..' in name.parts: raise ValueError(m.name)
+                  data=archive.extractfile(m).read()
+                  path=root/name
+                  path.parent.mkdir(parents=True,exist_ok=True)
+                  path.write_bytes(data)
+          PY
+
+      - name: Profile substitute to make shape quotient
+        run: |
+          node --stack-size=32768 genesis/substitute-make-shape-quotient-diagnostic-v1.mjs             | tee /tmp/substitute-make-shape-quotient-diagnostic-v1.log
+          grep -q PASS_SUBSTITUTE_MAKE_SHAPE_QUOTIENT_DIAGNOSTIC_V1             /tmp/substitute-make-shape-quotient-diagnostic-v1.log
+
+      - name: Gate shape quotient evidence
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('genesis/evidence/substitute-make-shape-quotient-diagnostic-v1.json'))
+          assert r['schema']=='substitute-make-shape-quotient-diagnostic-v1'
+          assert all(r['gates'].values()),r['gates']
+          assert r['precommit']['realitygraph_commit']=='37de6528971f8664b622aa64aac6044013e2203f'
+          assert r['classification'] in {'small-stable-basis','distributed-shapes'}
+          print('PASS_SUBSTITUTE_MAKE_SHAPE_QUOTIENT_DIAGNOSTIC_V1')
+          print('CLASSIFICATION='+r['classification'])
+          for row in r['rows']:
+              a=row['attempts'][-1]
+              print(row['name'],{
+                  'calls':a['substitute_make_calls'],
+                  'sampled':a['substitute_make_sampled'],
+                  'classes':a['substitute_make_shape_class_count'],
+                  'top8_coverage':a['substitute_make_top8_shape_coverage'],
+                  'top_shapes':a['substitute_make_top_shapes'][:8],
+              })
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: substitute-make-shape-quotient-diagnostic-v1
+          path: |
+            genesis/evidence/substitute-make-shape-quotient-diagnostic-v1.json
+            /tmp/substitute-make-shape-quotient-diagnostic-v1.log
+          if-no-files-found: error
