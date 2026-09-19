@@ -1,6 +1,7 @@
 import {readFileSync,writeFileSync,mkdirSync} from "node:fs";
 import {dirname,resolve} from "node:path";
 import * as K from "./kernel.mjs";
+import * as P from "./production.mjs";
 
 const CAPS=[
   "sort","binders","application","reduction","declarations","universes",
@@ -113,7 +114,11 @@ for(const name of TARGETS){
   const input=readFileSync(resolve("_build/tests",name),"utf8");
   let result;
   try{
-    result=K.checkExport(input,CAPS,BUDGET);
+    result=P.checkExport(input,{
+      semanticBudget:BUDGET,
+      inputBytes:20_000_000,
+      recordLimit:400_000,
+    });
   }finally{
     p.run=retainedRun;
   }
