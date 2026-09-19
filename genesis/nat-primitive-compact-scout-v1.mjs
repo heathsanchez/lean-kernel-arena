@@ -6,7 +6,7 @@ const ADD=N("Nat","add"),SUB=N("Nat","sub"),MUL=N("Nat","mul");
 const DIV=N("Nat","div"),MOD=N("Nat","mod"),BEQ=N("Nat","beq"),BLE=N("Nat","ble");
 const BTRUE=N("Bool","true"),BFALSE=N("Bool","false");
 
-function natVal(e){
+export function compactNatValue(e){
   if(!Array.isArray(e))return null;
   if(e[0]==="nat"){
     const n=e[1];
@@ -33,12 +33,12 @@ export function tryCompactNatPrimitive(head,args){
   const name=head[1];
 
   if(name===SUCC&&args.length===1){
-    const a=natVal(args[0]);
+    const a=compactNatValue(args[0]);
     return a===null?null:natExpr(a+1n);
   }
 
   if(args.length!==2||![ADD,SUB,MUL,DIV,MOD,BEQ,BLE].includes(name))return null;
-  const a=natVal(args[0]),b=natVal(args[1]);
+  const a=compactNatValue(args[0]),b=compactNatValue(args[1]);
   if(a===null||b===null)return null;
 
   if(name===ADD)return natExpr(a+b);
