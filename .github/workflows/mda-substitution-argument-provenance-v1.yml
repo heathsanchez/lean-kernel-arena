@@ -1,0 +1,86 @@
+name: Substitution argument provenance V1
+
+on:
+  push:
+    branches: [mda-substitution-argument-provenance-v1]
+    paths:
+      - 'genesis/exact-binder-transport-layer.mjs'
+      - 'genesis/substitution-argument-provenance-v1.mjs'
+      - '.github/workflows/mda-substitution-argument-provenance-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Protect core regressions
+        run: |
+          node genesis/test.mjs
+          node --test genesis/*.test.mjs
+
+      - name: Retrieve current public Arena corpus
+        run: |
+          mkdir -p _build/tests
+          curl --fail --location --retry 3 https://arena.lean-lang.org/lean-arena-tests.tar.gz -o /tmp/arena.tar.gz
+          python3 - <<'PY'
+          import tarfile,pathlib
+          root=pathlib.Path('_build/tests')
+          with tarfile.open('/tmp/arena.tar.gz','r:gz') as archive:
+              for m in archive:
+                  if not m.isfile() or not m.name.endswith('.ndjson'): continue
+                  parts=pathlib.PurePosixPath(m.name).parts
+                  group=next((i for i,x in enumerate(parts) if x in ('good','bad')),None)
+                  if group is None: continue
+                  name=pathlib.PurePosixPath(*parts[group+1:])
+                  if name.is_absolute() or '..' in name.parts: raise ValueError(m.name)
+                  data=archive.extractfile(m).read()
+                  path=root/name
+                  path.parent.mkdir(parents=True,exist_ok=True)
+                  path.write_bytes(data)
+          PY
+
+      - name: Run substitution argument provenance diagnostic
+        run: |
+          node --stack-size=32768 genesis/substitution-argument-provenance-v1.mjs             | tee /tmp/substitution-argument-provenance-v1.log
+          grep -q PASS_SUBSTITUTION_ARGUMENT_PROVENANCE_V1             /tmp/substitution-argument-provenance-v1.log
+
+      - name: Gate provenance evidence
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('genesis/evidence/substitution-argument-provenance-v1.json'))
+          assert r['schema']=='substitution-argument-provenance-v1'
+          assert all(r['gates'].values()),r['gates']
+          assert r['precommit']['realitygraph_commit']=='71fa248c183950e0757bc0bef76fd0129eecbd8e'
+          assert r['classification'] in {
+              'single-generator-dominant',
+              'stable-small-generator-basis',
+              'distributed-generation'
+          }
+          print('PASS_SUBSTITUTION_ARGUMENT_PROVENANCE_V1')
+          print('CLASSIFICATION='+r['classification'])
+          for row in r['rows']:
+              print(row['name'],{
+                  'sampled':row['argument_family_sampled'],
+                  'provenance':row['argument_provenance'],
+                  'top3_coverage':row['argument_provenance_top3_coverage'],
+              })
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: substitution-argument-provenance-v1
+          path: |
+            genesis/evidence/substitution-argument-provenance-v1.json
+            /tmp/substitution-argument-provenance-v1.log
+          if-no-files-found: error
