@@ -29,7 +29,8 @@ for(const name of TARGETS){
     }finally{
       Kernel.prototype.run=run0;
     }
-    const scopedHits=seen.reduce((n,k)=>n+(k.__scopedNativeNatHits??0),0);\n    const operandHits=seen.reduce((n,k)=>n+(k.__scopedNativeOperandHits??0),0);
+    const scopedHits=seen.reduce((n,k)=>n+(k.__scopedNativeNatHits??0),0);
+    const operandHits=seen.reduce((n,k)=>n+(k.__scopedNativeOperandHits??0),0);
     const symbolicHits=seen.reduce((n,k)=>n+(k.__symbolicNatBoolHits??0),0);
     attempts.push({
       budget,
