@@ -20,6 +20,14 @@ function natExpr(v){
   return ["nat",v<=BigInt(Number.MAX_SAFE_INTEGER)?Number(v):v.toString()];
 }
 
+export function compactNatPrimitiveArity(head){
+  if(!Array.isArray(head)||head[0]!=="const"||(head[2]??[]).length!==0)return null;
+  const name=head[1];
+  if(name===SUCC)return 1;
+  if([ADD,SUB,MUL,DIV,MOD,BEQ,BLE].includes(name))return 2;
+  return null;
+}
+
 export function tryCompactNatPrimitive(head,args){
   if(!Array.isArray(head)||head[0]!=="const"||(head[2]??[]).length!==0)return null;
   const name=head[1];
