@@ -210,7 +210,7 @@ for(const name of TARGETS){
       frontier:r.frontier_declaration??null,
       symbolic_nat_bool_hits:symbolicHits,
       top_declaration_ticks:topDeclarationTicks,
-      profiled_declaration:PROFILE_DECL,\n  precommit:{realitygraph_commit:"6bb224e72e2183e79b40298a5033349159a7e59e",source_episode_run:35425477279,source_episode_artifact:10578499369,source_episode_digest:"sha256:dc4049fff8c38f924e804250770df80fde88726c1d4fc726ac783b9bfe24abcc"},
+      profiled_declaration:PROFILE_DECL,
       top_method_ticks_for_profiled_declaration:topMethodTicks,
       first_rigid:firstRigid,
       last_rigid:lastRigid,
@@ -240,6 +240,12 @@ const profileMethods=rows.map(r=>r.attempts.at(-1)?.top_method_ticks_for_profile
 const report={
   schema:"isvalidchar-method-profile-v1",
   profiled_declaration:PROFILE_DECL,
+  precommit:{
+    realitygraph_commit:"6bb224e72e2183e79b40298a5033349159a7e59e",
+    source_episode_run:35425477279,
+    source_episode_artifact:10578499369,
+    source_episode_digest:"sha256:dc4049fff8c38f924e804250770df80fde88726c1d4fc726ac783b9bfe24abcc",
+  },
   candidate:"method-level tick decomposition inside the common isValidChar_UInt32 frontier after prior Nat.succ_le_succ routes were compiled away",
   claim_boundary:"Diagnostic-only method attribution inside the already observed common isValidChar_UInt32 declaration frontier. No semantic rule, cache admission, ACCEPT/REJECT authority, or optimization is added.",
   rows,
