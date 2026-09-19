@@ -1,5 +1,5 @@
 import { Kernel } from "./kernel-base.mjs";
-import {tryCompactNatPrimitive} from "./nat-primitive-compact-scout-v1.mjs";
+import {compactNatPrimitiveArity,compactNatValue,tryCompactNatPrimitive} from "./nat-primitive-compact-scout-v1.mjs";
 
 // Retained execution consequence from the lawful scoped beta-spine separator.
 //
@@ -185,11 +185,21 @@ function iterativeRecWhnf(k,root){
 
     if(head[0]==="const"){
       k.tick();k.need("declarations");
-      const native=tryCompactNatPrimitive(head,args);
-      if(native!==null){
-        k.need("nat-literals");k.need("reduction");
-        k.__scopedNativeNatHits=(k.__scopedNativeNatHits??0)+1;
-        state=attach(native,[]);
+      const nativeArity=compactNatPrimitiveArity(head);
+      if(nativeArity!==null && args.length===nativeArity){
+        const native=tryCompactNatPrimitive(head,args);
+        if(native!==null){
+          k.need("nat-literals");k.need("reduction");
+          k.__scopedNativeNatHits=(k.__scopedNativeNatHits??0)+1;
+          state=attach(native,[]);
+          continue;
+        }
+        // Evaluate primitive operands inside this same explicit machine rather
+        // than recursively re-entering Kernel.whnf. This is a diagnostic scout
+        // for path-independent primitive reachability; noncompact operands fall
+        // back to the ordinary checked definition unchanged.
+        frames.push({kind:"native",head,args,index:0,values:[]});
+        state=flatten(args[0]);
         continue;
       }
       const d=k.env.get(head[1]);
@@ -220,6 +230,47 @@ function iterativeRecWhnf(k,root){
     let result=rebuild(head,args);
     while(frames.length){
       const fr=frames.pop();
+
+      if(fr.kind==="native"){
+        const compact=compactNatValue(result);
+        if(compact===null){
+          const d=k.env.get(fr.head[1]);
+          if(d?.kind==="def"){
+            k.need("reduction");
+            state=attach(k.instantiateDeclaration(fr.head,d.value),fr.args);
+            result=null;
+            break;
+          }
+          result=rebuild(fr.head,fr.args);
+          continue;
+        }
+        const values=fr.values.concat([result]);
+        const next=fr.index+1;
+        if(next<fr.args.length){
+          frames.push({...fr,index:next,values});
+          state=flatten(fr.args[next]);
+          result=null;
+          break;
+        }
+        const native=tryCompactNatPrimitive(fr.head,values);
+        if(native===null){
+          const d=k.env.get(fr.head[1]);
+          if(d?.kind==="def"){
+            k.need("reduction");
+            state=attach(k.instantiateDeclaration(fr.head,d.value),fr.args);
+            result=null;
+            break;
+          }
+          result=rebuild(fr.head,fr.args);
+          continue;
+        }
+        k.need("nat-literals");k.need("reduction");
+        k.__scopedNativeNatHits=(k.__scopedNativeNatHits??0)+1;
+        k.__scopedNativeOperandHits=(k.__scopedNativeOperandHits??0)+1;
+        state=attach(native,[]);
+        result=null;
+        break;
+      }
 
       if(fr.kind==="proj"){
         const ms=flatten(result),mh=ms.head,margs=ms.args;
