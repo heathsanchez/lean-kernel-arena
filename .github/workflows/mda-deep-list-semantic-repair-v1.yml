@@ -53,6 +53,10 @@ jobs:
         run: |
           node --stack-size=32768 genesis/deep-list-rigid-diagnostic-v1.mjs | tee /tmp/deep-list-rigid-diagnostic-v1.log
           grep -q PASS_DEEP_LIST_RIGID_DIAGNOSTIC_V1 /tmp/deep-list-rigid-diagnostic-v1.log
+      - name: Test symbolic Nat boolean semantic repair
+        run: |
+          node --stack-size=32768 genesis/deep-list-semantic-repair-v1.mjs | tee /tmp/deep-list-semantic-repair-v1.log
+          grep -q PASS_DEEP_LIST_SEMANTIC_REPAIR_V1 /tmp/deep-list-semantic-repair-v1.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
