@@ -18,7 +18,9 @@ const BUDGET=4_000_000;
 
 const retainedWhnf=Kernel.prototype.whnf;
 const retainedEqual=Kernel.prototype.equal;
-const retainedRun=Kernel.prototype.run;\nconst retainedSubstitute=Kernel.prototype.substitute;\nconst retainedMake=Kernel.prototype.make;
+const retainedRun=Kernel.prototype.run;
+const retainedSubstitute=Kernel.prototype.substitute;
+const retainedMake=Kernel.prototype.make;
 Error.stackTraceLimit=80;
 
 function spine(e){
