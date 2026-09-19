@@ -115,7 +115,15 @@ Kernel.prototype.run=function(...args){
   this.__semanticRepairFirstRigid=null;
   this.__semanticRepairLastRigid=null;
   this.__semanticRepairHits=0;
+  this.__postSemanticTicks={};
   return retainedRun.apply(this,args);
+};
+
+Kernel.prototype.tick=function(...args){
+  this.__postSemanticTicks??={};
+  const key=String(this.currentDeclaration??"<none>");
+  this.__postSemanticTicks[key]=(this.__postSemanticTicks[key]??0)+1;
+  return retainedTick.apply(this,args);
 };
 
 Kernel.prototype.equal=function(a,b,ctx=[]){
@@ -129,8 +137,7 @@ Kernel.prototype.equal=function(a,b,ctx=[]){
         ctx_depth:ctx.length,
         left:JSON.stringify(a).slice(0,12000),
         right:JSON.stringify(b).slice(0,12000),
-        stack:String(e.stack??"").split("
-").slice(0,80),
+        stack:String(e.stack??"").split("\n").slice(0,80),
       };
       if(this.__semanticRepairFirstRigid===null)this.__semanticRepairFirstRigid=row;
       this.__semanticRepairLastRigid=row;
@@ -160,10 +167,20 @@ for(const name of TARGETS){
     const firstRigid=seen.map(k=>k.__semanticRepairFirstRigid).find(Boolean)??null;
     const lastRigid=[...seen].reverse().map(k=>k.__semanticRepairLastRigid).find(Boolean)??null;
     const symbolicHits=seen.reduce((n,k)=>n+(k.__symbolicNatBoolHits??0),0);
+    const declarationTicks={};
+    for(const k of seen){
+      for(const [decl,n] of Object.entries(k.__postSemanticTicks??{}))
+        declarationTicks[decl]=(declarationTicks[decl]??0)+n;
+    }
+    const topDeclarationTicks=Object.entries(declarationTicks)
+      .map(([declaration,ticks])=>({declaration,ticks}))
+      .sort((a,b)=>b.ticks-a.ticks||a.declaration.localeCompare(b.declaration))
+      .slice(0,16);
     attempts.push({
       budget,status:r.status,reason:r.reason??null,steps:r.steps??null,
       frontier:r.frontier_declaration??null,
       symbolic_nat_bool_hits:symbolicHits,
+      top_declaration_ticks:topDeclarationTicks,
       first_rigid:firstRigid,
       last_rigid:lastRigid,
     });
@@ -171,6 +188,7 @@ for(const name of TARGETS){
       name,budget,status:r.status,reason:r.reason??null,steps:r.steps??null,
       frontier:r.frontier_declaration??null,
       symbolicHits,
+      topDeclarationTicks,
       firstRigid,
       lastRigid,
     }));
@@ -181,10 +199,12 @@ for(const name of TARGETS){
 Kernel.prototype.whnf=retainedWhnf;
 Kernel.prototype.equal=retainedEqual;
 Kernel.prototype.run=retainedRun;
+Kernel.prototype.tick=retainedTick;
 
+const terminalFrontiers=rows.map(r=>r.attempts.at(-1)?.frontier??null);
 const report={
-  schema:"deep-list-semantic-repair-v1",
-  candidate:"profile declaration-level tick concentration after the exact symbolic Nat semantic repair",
+  schema:"deep-list-post-semantic-frontier-v1",
+  candidate:"declaration-level tick profile after exact symbolic Nat semantic repair",
   claim_boundary:"Diagnostic-only declaration tick profiling of the previously qualified exact symbolic Nat repair. No new conversion rule, theorem, proof-irrelevance rule, or ACCEPT/REJECT semantic authority is introduced.",
   rows,
   terminal_frontiers:terminalFrontiers,
@@ -195,9 +215,8 @@ const report={
     common_terminal_frontier:terminalFrontiers.length===2&&terminalFrontiers[0]!==null&&terminalFrontiers[0]===terminalFrontiers[1],
   },
 };
-mkdirSync(dirname("genesis/evidence/deep-list-semantic-repair-v1.json"),{recursive:true});
-writeFileSync("genesis/evidence/deep-list-semantic-repair-v1.json",JSON.stringify(report,null,2)+"
-");
-console.log("DEEP_LIST_SEMANTIC_REPAIR_RESULT="+JSON.stringify(report));
+mkdirSync(dirname("genesis/evidence/deep-list-post-semantic-frontier-v1.json"),{recursive:true});
+writeFileSync("genesis/evidence/deep-list-post-semantic-frontier-v1.json",JSON.stringify(report,null,2)+"\n");
+console.log("DEEP_LIST_POST_SEMANTIC_FRONTIER_RESULT="+JSON.stringify(report));
 if(!Object.values(report.gates).every(Boolean))process.exit(1);
-console.log("PASS_DEEP_LIST_SEMANTIC_REPAIR_V1");
+console.log("PASS_DEEP_LIST_POST_SEMANTIC_FRONTIER_V1");
