@@ -1,4 +1,5 @@
 import { Kernel } from "./kernel-base.mjs";
+import {tryCompactNatPrimitive} from "./nat-primitive-compact-scout-v1.mjs";
 
 // Stack safety is an execution property, not a new semantic capability.
 // Replace only structurally recursive traversals with explicit work stacks.
@@ -197,6 +198,13 @@ function fullStackWhnf(term) {
     if(cur[0]==="const") {
       this.tick();
       this.need("declarations");
+      const native=tryCompactNatPrimitive(cur,args);
+      if(native!==null){
+        this.need("nat-literals");this.need("reduction");
+        this.__fullStackNativeNatHits=(this.__fullStackNativeNatHits??0)+1;
+        cur=native;args=[];dirty=true;
+        continue;
+      }
       const d=this.env.get(cur[1]);
       if(!d) this.reject("undeclared-constant");
       if(d.kind==="def") {
@@ -435,6 +443,13 @@ function multiBetaSpineWhnf(kernel,root) {
     if(head[0]==="const") {
       kernel.tick();
       kernel.need("declarations");
+      const native=tryCompactNatPrimitive(head,args);
+      if(native!==null){
+        kernel.need("nat-literals");kernel.need("reduction");
+        kernel.__multiBetaNativeNatHits=(kernel.__multiBetaNativeNatHits??0)+1;
+        state=attach(native,[]);
+        continue;
+      }
       const d=kernel.env.get(head[1]);
       if(!d) kernel.reject("undeclared-constant");
 
