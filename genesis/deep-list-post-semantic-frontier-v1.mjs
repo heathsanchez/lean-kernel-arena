@@ -18,7 +18,8 @@ const BUDGETS=[4_000_000];
 
 const retainedWhnf=Kernel.prototype.whnf;
 const retainedEqual=Kernel.prototype.equal;
-const retainedRun=Kernel.prototype.run;\nconst retainedTick=Kernel.prototype.tick;
+const retainedRun=Kernel.prototype.run;
+const retainedTick=Kernel.prototype.tick;
 Error.stackTraceLimit=80;
 
 function spine(e){
@@ -128,7 +129,8 @@ Kernel.prototype.equal=function(a,b,ctx=[]){
         ctx_depth:ctx.length,
         left:JSON.stringify(a).slice(0,12000),
         right:JSON.stringify(b).slice(0,12000),
-        stack:String(e.stack??"").split("\n").slice(0,80),
+        stack:String(e.stack??"").split("
+").slice(0,80),
       };
       if(this.__semanticRepairFirstRigid===null)this.__semanticRepairFirstRigid=row;
       this.__semanticRepairLastRigid=row;
@@ -194,7 +196,8 @@ const report={
   },
 };
 mkdirSync(dirname("genesis/evidence/deep-list-semantic-repair-v1.json"),{recursive:true});
-writeFileSync("genesis/evidence/deep-list-semantic-repair-v1.json",JSON.stringify(report,null,2)+"\n");
+writeFileSync("genesis/evidence/deep-list-semantic-repair-v1.json",JSON.stringify(report,null,2)+"
+");
 console.log("DEEP_LIST_SEMANTIC_REPAIR_RESULT="+JSON.stringify(report));
 if(!Object.values(report.gates).every(Boolean))process.exit(1);
 console.log("PASS_DEEP_LIST_SEMANTIC_REPAIR_V1");
