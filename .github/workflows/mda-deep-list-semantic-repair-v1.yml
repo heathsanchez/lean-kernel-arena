@@ -6,6 +6,7 @@ on:
     paths:
       - 'genesis/deep-list-rigid-diagnostic-v1.mjs'
       - 'genesis/deep-list-semantic-repair-v1.mjs'
+      - 'genesis/stack-safe.mjs'
       - '.github/workflows/mda-deep-list-semantic-repair-v1.yml'
   workflow_dispatch:
 
