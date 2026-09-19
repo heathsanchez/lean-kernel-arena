@@ -53,7 +53,8 @@ const report={
   claim_boundary:"Diagnostic execution-order scout. It reuses only the already-authorized compact Nat primitive equations and exposes them inside the scoped-beta evaluator before ordinary definition unfolding. It is not a production promotion and does not add Nat.decLt, Decidable, UInt32, Char, or declaration-name semantics.",
   rows,
   gates:{
-    compact_native_dispatch_reached:rows.every(r=>r.attempts.some(a=>a.scoped_native_nat_hits>0)),\n    native_operand_frames_reached:rows.every(r=>r.attempts.some(a=>a.scoped_native_operand_hits>0)),
+    compact_native_dispatch_reached:rows.every(r=>r.attempts.some(a=>a.scoped_native_nat_hits>0)),
+    native_operand_frames_reached:rows.every(r=>r.attempts.some(a=>a.scoped_native_operand_hits>0)),
     no_expected_accept_became_reject:rows.every(r=>!r.attempts.some(a=>a.status==="REJECT")),
     symbolic_repair_still_active:rows.every(r=>r.attempts.some(a=>a.symbolic_nat_bool_hits>0)),
   },
