@@ -100,6 +100,7 @@ p.equal=function(a,b,ctx=[]){
           right_spine_arity:sb.args.length,
           left_json:JSON.stringify(a).slice(0,6000),
           right_json:JSON.stringify(b).slice(0,6000),
+          error_stack:String(e?.stack??"").split("\n").slice(0,24),
         });
       }
     }
