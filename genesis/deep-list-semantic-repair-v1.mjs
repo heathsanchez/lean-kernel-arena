@@ -1,6 +1,6 @@
 import {readFileSync,writeFileSync,mkdirSync} from "node:fs";
 import {dirname,resolve} from "node:path";
-import {Kernel} from "./kernel-base.mjs";
+import {Kernel,Stop,REJECT} from "./kernel-base.mjs";
 import {leanName} from "./name-codec.mjs";
 import * as P from "./production.mjs";
 
@@ -15,6 +15,9 @@ const TARGETS=[
 const BUDGETS=[2_000_000,4_000_000,8_000_000];
 
 const retainedWhnf=Kernel.prototype.whnf;
+const retainedEqual=Kernel.prototype.equal;
+const retainedRun=Kernel.prototype.run;
+Error.stackTraceLimit=80;
 
 function spine(e){
   const args=[];let h=e;
@@ -64,29 +67,70 @@ Kernel.prototype.whnf=function(e){
   return retainedWhnf.call(this,e);
 };
 
+Kernel.prototype.run=function(...args){
+  this.__semanticRepairFirstRigid=null;
+  this.__semanticRepairHits=0;
+  return retainedRun.apply(this,args);
+};
+
+Kernel.prototype.equal=function(a,b,ctx=[]){
+  try{
+    return retainedEqual.call(this,a,b,ctx);
+  }catch(e){
+    if(e instanceof Stop && e.status===REJECT && e.message==="rigid-head-mismatch" &&
+       this.__semanticRepairFirstRigid===null){
+      this.__semanticRepairFirstRigid={
+        step:this.steps,
+        declaration:String(this.currentDeclaration),
+        ctx_depth:ctx.length,
+        left:JSON.stringify(a).slice(0,6000),
+        right:JSON.stringify(b).slice(0,6000),
+        stack:String(e.stack??"").split("\n").slice(0,80),
+      };
+    }
+    throw e;
+  }
+};
+
 const rows=[];
 for(const name of TARGETS){
   const input=readFileSync(resolve("_build/tests",name),"utf8");
   const attempts=[];
   for(const budget of BUDGETS){
-    const r=P.checkExport(input,{
-      semanticBudget:budget,
-      inputBytes:20_000_000,
-      recordLimit:400_000,
-    });
+    const seen=[];
+    const captureRun=Kernel.prototype.run;
+    Kernel.prototype.run=function(...xs){seen.push(this);return captureRun.apply(this,xs);};
+    let r;
+    try{
+      r=P.checkExport(input,{
+        semanticBudget:budget,
+        inputBytes:20_000_000,
+        recordLimit:400_000,
+      });
+    }finally{
+      Kernel.prototype.run=captureRun;
+    }
+    const firstRigid=seen.map(k=>k.__semanticRepairFirstRigid).find(Boolean)??null;
+    const symbolicHits=seen.reduce((n,k)=>n+(k.__symbolicNatBoolHits??0),0);
     attempts.push({
       budget,status:r.status,reason:r.reason??null,steps:r.steps??null,
       frontier:r.frontier_declaration??null,
+      symbolic_nat_bool_hits:symbolicHits,
+      first_rigid:firstRigid,
     });
     console.log("DEEP_LIST_SEMANTIC_REPAIR_ATTEMPT "+JSON.stringify({
       name,budget,status:r.status,reason:r.reason??null,steps:r.steps??null,
       frontier:r.frontier_declaration??null,
+      symbolicHits,
+      firstRigid,
     }));
     if(r.status==="ACCEPT"||r.status==="REJECT")break;
   }
   rows.push({name,attempts});
 }
 Kernel.prototype.whnf=retainedWhnf;
+Kernel.prototype.equal=retainedEqual;
+Kernel.prototype.run=retainedRun;
 
 const report={
   schema:"deep-list-semantic-repair-v1",
