@@ -1,0 +1,91 @@
+name: Substitute generated argument fanout V1
+
+on:
+  push:
+    branches: [mda-substitute-generated-argument-fanout-v1]
+    paths:
+      - 'genesis/exact-binder-transport-layer.mjs'
+      - 'genesis/substitute-generated-argument-fanout-v1.mjs'
+      - '.github/workflows/mda-substitute-generated-argument-fanout-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Protect core regressions
+        run: |
+          node genesis/test.mjs
+          node --test genesis/*.test.mjs
+
+      - name: Retrieve current public Arena corpus
+        run: |
+          mkdir -p _build/tests
+          curl --fail --location --retry 3 https://arena.lean-lang.org/lean-arena-tests.tar.gz -o /tmp/arena.tar.gz
+          python3 - <<'PY'
+          import tarfile,pathlib
+          root=pathlib.Path('_build/tests')
+          with tarfile.open('/tmp/arena.tar.gz','r:gz') as archive:
+              for m in archive:
+                  if not m.isfile() or not m.name.endswith('.ndjson'): continue
+                  parts=pathlib.PurePosixPath(m.name).parts
+                  group=next((i for i,x in enumerate(parts) if x in ('good','bad')),None)
+                  if group is None: continue
+                  name=pathlib.PurePosixPath(*parts[group+1:])
+                  if name.is_absolute() or '..' in name.parts: raise ValueError(m.name)
+                  data=archive.extractfile(m).read()
+                  path=root/name
+                  path.parent.mkdir(parents=True,exist_ok=True)
+                  path.write_bytes(data)
+          PY
+
+      - name: Run substitute-generated fanout diagnostic
+        run: |
+          node --stack-size=32768 genesis/substitute-generated-argument-fanout-v1.mjs             | tee /tmp/substitute-generated-argument-fanout-v1.log
+          grep -q PASS_SUBSTITUTE_GENERATED_ARGUMENT_FANOUT_V1             /tmp/substitute-generated-argument-fanout-v1.log
+
+      - name: Gate fanout evidence
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('genesis/evidence/substitute-generated-argument-fanout-v1.json'))
+          assert r['schema']=='substitute-generated-argument-fanout-v1'
+          assert all(r['gates'].values()),r['gates']
+          assert r['precommit']['realitygraph_commit']=='6842cb48501c6ee40825b70adcf424c68d5a1c4f'
+          assert r['classification'] in {
+              'bilateral-hot-basis',
+              'hot-expression-basis',
+              'hot-argument-basis',
+              'diffuse-cross-product'
+          }
+          print('PASS_SUBSTITUTE_GENERATED_ARGUMENT_FANOUT_V1')
+          print('CLASSIFICATION='+r['classification'])
+          for row in r['rows']:
+              print(row['name'],{
+                  'sampled':row['substitute_fanout_sampled'],
+                  'expression_identities':row['substitute_expression_identity_count'],
+                  'argument_identities':row['substitute_argument_identity_count'],
+                  'top32_expression_coverage':row['substitute_top32_expression_coverage'],
+                  'top32_argument_coverage':row['substitute_top32_argument_coverage'],
+                  'top_expressions':row['substitute_top_expression_counts'][:8],
+                  'top_arguments':row['substitute_top_argument_counts'][:8],
+              })
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: substitute-generated-argument-fanout-v1
+          path: |
+            genesis/evidence/substitute-generated-argument-fanout-v1.json
+            /tmp/substitute-generated-argument-fanout-v1.log
+          if-no-files-found: error
