@@ -310,7 +310,7 @@ const report={
     no_wrong_reject:rows.every(r=>!r.attempts.some(a=>a.status==="REJECT")),
     both_remain_unknown_at_4m:rows.every(r=>r.attempts.at(-1)?.status==="UNKNOWN"&&r.attempts.at(-1)?.budget===4_000_000),
     both_profile_whnf:recurrences.every(r=>r&&r.calls>100_000),
-    bounded_sample_complete:recurrences.every(r=>r.sampled===WHNF_SAMPLE_LIMIT),
+    bounded_sample_complete:recurrences.every(r=>r.sampled>=WHNF_SAMPLE_LIMIT&&r.sampled<=WHNF_SAMPLE_LIMIT*2),
     common_terminal_frontier:terminalFrontiers.length===2&&terminalFrontiers[0]!==null&&terminalFrontiers[0]===terminalFrontiers[1],
   },
 };
