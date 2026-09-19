@@ -55,6 +55,10 @@ jobs:
         run: |
           node --stack-size=32768 genesis/deep-list-native-nat-dispatch-scout-v1.mjs | tee /tmp/deep-list-native-nat-dispatch-scout-v1.log
           grep -q PASS_DEEP_LIST_NATIVE_NAT_DISPATCH_SCOUT_V1 /tmp/deep-list-native-nat-dispatch-scout-v1.log
+      - name: Reprofile isValidChar after native Nat dispatch
+        run: |
+          node --stack-size=32768 genesis/deep-list-isvalidchar-frontier-v1.mjs | tee /tmp/deep-list-isvalidchar-after-native.log
+          grep -q PASS_DEEP_LIST_ISVALIDCHAR_FRONTIER_V1 /tmp/deep-list-isvalidchar-after-native.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -62,4 +66,6 @@ jobs:
           path: |
             genesis/evidence/deep-list-native-nat-dispatch-scout-v1.json
             /tmp/deep-list-native-nat-dispatch-scout-v1.log
+            genesis/evidence/deep-list-isvalidchar-frontier-v1.json
+            /tmp/deep-list-isvalidchar-after-native.log
           if-no-files-found: warn
