@@ -1,0 +1,72 @@
+name: Lean deep-list native Nat operands V1
+
+on:
+  push:
+    branches: [mda-deep-list-native-nat-operands-v1]
+    paths:
+      - 'genesis/nat-primitive-compact-scout-v1.mjs'
+      - 'genesis/scoped-beta-spine.mjs'
+      - 'genesis/deep-list-symbolic-nat-layer-v1.mjs'
+      - 'genesis/deep-list-native-nat-dispatch-scout-v1.mjs'
+      - 'genesis/deep-list-isvalidchar-frontier-v1.mjs'
+      - '.github/workflows/mda-deep-list-native-nat-operands-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Protect core regressions
+        run: |
+          node genesis/test.mjs
+          node --test genesis/*.test.mjs
+      - name: Retrieve current public Arena corpus
+        run: |
+          mkdir -p _build/tests
+          curl --fail --location --retry 3 https://arena.lean-lang.org/lean-arena-tests.tar.gz -o /tmp/arena.tar.gz
+          python3 - <<'PY'
+          import tarfile,pathlib,json,hashlib
+          root=pathlib.Path('_build/tests')
+          rows=[]
+          with tarfile.open('/tmp/arena.tar.gz','r:gz') as archive:
+              for m in archive:
+                  if not m.isfile() or not m.name.endswith('.ndjson'): continue
+                  parts=pathlib.PurePosixPath(m.name).parts
+                  group=next((i for i,x in enumerate(parts) if x in ('good','bad')),None)
+                  if group is None: continue
+                  name=pathlib.PurePosixPath(*parts[group+1:])
+                  if name.is_absolute() or '..' in name.parts: raise ValueError(m.name)
+                  data=archive.extractfile(m).read()
+                  path=root/name
+                  path.parent.mkdir(parents=True,exist_ok=True)
+                  path.write_bytes(data)
+                  rows.append(dict(name=str(name),expected='ACCEPT' if parts[group]=='good' else 'REJECT',bytes=len(data),sha256=hashlib.sha256(data).hexdigest()))
+          (root/'manifest.json').write_text(json.dumps(rows,indent=2))
+          print('ARENA_CASES='+str(len(rows)))
+          PY
+      - name: Run native Nat operand-frame probe
+        run: |
+          node --stack-size=32768 genesis/deep-list-native-nat-dispatch-scout-v1.mjs | tee /tmp/deep-list-native-nat-operands-v1.log
+          grep -q PASS_DEEP_LIST_NATIVE_NAT_DISPATCH_SCOUT_V1 /tmp/deep-list-native-nat-operands-v1.log
+      - name: Reprofile isValidChar after operand frames
+        run: |
+          node --stack-size=32768 genesis/deep-list-isvalidchar-frontier-v1.mjs | tee /tmp/deep-list-isvalidchar-native-operands-v1.log
+          grep -q PASS_DEEP_LIST_ISVALIDCHAR_FRONTIER_V1 /tmp/deep-list-isvalidchar-native-operands-v1.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lean-deep-list-native-nat-operands-v1
+          path: |
+            genesis/evidence/deep-list-native-nat-dispatch-scout-v1.json
+            genesis/evidence/deep-list-isvalidchar-frontier-v1.json
+            /tmp/deep-list-native-nat-operands-v1.log
+            /tmp/deep-list-isvalidchar-native-operands-v1.log
+          if-no-files-found: warn
