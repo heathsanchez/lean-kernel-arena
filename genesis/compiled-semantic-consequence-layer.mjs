@@ -1,6 +1,25 @@
-import {Kernel} from "./kernel-base.mjs";
+import {Kernel} from "./kernel-base.mjs";\nimport {leanName} from "./name-codec.mjs";
 
 const p=Kernel.prototype;
+const N=leanName;
+const LE_LE=N("LE","le"),NAT=N("Nat"),INST_LE_NAT=N("instLENat"),NAT_LE=N("Nat","le");
+const DIRECT_NAT_LE_ENV="LEAN_DIRECT_NAT_LE_TRANSITION_V1";
+
+function spine(e){
+  const args=[];let h=e;
+  while(Array.isArray(h)&&h[0]==="app"){args.push(h[2]);h=h[1];}
+  args.reverse();return {h,args};
+}
+function isConst(e,name){return Array.isArray(e)&&e[0]==="const"&&e[1]===name;}
+function directNatLeTransition(k,e){
+  if(process.env[DIRECT_NAT_LE_ENV]!=="1"||!Array.isArray(e)||e[0]!=="app")return null;
+  const {h,args}=spine(e);
+  if(!(h?.[0]==="const"&&h[1]===LE_LE&&Array.isArray(h[2])&&h[2].length===1&&h[2][0]===0))return null;
+  if(args.length<2||!isConst(args[0],NAT)||!isConst(args[1],INST_LE_NAT))return null;
+  let out=["const",NAT_LE];
+  for(const arg of args.slice(2))out=k.make("app",out,arg);
+  return out;
+}
 const run0=p.run,whnf0=p.whnf,normal0=p.normal,same0=p.same,proofType0=p.proofType,equal0=p.equal,inst0=p.instantiateDeclaration;
 const NULL=Symbol("null-proof-type");
 
@@ -14,7 +33,7 @@ function reset(k){
   k.__semObjIds=new WeakMap();
   k.__semNextObjId=1;
   k.__semStats={whnfHits:0,whnfStores:0,normalHits:0,normalStores:0,sameHits:0,sameStores:0,
-    proofHits:0,proofStores:0,equalHits:0,equalStores:0,instHits:0,instStores:0};
+    proofHits:0,proofStores:0,equalHits:0,equalStores:0,instHits:0,instStores:0,directNatLeHits:0};
 }
 function ensure(k){if(!k.__semStats)reset(k);}
 function objId(k,x){
@@ -41,6 +60,12 @@ p.run=function(...args){reset(this);return run0.apply(this,args);};
 
 p.whnf=function(e){
   ensure(this);
+  const direct=directNatLeTransition(this,e);
+  if(direct!==null){
+    this.tick();this.need("reduction");this.need("declarations");
+    this.__semStats.directNatLeHits++;
+    return direct;
+  }
   if(this.localDefs===true||!Array.isArray(e))return whnf0.call(this,e);
   const old=this.__semWhnf.get(e);
   if(old!==undefined){this.__semStats.whnfHits++;return old;}
