@@ -1,27 +1,25 @@
 description: |
-  MathGraph explores a verifier-guided approach to machine reasoning: treat
-  failed or inefficient attempts as structured residuals rather than discarded
-  search.
+  MathGraph's Lean checker is a testbed for verifier-preserving checker
+  development. It is gratefully based on Jeremy Chen's
+  [sokonanoda](https://github.com/intgrah/sokonanoda), itself part of the
+  nanoda-family lineage.
 
-  Each residual asks: what is the minimal refinement of the current
-  representation needed to eliminate it? Candidate refinements are tested by
-  external verification; those that survive become reusable constraints, while
-  counterexamples refine the remaining search space.
+  At present MathGraph remains close to sokonanoda; it is not an independent
+  rewrite, and no such claim is intended. The retained MathGraph line includes
+  additional recursor validation for newer Arena tests, repairs to deep
+  environment keying and pruning, targeted unfolding and conversion
+  optimizations, and removal of redundant work found through profiling and
+  differential testing.
 
-  This checker applies that process to a fork of
-  [sokonanoda](https://github.com/intgrah/sokonanoda). Arena profiling exposed
-  concentrated cost in environment handling; controlled intervention and
-  ablation isolated the retained optimizations. Changes that improved local
-  measurements but failed the full semantic gate were discarded.
+  This revision additionally avoids forcing an inferred function type when it
+  is already a Pi type, and uses two worker threads. A larger architectural
+  rewrite is future work rather than something claimed by this submission.
 
-  residual → conjecture → minimal refinement → verification → retained
-  constraint → new residual
-
-  Developed by [Metalogic Labs](https://mathgraph.org/).
-version: "dulce-de-leche"
+  Maintained by [Metalogic Labs](https://mathgraph.org/).
+version: "flash"
 url: https://github.com/metalogiclabs/mathgraph-lean-kernel
-ref: dulce-de-leche
-rev: d6a73279e6765e637f9741180cefbd7ef957d8e5
+ref: flash-2-inferpi-thread2-candidate-v1
+rev: 78c7502bac8a5ba000057b3f083bc0595ac65750
 build: |
   cat > config.json <<__END__
    {
@@ -30,7 +28,7 @@ build: |
      "string_extension": true,
      "unpermitted_axiom_hard_error": false,
      "unsafe_permit_all_axioms": true,
-     "num_threads": 4
+     "num_threads": 2
    }
   __END__
   ROOT=$(cd ../../../.. && pwd)
