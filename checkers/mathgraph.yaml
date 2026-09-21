@@ -18,7 +18,7 @@ description: |
   Maintained by [Metalogic Labs](https://mathgraph.org/).
 version: "flash"
 url: https://github.com/metalogiclabs/mathgraph-lean-kernel
-ref: flash-2-inferpi-thread2-candidate-v1
+ref: flash
 rev: 78c7502bac8a5ba000057b3f083bc0595ac65750
 build: |
   cat > config.json <<__END__
